@@ -264,7 +264,11 @@ git commit -m "chore: set up Spring Boot backend skeleton"
 - Create: `backend/src/main/java/com/valuescreener/portfolio/PortfolioPosition.java`
 
 **Interfaces:**
-- Produces: `PortfolioPosition` — Konstruktor `PortfolioPosition(String ticker, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate)`, Getter `getId()`, `getTicker()`, `getQuantity()`, `getEntryPrice()`, `getPurchaseDate()`. Wirft `IllegalArgumentException` bei ungültigen Werten.
+- Produces: `PortfolioPosition` — Konstruktor `PortfolioPosition(String ticker, String isin, String companyName, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate)`, Getter `getId()`, `getTicker()`, `getIsin()`, `getCompanyName()`, `getQuantity()`, `getEntryPrice()`, `getPurchaseDate()`. Wirft `IllegalArgumentException` bei ungültigen Werten.
+
+`companyName` wird manuell beim Anlegen der Position eingegeben (kein externer Datenanbieter-Call in Phase 1). Grund: Der Ticker allein ist für Menschen nicht lesbar ("AAPL" sagt nicht sofort "Apple") — das ist kein Privatsphäre-Thema (der Firmenname zu einem Ticker ist ohnehin öffentlich bekannt), sondern reine Usability. Betrifft nur Stückzahl/Einstiegspreis/Kaufdatum, die weiterhin nie öffentlich angezeigt werden (Design-Spec Abschnitt 9).
+
+`isin` wird ebenfalls manuell eingegeben und ist die **eigentliche eindeutige Kennung** einer Position — Ticker sind exchange-spezifisch und nicht global eindeutig (dasselbe Symbol kann je nach Börse unterschiedliche Wertpapiere meinen). Deshalb wandert die Eindeutigkeitsbeschränkung in der DB von `ticker` auf `isin` (siehe Task 3). Der Ticker bleibt zusätzlich als eigenes Feld bestehen, weil die Screening-Pipeline (Phase 2) den Datenanbieter ticker-basiert abfragt. Validiert wird nur das Format (`[A-Z]{2}[A-Z0-9]{9}[0-9]`, 12 Zeichen) — die volle ISIN-Prüfziffernberechnung ist für die MVP-Phase bewusst nicht implementiert (Overengineering für den aktuellen Nutzen). ISIN bleibt eine reine Backend-/Admin-Angabe und wird in der öffentlichen Ansicht nicht angezeigt (die zeigt weiterhin nur Ticker + Firmenname, Task 9).
 
 - [ ] **Step 1: Fehlschlagenden Test schreiben**
 
@@ -284,17 +288,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PortfolioPositionTest {
 
     @Test
-    void createsPositionWithNormalizedUppercaseTicker() {
+    void createsPositionWithNormalizedUppercaseTickerAndIsin() {
         PortfolioPosition position = new PortfolioPosition(
-                "aapl", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+                "aapl", "us0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
 
         assertThat(position.getTicker()).isEqualTo("AAPL");
+        assertThat(position.getIsin()).isEqualTo("US0378331005");
+        assertThat(position.getCompanyName()).isEqualTo("Apple Inc.");
     }
 
     @Test
     void rejectsBlankTicker() {
         assertThatThrownBy(() -> new PortfolioPosition(
-                "  ", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
+                "  ", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ticker");
     }
@@ -302,15 +308,39 @@ class PortfolioPositionTest {
     @Test
     void rejectsTickerLongerThanTenCharacters() {
         assertThatThrownBy(() -> new PortfolioPosition(
-                "TOOLONGTICKER", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
+                "TOOLONGTICKER", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ticker");
     }
 
     @Test
+    void rejectsBlankIsin() {
+        assertThatThrownBy(() -> new PortfolioPosition(
+                "AAPL", "  ", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isin");
+    }
+
+    @Test
+    void rejectsMalformedIsin() {
+        assertThatThrownBy(() -> new PortfolioPosition(
+                "AAPL", "NOT-AN-ISIN", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isin");
+    }
+
+    @Test
+    void rejectsBlankCompanyName() {
+        assertThatThrownBy(() -> new PortfolioPosition(
+                "AAPL", "US0378331005", "  ", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("companyName");
+    }
+
+    @Test
     void rejectsZeroOrNegativeQuantity() {
         assertThatThrownBy(() -> new PortfolioPosition(
-                "AAPL", BigDecimal.ZERO, new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
+                "AAPL", "US0378331005", "Apple Inc.", BigDecimal.ZERO, new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("quantity");
     }
@@ -318,7 +348,7 @@ class PortfolioPositionTest {
     @Test
     void rejectsZeroOrNegativeEntryPrice() {
         assertThatThrownBy(() -> new PortfolioPosition(
-                "AAPL", new BigDecimal("10"), BigDecimal.ZERO, LocalDate.of(2026, 1, 15)))
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), BigDecimal.ZERO, LocalDate.of(2026, 1, 15)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("entryPrice");
     }
@@ -326,7 +356,7 @@ class PortfolioPositionTest {
     @Test
     void rejectsNullPurchaseDate() {
         assertThatThrownBy(() -> new PortfolioPosition(
-                "AAPL", new BigDecimal("10"), new BigDecimal("150.00"), null))
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), null))
                 .isInstanceOf(NullPointerException.class);
     }
 }
@@ -354,6 +384,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 @Entity
 @Table(name = "portfolio_position")
@@ -363,8 +394,14 @@ public class PortfolioPosition {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 10)
+    @Column(nullable = false, length = 10)
     private String ticker;
+
+    @Column(nullable = false, unique = true, length = 12)
+    private String isin;
+
+    @Column(name = "company_name", nullable = false, length = 200)
+    private String companyName;
 
     @Column(nullable = false)
     private BigDecimal quantity;
@@ -379,8 +416,12 @@ public class PortfolioPosition {
         // JPA
     }
 
-    public PortfolioPosition(String ticker, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate) {
+    private static final Pattern ISIN_PATTERN = Pattern.compile("[A-Z]{2}[A-Z0-9]{9}[0-9]");
+
+    public PortfolioPosition(String ticker, String isin, String companyName, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate) {
         this.ticker = requireValidTicker(ticker);
+        this.isin = requireValidIsin(isin);
+        this.companyName = requireNonBlank(companyName, "companyName");
         this.quantity = requirePositive(quantity, "quantity");
         this.entryPrice = requirePositive(entryPrice, "entryPrice");
         this.purchaseDate = Objects.requireNonNull(purchaseDate, "purchaseDate must not be null");
@@ -397,6 +438,24 @@ public class PortfolioPosition {
         return normalized;
     }
 
+    private static String requireValidIsin(String isin) {
+        if (isin == null || isin.isBlank()) {
+            throw new IllegalArgumentException("isin must not be blank");
+        }
+        String normalized = isin.trim().toUpperCase();
+        if (!ISIN_PATTERN.matcher(normalized).matches()) {
+            throw new IllegalArgumentException("isin must be a valid 12-character ISIN");
+        }
+        return normalized;
+    }
+
+    private static String requireNonBlank(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return value.trim();
+    }
+
     private static BigDecimal requirePositive(BigDecimal value, String fieldName) {
         if (value == null || value.signum() <= 0) {
             throw new IllegalArgumentException(fieldName + " must be positive");
@@ -410,6 +469,14 @@ public class PortfolioPosition {
 
     public String getTicker() {
         return ticker;
+    }
+
+    public String getIsin() {
+        return isin;
+    }
+
+    public String getCompanyName() {
+        return companyName;
     }
 
     public BigDecimal getQuantity() {
@@ -429,7 +496,7 @@ public class PortfolioPosition {
 - [ ] **Step 4: Test ausführen, Erfolg bestätigen**
 
 Run: `cd backend && mvn test -Dtest=PortfolioPositionTest`
-Erwartet: PASS (alle 6 Tests grün).
+Erwartet: PASS (alle 9 Tests grün).
 
 - [ ] **Step 5: Commit**
 
@@ -458,7 +525,9 @@ git commit -m "feat: add PortfolioPosition aggregate with validated invariants"
 ```sql
 CREATE TABLE portfolio_position (
     id BIGSERIAL PRIMARY KEY,
-    ticker VARCHAR(10) NOT NULL UNIQUE,
+    ticker VARCHAR(10) NOT NULL,
+    isin VARCHAR(12) NOT NULL UNIQUE,
+    company_name VARCHAR(200) NOT NULL,
     quantity NUMERIC(20, 6) NOT NULL,
     entry_price NUMERIC(20, 6) NOT NULL,
     purchase_date DATE NOT NULL
@@ -507,7 +576,7 @@ class PortfolioPositionRepositoryTest {
     @Test
     void savesAndFindsPositionByTicker() {
         repository.save(new PortfolioPosition(
-                "MSFT", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1)));
+                "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1)));
 
         assertThat(repository.findByTicker("MSFT")).isPresent();
     }
@@ -565,7 +634,9 @@ git commit -m "feat: add portfolio_position table and repository"
 
 **Interfaces:**
 - Consumes: `PortfolioPosition`, `PortfolioPositionRepository` (Task 2, 3).
-- Produces: `AddPortfolioPositionRequest(String ticker, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate)`, `PublicPortfolioPositionView(String ticker)`, `PortfolioService` mit `void addPosition(AddPortfolioPositionRequest request)` und `List<PublicPortfolioPositionView> listPublicPositions()` — beide werden von `PortfolioController` (Task 5) konsumiert.
+- Produces: `AddPortfolioPositionRequest(String ticker, String isin, String companyName, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate)`, `PublicPortfolioPositionView(String ticker, String companyName)`, `PortfolioService` mit `void addPosition(AddPortfolioPositionRequest request)` und `List<PublicPortfolioPositionView> listPublicPositions()` — beide werden von `PortfolioController` (Task 5) konsumiert.
+
+`isin` fließt in `AddPortfolioPositionRequest` mit ein (Pflichtfeld, `@NotBlank`), taucht aber bewusst NICHT in `PublicPortfolioPositionView` auf — die öffentliche Ansicht bleibt bei Ticker + Firmenname (siehe Task-2-Begründung oben).
 
 - [ ] **Step 1: Request- und View-DTOs anlegen**
 
@@ -583,6 +654,8 @@ import java.time.LocalDate;
 
 public record AddPortfolioPositionRequest(
         @NotBlank String ticker,
+        @NotBlank String isin,
+        @NotBlank String companyName,
         @NotNull @Positive BigDecimal quantity,
         @NotNull @Positive BigDecimal entryPrice,
         @NotNull LocalDate purchaseDate
@@ -595,7 +668,7 @@ public record AddPortfolioPositionRequest(
 ```java
 package com.valuescreener.portfolio;
 
-public record PublicPortfolioPositionView(String ticker) {
+public record PublicPortfolioPositionView(String ticker, String companyName) {
 }
 ```
 
@@ -630,25 +703,27 @@ class PortfolioServiceTest {
     void addPositionSavesNormalizedPosition() {
         PortfolioService service = new PortfolioService(repository);
         AddPortfolioPositionRequest request = new AddPortfolioPositionRequest(
-                "aapl", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+                "aapl", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
 
         service.addPosition(request);
 
         ArgumentCaptor<PortfolioPosition> captor = ArgumentCaptor.forClass(PortfolioPosition.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getTicker()).isEqualTo("AAPL");
+        assertThat(captor.getValue().getIsin()).isEqualTo("US0378331005");
+        assertThat(captor.getValue().getCompanyName()).isEqualTo("Apple Inc.");
     }
 
     @Test
-    void listPublicPositionsExposesOnlyTicker() {
+    void listPublicPositionsExposesTickerAndCompanyName() {
         PortfolioService service = new PortfolioService(repository);
         PortfolioPosition position = new PortfolioPosition(
-                "MSFT", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
+                "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
         when(repository.findAll()).thenReturn(List.of(position));
 
         List<PublicPortfolioPositionView> result = service.listPublicPositions();
 
-        assertThat(result).containsExactly(new PublicPortfolioPositionView("MSFT"));
+        assertThat(result).containsExactly(new PublicPortfolioPositionView("MSFT", "Microsoft Corp."));
     }
 }
 ```
@@ -680,13 +755,13 @@ public class PortfolioService {
 
     public void addPosition(AddPortfolioPositionRequest request) {
         PortfolioPosition position = new PortfolioPosition(
-                request.ticker(), request.quantity(), request.entryPrice(), request.purchaseDate());
+                request.ticker(), request.isin(), request.companyName(), request.quantity(), request.entryPrice(), request.purchaseDate());
         repository.save(position);
     }
 
     public List<PublicPortfolioPositionView> listPublicPositions() {
         return repository.findAll().stream()
-                .map(position -> new PublicPortfolioPositionView(position.getTicker()))
+                .map(position -> new PublicPortfolioPositionView(position.getTicker(), position.getCompanyName()))
                 .toList();
     }
 }
@@ -751,11 +826,11 @@ class PortfolioControllerTest {
     @Test
     void returnsPublicPositionsAsJson() throws Exception {
         when(portfolioService.listPublicPositions())
-                .thenReturn(List.of(new PublicPortfolioPositionView("AAPL")));
+                .thenReturn(List.of(new PublicPortfolioPositionView("AAPL", "Apple Inc.")));
 
         mockMvc.perform(get("/api/portfolio/public"))
                 .andExpect(status().isOk())
-                .andExpect(content().json("[{\"ticker\":\"AAPL\"}]"));
+                .andExpect(content().json("[{\"ticker\":\"AAPL\",\"companyName\":\"Apple Inc.\"}]"));
     }
 
     @Test
@@ -763,7 +838,7 @@ class PortfolioControllerTest {
         mockMvc.perform(post("/api/portfolio")
                         .contentType("application/json")
                         .content("""
-                                {"ticker":"AAPL","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
                                 """))
                 .andExpect(status().isCreated());
     }
@@ -773,7 +848,7 @@ class PortfolioControllerTest {
         mockMvc.perform(post("/api/portfolio")
                         .contentType("application/json")
                         .content("""
-                                {"ticker":"","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
+                                {"ticker":"","isin":"US0378331005","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
                                 """))
                 .andExpect(status().isBadRequest());
     }
@@ -907,7 +982,7 @@ class PortfolioSecurityTest {
         mockMvc.perform(post("/api/portfolio")
                         .contentType("application/json")
                         .content("""
-                                {"ticker":"AAPL","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
                                 """))
                 .andExpect(status().isUnauthorized());
     }
@@ -918,7 +993,7 @@ class PortfolioSecurityTest {
                         .with(SecurityMockMvcRequestPostProcessors.httpBasic("admin", "test-password"))
                         .contentType("application/json")
                         .content("""
-                                {"ticker":"AAPL","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
                                 """))
                 .andExpect(status().isCreated());
     }
@@ -1308,7 +1383,7 @@ git commit -m "feat: add mandatory disclaimer footer"
 - Create: `frontend/src/pages/PortfolioPage.test.tsx`
 
 **Interfaces:**
-- Produces: `fetchPublicPositions(): Promise<PublicPosition[]>`, `PublicPosition { ticker: string }` (aus `src/api/portfolioApi.ts`, wird in Task 10 erweitert). `PortfolioPage`-Komponente (Named Export), wird in Task 12 von `App.tsx` eingebunden.
+- Produces: `fetchPublicPositions(): Promise<PublicPosition[]>`, `PublicPosition { ticker: string; companyName: string }` (aus `src/api/portfolioApi.ts`, wird in Task 10 erweitert). `PortfolioPage`-Komponente (Named Export), wird in Task 12 von `App.tsx` eingebunden.
 
 - [ ] **Step 1: API-Client anlegen**
 
@@ -1317,6 +1392,7 @@ git commit -m "feat: add mandatory disclaimer footer"
 ```ts
 export interface PublicPosition {
   ticker: string
+  companyName: string
 }
 
 export async function fetchPublicPositions(): Promise<PublicPosition[]> {
@@ -1342,16 +1418,19 @@ describe('PortfolioPage', () => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('renders public tickers returned by the backend', async () => {
+  it('renders public tickers and company names returned by the backend', async () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
-      json: async () => [{ ticker: 'AAPL' }, { ticker: 'MSFT' }],
+      json: async () => [
+        { ticker: 'AAPL', companyName: 'Apple Inc.' },
+        { ticker: 'MSFT', companyName: 'Microsoft Corp.' },
+      ],
     })
 
     render(<PortfolioPage />)
 
-    expect(await screen.findByText('AAPL')).toBeInTheDocument()
-    expect(await screen.findByText('MSFT')).toBeInTheDocument()
+    expect(await screen.findByText('Apple Inc. (AAPL)')).toBeInTheDocument()
+    expect(await screen.findByText('Microsoft Corp. (MSFT)')).toBeInTheDocument()
   })
 
   it('shows an error message when the request fails', async () => {
@@ -1400,7 +1479,7 @@ export function PortfolioPage() {
       <h1>Mein Portfolio</h1>
       <ul>
         {positions.map((position) => (
-          <li key={position.ticker}>{position.ticker}</li>
+          <li key={position.ticker}>{position.companyName} ({position.ticker})</li>
         ))}
       </ul>
     </section>
@@ -1442,6 +1521,7 @@ git commit -m "feat: display public portfolio ticker list"
 ```ts
 export interface PublicPosition {
   ticker: string
+  companyName: string
 }
 
 export async function fetchPublicPositions(): Promise<PublicPosition[]> {
@@ -1454,6 +1534,8 @@ export async function fetchPublicPositions(): Promise<PublicPosition[]> {
 
 export interface AddPositionInput {
   ticker: string
+  isin: string
+  companyName: string
   quantity: number
   entryPrice: number
   purchaseDate: string
@@ -1503,6 +1585,8 @@ describe('AddPositionForm', () => {
     render(<AddPositionForm credentials={credentials} onAdded={onAdded} />)
 
     fireEvent.change(screen.getByLabelText('Ticker'), { target: { value: 'aapl' } })
+    fireEvent.change(screen.getByLabelText('ISIN'), { target: { value: 'US0378331005' } })
+    fireEvent.change(screen.getByLabelText('Unternehmensname'), { target: { value: 'Apple Inc.' } })
     fireEvent.change(screen.getByLabelText('Stückzahl'), { target: { value: '10' } })
     fireEvent.change(screen.getByLabelText('Einstiegspreis'), { target: { value: '150' } })
     fireEvent.change(screen.getByLabelText('Kaufdatum'), { target: { value: '2026-01-15' } })
@@ -1573,6 +1657,8 @@ interface AddPositionFormProps {
 
 export function AddPositionForm({ credentials, onAdded }: AddPositionFormProps) {
   const [ticker, setTicker] = useState('')
+  const [isin, setIsin] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [entryPrice, setEntryPrice] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
@@ -1584,11 +1670,15 @@ export function AddPositionForm({ credentials, onAdded }: AddPositionFormProps) 
     try {
       await addPosition(credentials, {
         ticker,
+        isin,
+        companyName,
         quantity: Number(quantity),
         entryPrice: Number(entryPrice),
         purchaseDate,
       })
       setTicker('')
+      setIsin('')
+      setCompanyName('')
       setQuantity('')
       setEntryPrice('')
       setPurchaseDate('')
@@ -1603,6 +1693,14 @@ export function AddPositionForm({ credentials, onAdded }: AddPositionFormProps) 
       <label>
         Ticker
         <input value={ticker} onChange={(e) => setTicker(e.target.value)} />
+      </label>
+      <label>
+        ISIN
+        <input value={isin} onChange={(e) => setIsin(e.target.value)} />
+      </label>
+      <label>
+        Unternehmensname
+        <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
       </label>
       <label>
         Stückzahl
@@ -1662,7 +1760,7 @@ export function PortfolioPage() {
       <h1>Mein Portfolio</h1>
       <ul>
         {positions.map((position) => (
-          <li key={position.ticker}>{position.ticker}</li>
+          <li key={position.ticker}>{position.companyName} ({position.ticker})</li>
         ))}
       </ul>
       {credentials ? (
