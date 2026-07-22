@@ -45,18 +45,89 @@ Fortschritt wird in `.superpowers/sdd/progress.md` (im Projektordner, git-ignore
 
 ### Stand der Umsetzung
 
-- **Task 1 (Backend-Projekt-Grundgerüst): fertig implementiert, geprüft (Review: Approved,
-  keine Critical/Important-Findings) und vom Nutzer selbst committet.**
-- Dabei aufgetretenes und gelöstes Umgebungsproblem: Testcontainers 1.x ist mit der lokalen
-  Docker-Engine-Version in diesem WSL-Setup inkompatibel (bekannter Upstream-Bug). Fix:
-  `backend/src/test/resources/docker-java.properties` mit `api.version=1.44` — siehe Projekt-Memory
-  "WSL Docker/Testcontainers fix" für Details, falls das bei Alpine Guide wieder auftaucht.
-- **Kosmetisch offen (nicht blockierend):** Branch heißt noch `master`, nicht `main`
-  (`git branch -m main`, jederzeit vom Nutzer nachholbar).
-- **Repo ist noch privat/lokal** (kein `git remote`) — vor dem ersten Push auf GitHub muss die
-  Historie frei von persönlichen Daten sein (siehe Hinweis unten zum öffentlichen Repo).
-- **Nächster Schritt bei Wiederaufnahme:** Task 2 (PortfolioPosition-Domänen-Aggregat) erklären und
-  per Subagent umsetzen lassen — siehe Plan-Datei.
+- **Repo ist live auf GitHub:** `https://github.com/BenjaminS01/value-screener`, Branch `main`,
+  sauberer Working Tree, lokal und remote synchron.
+- **Task 1 (Backend-Projekt-Grundgerüst): fertig, geprüft (Approved), committet und gepusht.**
+  Dabei gelöstes Umgebungsproblem: Testcontainers 1.x ist mit der lokalen Docker-Engine-Version in
+  diesem WSL-Setup inkompatibel. Fix: `backend/src/test/resources/docker-java.properties` mit
+  `api.version=1.44` — siehe Projekt-Memory "WSL Docker/Testcontainers fix", falls das bei Alpine
+  Guide wieder auftaucht.
+- **Task 2 (PortfolioPosition-Domänen-Aggregat): fertig, geprüft (Approved), committet und gepusht**
+  (Commit `ca13802`, "add PortfolioPosition aggregate with ticker, ISIN and company name
+  invariants"). Während der Umsetzung zwei vom Nutzer entschiedene Scope-Erweiterungen gegenüber
+  dem ursprünglichen Plan:
+  - **`companyName`** ergänzt — Ticker allein ist für Menschen nicht lesbar; manuell einzugeben
+    (kein Datenanbieter-Call in Phase 1), keine Privatsphäre-Implikation.
+  - **`isin`** ergänzt und zur **eindeutigen Kennung** gemacht (Unique-Constraint von `ticker` auf
+    `isin` verschoben) — Ticker sind exchange-spezifisch nicht global eindeutig, relevant weil der
+    Nutzer weltweit Aktien hält (Kauf i. d. R. über Gettex). Ticker bleibt zusätzlich bestehen, da
+    die Screening-Pipeline (Phase 2) den Datenanbieter ticker-basiert abfragt. ISIN-Format wird
+    validiert (Regex, kein Prüfziffern-Check — bewusst kein Overengineering für MVP), bleibt
+    Backend-/Admin-only, taucht nicht in der öffentlichen Ansicht auf.
+  - Finaler Konstruktor: `PortfolioPosition(String ticker, String isin, String companyName,
+    BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate)`.
+  - Der Plan (`docs/superpowers/plans/2026-07-21-phase1-portfolio-foundation.md`) wurde für Tasks
+    2–6, 9, 10 konsistent mit-aktualisiert (Migration, DTOs, Service, Controller-/Security-Tests,
+    Frontend-Formular) — Task 3 kann direkt aus dem Plan umgesetzt werden, ohne weitere Anpassung.
+- **Nächster Schritt bei Wiederaufnahme:** Task 3 (PortfolioPositionRepository + Flyway-Migration)
+  erklären und per Subagent umsetzen lassen — siehe Plan-Datei. Das MCP-Nebenthema (siehe unten)
+  ist bewusst pausiert und nicht Teil dieses nächsten Schritts.
+
+## Nebenthema: MCP (Model Context Protocol) — Lernthema, pausiert
+
+Der Nutzer möchte sich neben der eigentlichen Implementierung auch praktisch mit MCP weiterbilden,
+mit diesem Projekt als Lernvehikel (passt zum in der Idee genannten Zweck als AWS/KI-Lernvehikel).
+Besprochener Fahrplan, noch nicht fortgesetzt:
+
+1. **Einstieg (begonnen):** MCP zunächst rein als Dev-Tooling in der Claude-Code-Session ausprobieren
+   — ein Postgres-MCP-Server gegen die lokale DB, um das Client/Server/Tool-Call-Konzept ohne
+   App-Code-Änderung zu verstehen. Dafür wurde ein **Wegwerf-Docker-Container** `value-screener-postgres`
+   gestartet (Postgres 16, DB/User/Passwort `value_screener`, Port 5432 — passend zu
+   `backend/src/main/resources/application.yml`). **Wichtig:** Das ist nicht das offizielle
+   Docker-Compose-Setup aus Task 9 des Implementierungsplans — beides bewusst getrennt halten. Der
+   Container war zum Stand dieses Updates noch nicht mit dem MCP-Postgres-Server verbunden; die DB
+   ist leer, da Flyway-Migrationen erst mit Task 3 entstehen.
+2. **Später, für Phase 2 vorgemerkt (Screening Engine / AI Assessor):**
+   - Eigener MCP-Server, der den Data-Provider-Client (Fundamentaldaten-Anbieter) kapselt, mit Tools
+     wie `get_fundamentals(ticker)`, `screen_market(criteria)`, `get_company_profile(ticker)`. Das
+     adressiert direkt zwei offene Risiken aus der Design-Spec (Abschnitt 8): Risiko 4 (AI Assessor
+     braucht echten aktuellen Kontext statt nur Kennzahlen) und Risiko 5 (Data-Provider-Anbindung
+     muss austauschbar bleiben — MCP liefert dafür eine saubere Protokollgrenze).
+   - MCP-Client vom AI Assessor zu einem externen Server (z. B. Web-Suche) für zusätzlichen
+     qualitativen Kontext (News, Firmenbeschreibung) bei der Burggraben-Bewertung.
+
+Bewusste Entscheidung: MCP nicht in den Phase-1-Plan hineinziehen (reine Portfolio-CRUD/Auth-Basis),
+sondern bei Wiederaufnahme von Phase 2 aktiv wieder ansprechen.
+
+## Nebenthema: llm-broker als zentraler LLM-Service — Kandidat für Phase 2, nicht entschieden
+
+Eigenes, separates Projekt unter `~/projects/llm-broker` (Spring Boot, gleicher Stack) geprüft:
+ein eigenständiger Service, der Anwendungen von LLM-Details entkoppelt — Aufrufer schicken
+`topic` + Rohdaten an `POST /api/v1/process`, der Broker übernimmt Prompt-Bau (Mustache-Template
+pro Topic-YAML), providerunabhängigen LLM-Aufruf (Spring AI: OpenAI/Anthropic/Google/Ollama),
+Input-/Output-Schema-Validierung, Retries bei ungültiger LLM-Antwort und liefert strukturiertes
+JSON zurück. Dazu JWT-Auth (Keycloak) und Token-/Latenz-/Error-Metriken pro Topic. Laut
+Git-Historie schon weit fortgeschritten (9 Epics fertig: Setup, CI/CD, Topic-Management,
+LLM-Boundary, Processing-Pipeline, REST-API, Security, Observability).
+
+**Warum relevant für Value Screener:** Beide AI-Anwendungsfälle im Design (Abschnitt 4: AI
+Assessor) passen als Topics — Burggraben-/Geschäftsmodell-Bewertung eines Screening-Kandidaten und
+Klartext-Erklärung einer erkannten Fundamental-Änderung. Der Broker würde zwei offene Punkte aus
+der Design-Spec direkt mit-lösen, ohne sie in value-screener nochmal zu bauen:
+- **Risiko 3** (Claude-Kosten im Blick behalten, Abschnitt 8) — Token-/Latenz-Metriken pro Topic
+  gibt es im Broker bereits.
+- Die **Formulierungsrichtlinie** (Abschnitt 9, deskriptiv statt empfehlend) lässt sich zentral im
+  `promptTemplate` der jeweiligen Topic-YAML verankern statt verstreut im value-screener-Code.
+
+**Warum noch nicht entschieden:** zusätzlicher Netzwerk-Hop und zusätzlicher Deploy (Broker braucht
+eigenes JWT/OAuth2 — aktuell lokal über Keycloak gelöst, müsste für ein öffentlich erreichbares
+Setup produktionstauglich laufen) — mehr Betriebsaufwand als eine direkte Spring-AI-Anthropic-
+Anbindung im value-screener-Backend selbst. Der eigentlich starke Case ist die Wiederverwendung
+über mehrere zukünftige Projekte hinweg (u. a. Alpine Guide, `/mnt/c/Users/PCUser/dev/berg`, nutzt
+den Broker aktuell noch nicht), nicht der Nutzen für value-screener isoliert betrachtet.
+
+Bewusste Entscheidung: wie beim MCP-Thema erst bei Wiederaufnahme von Phase 2 (AI Assessor) aktiv
+wieder ansprechen und dann entscheiden, nicht in Phase 1 hineinziehen.
 
 ## Hinweis: öffentliches Repo
 
