@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -115,5 +116,29 @@ public class PortfolioPosition {
 
     public LocalDate getPurchaseDate() {
         return purchaseDate;
+    }
+
+    public void recordPurchase(BigDecimal additionalQuantity, BigDecimal purchasePrice) {
+        BigDecimal validQuantity = requirePositive(additionalQuantity, "quantity");
+        BigDecimal validPrice = requirePositive(purchasePrice, "purchasePrice");
+
+        BigDecimal existingCost = this.quantity.multiply(this.entryPrice);
+        BigDecimal addedCost = validQuantity.multiply(validPrice);
+        BigDecimal newQuantity = this.quantity.add(validQuantity);
+
+        this.entryPrice = existingCost.add(addedCost).divide(newQuantity, 6, RoundingMode.HALF_UP);
+        this.quantity = newQuantity;
+    }
+
+    public void recordSale(BigDecimal soldQuantity) {
+        BigDecimal validQuantity = requirePositive(soldQuantity, "quantity");
+        if (validQuantity.compareTo(this.quantity) > 0) {
+            throw new IllegalArgumentException("sale quantity must not exceed current holding");
+        }
+        this.quantity = this.quantity.subtract(validQuantity);
+    }
+
+    public boolean isClosed() {
+        return quantity.signum() == 0;
     }
 }

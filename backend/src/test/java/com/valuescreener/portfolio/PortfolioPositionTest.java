@@ -82,4 +82,58 @@ class PortfolioPositionTest {
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), null))
                 .isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    void recordPurchaseIncreasesQuantityAndRecalculatesWeightedAverageEntryPrice() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+
+        position.recordPurchase(new BigDecimal("10"), new BigDecimal("170.00"));
+
+        assertThat(position.getQuantity()).isEqualByComparingTo("20");
+        assertThat(position.getEntryPrice()).isEqualByComparingTo("160.00");
+        assertThat(position.getPurchaseDate()).isEqualTo(LocalDate.of(2026, 1, 15));
+    }
+
+    @Test
+    void recordPurchaseRejectsZeroOrNegativeQuantity() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+
+        assertThatThrownBy(() -> position.recordPurchase(BigDecimal.ZERO, new BigDecimal("170.00")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("quantity");
+    }
+
+    @Test
+    void recordSaleDecreasesQuantityWithoutChangingEntryPrice() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        position.recordSale(new BigDecimal("5"));
+
+        assertThat(position.getQuantity()).isEqualByComparingTo("15");
+        assertThat(position.getEntryPrice()).isEqualByComparingTo("160.00");
+    }
+
+    @Test
+    void recordSaleRejectsQuantityExceedingCurrentHolding() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        assertThatThrownBy(() -> position.recordSale(new BigDecimal("25")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exceed");
+    }
+
+    @Test
+    void recordSaleToZeroClosesPosition() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        position.recordSale(new BigDecimal("20"));
+
+        assertThat(position.getQuantity()).isEqualByComparingTo("0");
+        assertThat(position.isClosed()).isTrue();
+    }
 }
