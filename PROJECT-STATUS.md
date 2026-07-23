@@ -52,6 +52,15 @@ Fortschritt wird in `.superpowers/sdd/progress.md` (im Projektordner, git-ignore
   diesem WSL-Setup inkompatibel. Fix: `backend/src/test/resources/docker-java.properties` mit
   `api.version=1.44` — siehe Projekt-Memory "WSL Docker/Testcontainers fix", falls das bei Alpine
   Guide wieder auftaucht.
+- **Umgebungsfix (2026-07-23, während Task 5 entdeckt): Java-Versionskonflikt.** Die Maschine hatte
+  Java 25 als sdkman-Default, `pom.xml` ist aber auf Java 21 konfiguriert. Folge: Mockito konnte bei
+  `@MockBean` auf konkrete Klassen (z. B. `PortfolioService` in `PortfolioControllerTest`) nicht mehr
+  per Bytecode-Instrumentierung mocken (`MockitoException: Mockito cannot mock this class`) — betraf
+  jeden `@WebMvcTest`/`@MockBean`-Test, nicht nur diesen. Fix (Nutzerentscheidung: global, nicht nur
+  projektlokal): vorhandenes System-JDK 21 (`/usr/lib/jvm/java-21-openjdk-amd64`) als sdkman-Kandidat
+  `21.0.11-local` registriert und per `sdk default java 21.0.11-local` global als Standard gesetzt.
+  Betrifft alle Projekte/Shells auf dieser Maschine, nicht nur value-screener — falls Alpine Guide
+  oder llm-broker bewusst Java 25 brauchen, dort gegenprüfen.
 - **Task 2 (PortfolioPosition-Domänen-Aggregat): fertig, geprüft (Approved), committet und gepusht**
   (Commit `ca13802`, "add PortfolioPosition aggregate with ticker, ISIN and company name
   invariants"). Während der Umsetzung zwei vom Nutzer entschiedene Scope-Erweiterungen gegenüber
