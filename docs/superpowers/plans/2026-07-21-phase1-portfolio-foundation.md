@@ -1321,7 +1321,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .httpBasic(basic -> {
                 });
-        return http;
+        return http.build();
     }
 }
 ```
