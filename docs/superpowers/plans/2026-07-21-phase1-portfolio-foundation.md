@@ -505,6 +505,123 @@ git add backend/src/main/java/com/valuescreener/portfolio/PortfolioPosition.java
 git commit -m "feat: add PortfolioPosition aggregate with validated invariants"
 ```
 
+### Nachträgliche Erweiterung: Teilkäufe/Teilverkäufe (Option 1)
+
+**Grund:** Ein einzelnes `quantity`/`entryPrice`/`purchaseDate` pro ISIN kann keine Nachkäufe oder
+Teilverkäufe abbilden. Entscheidung (siehe `PROJECT-STATUS.md`): Position bleibt eine Zeile pro
+ISIN, `entryPrice` wird zum mengengewichteten Durchschnittspreis, `purchaseDate` bleibt das Datum
+des Erstkaufs. Ein vollständiges Transaktions-/Lot-Modell (Option 2) wäre genauer, ist aber für das
+MVP bewusst zurückgestellt (Richtung Event-Sourcing, siehe Design-Spec Abschnitt 7.1).
+
+**Interfaces (Ergänzung):** `void recordPurchase(BigDecimal additionalQuantity, BigDecimal purchasePrice)`,
+`void recordSale(BigDecimal soldQuantity)`, `boolean isClosed()`.
+
+- [ ] **Step 6: Fehlschlagende Tests ergänzen**
+
+Ergänzung in `backend/src/test/java/com/valuescreener/portfolio/PortfolioPositionTest.java`:
+
+```java
+    @Test
+    void recordPurchaseIncreasesQuantityAndRecalculatesWeightedAverageEntryPrice() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+
+        position.recordPurchase(new BigDecimal("10"), new BigDecimal("170.00"));
+
+        assertThat(position.getQuantity()).isEqualByComparingTo("20");
+        assertThat(position.getEntryPrice()).isEqualByComparingTo("160.00");
+        assertThat(position.getPurchaseDate()).isEqualTo(LocalDate.of(2026, 1, 15));
+    }
+
+    @Test
+    void recordPurchaseRejectsZeroOrNegativeQuantity() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+
+        assertThatThrownBy(() -> position.recordPurchase(BigDecimal.ZERO, new BigDecimal("170.00")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("quantity");
+    }
+
+    @Test
+    void recordSaleDecreasesQuantityWithoutChangingEntryPrice() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        position.recordSale(new BigDecimal("5"));
+
+        assertThat(position.getQuantity()).isEqualByComparingTo("15");
+        assertThat(position.getEntryPrice()).isEqualByComparingTo("160.00");
+    }
+
+    @Test
+    void recordSaleRejectsQuantityExceedingCurrentHolding() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        assertThatThrownBy(() -> position.recordSale(new BigDecimal("25")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exceed");
+    }
+
+    @Test
+    void recordSaleToZeroClosesPosition() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        position.recordSale(new BigDecimal("20"));
+
+        assertThat(position.getQuantity()).isEqualByComparingTo("0");
+        assertThat(position.isClosed()).isTrue();
+    }
+```
+
+- [ ] **Step 7: Tests ausführen, Fehlschlag bestätigen**
+
+Run: `cd backend && mvn test -Dtest=PortfolioPositionTest`
+Erwartet: FAIL (Kompilierfehler, `recordPurchase`/`recordSale`/`isClosed` existieren nicht).
+
+- [ ] **Step 8: Methoden ergänzen**
+
+Ergänzung in `backend/src/main/java/com/valuescreener/portfolio/PortfolioPosition.java` (Import
+`java.math.RoundingMode` ergänzen; Methoden nach den bestehenden Gettern einfügen):
+
+```java
+    public void recordPurchase(BigDecimal additionalQuantity, BigDecimal purchasePrice) {
+        BigDecimal validQuantity = requirePositive(additionalQuantity, "quantity");
+        BigDecimal validPrice = requirePositive(purchasePrice, "purchasePrice");
+
+        BigDecimal existingCost = this.quantity.multiply(this.entryPrice);
+        BigDecimal addedCost = validQuantity.multiply(validPrice);
+        BigDecimal newQuantity = this.quantity.add(validQuantity);
+
+        this.entryPrice = existingCost.add(addedCost).divide(newQuantity, 6, RoundingMode.HALF_UP);
+        this.quantity = newQuantity;
+    }
+
+    public void recordSale(BigDecimal soldQuantity) {
+        BigDecimal validQuantity = requirePositive(soldQuantity, "quantity");
+        if (validQuantity.compareTo(this.quantity) > 0) {
+            throw new IllegalArgumentException("sale quantity must not exceed current holding");
+        }
+        this.quantity = this.quantity.subtract(validQuantity);
+    }
+
+    public boolean isClosed() {
+        return quantity.signum() == 0;
+    }
+```
+
+- [ ] **Step 9: Tests ausführen, Erfolg bestätigen; Commit**
+
+Run: `cd backend && mvn test -Dtest=PortfolioPositionTest`
+Erwartet: PASS (alle 14 Tests grün).
+
+```bash
+git add backend/src/main/java/com/valuescreener/portfolio/PortfolioPosition.java backend/src/test/java/com/valuescreener/portfolio/PortfolioPositionTest.java
+git commit -m "feat: support partial buys/sells via weighted-average PortfolioPosition"
+```
+
 ---
 
 ## Task 3: PortfolioPositionRepository + Flyway-Migration
@@ -516,7 +633,11 @@ git commit -m "feat: add PortfolioPosition aggregate with validated invariants"
 
 **Interfaces:**
 - Consumes: `PortfolioPosition` (Task 2).
-- Produces: `PortfolioPositionRepository extends JpaRepository<PortfolioPosition, Long>` mit `Optional<PortfolioPosition> findByTicker(String ticker)`.
+- Produces: `PortfolioPositionRepository extends JpaRepository<PortfolioPosition, Long>` mit `Optional<PortfolioPosition> findByIsin(String isin)`.
+
+`findByIsin` statt `findByTicker`, weil ISIN (nicht Ticker) die eindeutige Kennung ist (siehe
+Task-2-Begründung) und Task 4 (Buy/Sell) genau diese Lookup braucht, um beim Nachkauf die
+bestehende Position zu finden und zusammenzuführen.
 
 - [ ] **Step 1: Flyway-Migration anlegen**
 
@@ -574,16 +695,16 @@ class PortfolioPositionRepositoryTest {
     private PortfolioPositionRepository repository;
 
     @Test
-    void savesAndFindsPositionByTicker() {
+    void savesAndFindsPositionByIsin() {
         repository.save(new PortfolioPosition(
                 "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1)));
 
-        assertThat(repository.findByTicker("MSFT")).isPresent();
+        assertThat(repository.findByIsin("US5949181045")).isPresent();
     }
 
     @Test
-    void returnsEmptyWhenTickerNotFound() {
-        assertThat(repository.findByTicker("UNKNOWN")).isEmpty();
+    void returnsEmptyWhenIsinNotFound() {
+        assertThat(repository.findByIsin("US0000000000")).isEmpty();
     }
 }
 ```
@@ -605,7 +726,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface PortfolioPositionRepository extends JpaRepository<PortfolioPosition, Long> {
-    Optional<PortfolioPosition> findByTicker(String ticker);
+    Optional<PortfolioPosition> findByIsin(String isin);
 }
 ```
 
@@ -627,20 +748,36 @@ git commit -m "feat: add portfolio_position table and repository"
 ## Task 4: PortfolioService (Application Service)
 
 **Files:**
-- Create: `backend/src/main/java/com/valuescreener/portfolio/AddPortfolioPositionRequest.java`
+- Create: `backend/src/main/java/com/valuescreener/portfolio/BuyPositionRequest.java`
+- Create: `backend/src/main/java/com/valuescreener/portfolio/SellPositionRequest.java`
 - Create: `backend/src/main/java/com/valuescreener/portfolio/PublicPortfolioPositionView.java`
+- Create: `backend/src/main/java/com/valuescreener/portfolio/PositionNotFoundException.java`
 - Create: `backend/src/main/java/com/valuescreener/portfolio/PortfolioService.java`
 - Create: `backend/src/test/java/com/valuescreener/portfolio/PortfolioServiceTest.java`
 
 **Interfaces:**
 - Consumes: `PortfolioPosition`, `PortfolioPositionRepository` (Task 2, 3).
-- Produces: `AddPortfolioPositionRequest(String ticker, String isin, String companyName, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate)`, `PublicPortfolioPositionView(String ticker, String companyName)`, `PortfolioService` mit `void addPosition(AddPortfolioPositionRequest request)` und `List<PublicPortfolioPositionView> listPublicPositions()` — beide werden von `PortfolioController` (Task 5) konsumiert.
+- Produces: `BuyPositionRequest(String ticker, String isin, String companyName, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate)`,
+  `SellPositionRequest(String isin, BigDecimal quantity)`, `PublicPortfolioPositionView(String ticker, String companyName)`,
+  `PortfolioService` mit `void buy(BuyPositionRequest request)`, `void sell(SellPositionRequest request)` und
+  `List<PublicPortfolioPositionView> listPublicPositions()` — konsumiert von `PortfolioController` (Task 5).
 
-`isin` fließt in `AddPortfolioPositionRequest` mit ein (Pflichtfeld, `@NotBlank`), taucht aber bewusst NICHT in `PublicPortfolioPositionView` auf — die öffentliche Ansicht bleibt bei Ticker + Firmenname (siehe Task-2-Begründung oben).
+`BuyPositionRequest` ersetzt das frühere `AddPortfolioPositionRequest` 1:1 in Feldern und JSON-Form (siehe Nachtrag zu
+Task 2/3: Teilkäufe erfordern jetzt ein Upsert-Verhalten statt eines reinen "Anlegen"). `isin` bleibt Pflichtfeld
+(`@NotBlank`), taucht aber bewusst NICHT in `PublicPortfolioPositionView` auf — die öffentliche Ansicht bleibt bei
+Ticker + Firmenname (siehe Task-2-Begründung oben).
+
+`buy`: Sucht per `findByIsin`. Existiert die Position noch nicht, wird sie neu angelegt (wie früher `addPosition`).
+Existiert sie bereits, wird `recordPurchase` aufgerufen (Menge/Durchschnittspreis werden auf der bestehenden
+Position aktualisiert) — das bildet Nachkäufe ab.
+
+`sell`: Sucht per `findByIsin`, wirft `PositionNotFoundException` wenn keine Position existiert, ruft sonst
+`recordSale` auf. Ist die Position danach `isClosed()` (Menge 0), wird sie gelöscht statt gespeichert — das bildet
+einen vollständigen Verkauf ab, ohne eine "leere" Position liegen zu lassen.
 
 - [ ] **Step 1: Request- und View-DTOs anlegen**
 
-`backend/src/main/java/com/valuescreener/portfolio/AddPortfolioPositionRequest.java`:
+`backend/src/main/java/com/valuescreener/portfolio/BuyPositionRequest.java`:
 
 ```java
 package com.valuescreener.portfolio;
@@ -652,7 +789,7 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record AddPortfolioPositionRequest(
+public record BuyPositionRequest(
         @NotBlank String ticker,
         @NotBlank String isin,
         @NotBlank String companyName,
@@ -663,12 +800,43 @@ public record AddPortfolioPositionRequest(
 }
 ```
 
+`backend/src/main/java/com/valuescreener/portfolio/SellPositionRequest.java`:
+
+```java
+package com.valuescreener.portfolio;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
+import java.math.BigDecimal;
+
+public record SellPositionRequest(
+        @NotBlank String isin,
+        @NotNull @Positive BigDecimal quantity
+) {
+}
+```
+
 `backend/src/main/java/com/valuescreener/portfolio/PublicPortfolioPositionView.java`:
 
 ```java
 package com.valuescreener.portfolio;
 
 public record PublicPortfolioPositionView(String ticker, String companyName) {
+}
+```
+
+`backend/src/main/java/com/valuescreener/portfolio/PositionNotFoundException.java`:
+
+```java
+package com.valuescreener.portfolio;
+
+public class PositionNotFoundException extends RuntimeException {
+
+    public PositionNotFoundException(String isin) {
+        super("no portfolio position found for isin " + isin);
+    }
 }
 ```
 
@@ -688,8 +856,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -700,18 +871,72 @@ class PortfolioServiceTest {
     private PortfolioPositionRepository repository;
 
     @Test
-    void addPositionSavesNormalizedPosition() {
+    void buyCreatesNewPositionWhenIsinUnknown() {
         PortfolioService service = new PortfolioService(repository);
-        AddPortfolioPositionRequest request = new AddPortfolioPositionRequest(
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+        BuyPositionRequest request = new BuyPositionRequest(
                 "aapl", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
 
-        service.addPosition(request);
+        service.buy(request);
 
         ArgumentCaptor<PortfolioPosition> captor = ArgumentCaptor.forClass(PortfolioPosition.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getTicker()).isEqualTo("AAPL");
         assertThat(captor.getValue().getIsin()).isEqualTo("US0378331005");
-        assertThat(captor.getValue().getCompanyName()).isEqualTo("Apple Inc.");
+        assertThat(captor.getValue().getQuantity()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void buyMergesIntoExistingPositionWhenIsinKnown() {
+        PortfolioService service = new PortfolioService(repository);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+        BuyPositionRequest request = new BuyPositionRequest(
+                "aapl", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("170.00"), LocalDate.of(2026, 3, 1));
+
+        service.buy(request);
+
+        ArgumentCaptor<PortfolioPosition> captor = ArgumentCaptor.forClass(PortfolioPosition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getQuantity()).isEqualByComparingTo("20");
+        assertThat(captor.getValue().getEntryPrice()).isEqualByComparingTo("160.00");
+    }
+
+    @Test
+    void sellReducesExistingPosition() {
+        PortfolioService service = new PortfolioService(repository);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+
+        service.sell(new SellPositionRequest("US0378331005", new BigDecimal("4")));
+
+        ArgumentCaptor<PortfolioPosition> captor = ArgumentCaptor.forClass(PortfolioPosition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getQuantity()).isEqualByComparingTo("6");
+    }
+
+    @Test
+    void sellDeletesPositionWhenFullyClosed() {
+        PortfolioService service = new PortfolioService(repository);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+
+        service.sell(new SellPositionRequest("US0378331005", new BigDecimal("10")));
+
+        verify(repository).delete(existing);
+        verify(repository, never()).save(existing);
+    }
+
+    @Test
+    void sellRejectsUnknownIsin() {
+        PortfolioService service = new PortfolioService(repository);
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.sell(new SellPositionRequest("US0378331005", new BigDecimal("1"))))
+                .isInstanceOf(PositionNotFoundException.class);
     }
 
     @Test
@@ -753,10 +978,31 @@ public class PortfolioService {
         this.repository = repository;
     }
 
-    public void addPosition(AddPortfolioPositionRequest request) {
-        PortfolioPosition position = new PortfolioPosition(
-                request.ticker(), request.isin(), request.companyName(), request.quantity(), request.entryPrice(), request.purchaseDate());
+    public void buy(BuyPositionRequest request) {
+        PortfolioPosition position = repository.findByIsin(request.isin()).orElse(null);
+
+        if (position == null) {
+            repository.save(new PortfolioPosition(
+                    request.ticker(), request.isin(), request.companyName(),
+                    request.quantity(), request.entryPrice(), request.purchaseDate()));
+            return;
+        }
+
+        position.recordPurchase(request.quantity(), request.entryPrice());
         repository.save(position);
+    }
+
+    public void sell(SellPositionRequest request) {
+        PortfolioPosition position = repository.findByIsin(request.isin())
+                .orElseThrow(() -> new PositionNotFoundException(request.isin()));
+
+        position.recordSale(request.quantity());
+
+        if (position.isClosed()) {
+            repository.delete(position);
+        } else {
+            repository.save(position);
+        }
     }
 
     public List<PublicPortfolioPositionView> listPublicPositions() {
@@ -770,13 +1016,13 @@ public class PortfolioService {
 - [ ] **Step 5: Test ausführen, Erfolg bestätigen**
 
 Run: `cd backend && mvn test -Dtest=PortfolioServiceTest`
-Erwartet: PASS (beide Tests grün).
+Erwartet: PASS (alle sechs Tests grün).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/src/main/java/com/valuescreener/portfolio/AddPortfolioPositionRequest.java backend/src/main/java/com/valuescreener/portfolio/PublicPortfolioPositionView.java backend/src/main/java/com/valuescreener/portfolio/PortfolioService.java backend/src/test/java/com/valuescreener/portfolio/PortfolioServiceTest.java
-git commit -m "feat: add PortfolioService application service"
+git add backend/src/main/java/com/valuescreener/portfolio/BuyPositionRequest.java backend/src/main/java/com/valuescreener/portfolio/SellPositionRequest.java backend/src/main/java/com/valuescreener/portfolio/PublicPortfolioPositionView.java backend/src/main/java/com/valuescreener/portfolio/PositionNotFoundException.java backend/src/main/java/com/valuescreener/portfolio/PortfolioService.java backend/src/test/java/com/valuescreener/portfolio/PortfolioServiceTest.java
+git commit -m "feat: add PortfolioService with buy/sell semantics for partial trades"
 ```
 
 ---
@@ -789,7 +1035,7 @@ git commit -m "feat: add PortfolioService application service"
 
 **Interfaces:**
 - Consumes: `PortfolioService` (Task 4).
-- Produces: `GET /api/portfolio/public` → `List<PublicPortfolioPositionView>`; `POST /api/portfolio` (Body: `AddPortfolioPositionRequest` als JSON) → `201 Created`. Diese Pfade werden von Task 6 (Security) und dem Frontend (Task 9/10) konsumiert.
+- Produces: `GET /api/portfolio/public` → `List<PublicPortfolioPositionView>`; `POST /api/portfolio` (Body: `BuyPositionRequest` als JSON, identisches JSON-Schema wie das frühere `AddPortfolioPositionRequest`) → `201 Created`; `POST /api/portfolio/sell` (Body: `SellPositionRequest` als JSON) → `204 No Content`. Diese Pfade werden von Task 6 (Security) und dem Frontend (Task 9/10) konsumiert. `POST /api/portfolio` bleibt für Task 6 unverändert (gleicher Pfad, gleiches JSON) — die dortigen Tests brauchen keine Anpassung.
 
 - [ ] **Step 1: Fehlschlagenden Controller-Test schreiben**
 
@@ -852,6 +1098,16 @@ class PortfolioControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void sellsPositionOnValidRequest() throws Exception {
+        mockMvc.perform(post("/api/portfolio/sell")
+                        .contentType("application/json")
+                        .content("""
+                                {"isin":"US0378331005","quantity":4}
+                                """))
+                .andExpect(status().isNoContent());
+    }
 }
 ```
 
@@ -897,8 +1153,14 @@ public class PortfolioController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public void addPosition(@Valid @RequestBody AddPortfolioPositionRequest request) {
-        portfolioService.addPosition(request);
+    public void buy(@Valid @RequestBody BuyPositionRequest request) {
+        portfolioService.buy(request);
+    }
+
+    @PostMapping("/sell")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void sell(@Valid @RequestBody SellPositionRequest request) {
+        portfolioService.sell(request);
     }
 }
 ```
@@ -906,7 +1168,7 @@ public class PortfolioController {
 - [ ] **Step 4: Test ausführen, Erfolg bestätigen**
 
 Run: `cd backend && mvn test -Dtest=PortfolioControllerTest`
-Erwartet: PASS (alle drei Tests grün).
+Erwartet: PASS (alle vier Tests grün).
 
 - [ ] **Step 5: Commit**
 
@@ -1510,9 +1772,17 @@ git commit -m "feat: display public portfolio ticker list"
 - Create: `frontend/src/components/AddPositionForm.test.tsx`
 - Modify: `frontend/src/pages/PortfolioPage.tsx`
 
+**⚠️ Noch nicht mit der Buy/Sell-Änderung abgeglichen:** Task 4/5 heißen jetzt `buy`/`sell` statt
+`addPosition` (siehe Nachtrag zu Task 2, `PROJECT-STATUS.md`). Der `POST /api/portfolio`-Pfad und das
+JSON-Schema sind identisch geblieben, daher ruft die Funktion unten weiterhin denselben Endpunkt
+auf — nur der Funktionsname (`addPosition` → z. B. `buyPosition`) sollte bei Umsetzung dieses Tasks
+zur Konsistenz mit dem Backend umbenannt werden. Ein Verkaufs-Formular (`sell`) ist bewusst noch
+nicht Teil dieses Tasks — Frontend-Scope für Phase 1 bleibt "Position hinzufügen"; der Sell-Endpunkt
+existiert im Backend bereits für spätere Erweiterung.
+
 **Interfaces:**
 - Consumes: `PortfolioPage` (Task 9).
-- Produces: `Credentials { username: string; password: string }`, `addPosition(credentials, input): Promise<void>` (ergänzt `portfolioApi.ts`), `LoginForm`- und `AddPositionForm`-Komponenten.
+- Produces: `Credentials { username: string; password: string }`, `addPosition(credentials, input): Promise<void>` (ergänzt `portfolioApi.ts`; bei Umsetzung ggf. in `buyPosition` umbenennen), `LoginForm`- und `AddPositionForm`-Komponenten.
 
 - [ ] **Step 1: `portfolioApi.ts` um `addPosition` erweitern**
 

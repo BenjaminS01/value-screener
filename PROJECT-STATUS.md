@@ -69,9 +69,36 @@ Fortschritt wird in `.superpowers/sdd/progress.md` (im Projektordner, git-ignore
   - Der Plan (`docs/superpowers/plans/2026-07-21-phase1-portfolio-foundation.md`) wurde für Tasks
     2–6, 9, 10 konsistent mit-aktualisiert (Migration, DTOs, Service, Controller-/Security-Tests,
     Frontend-Formular) — Task 3 kann direkt aus dem Plan umgesetzt werden, ohne weitere Anpassung.
-- **Nächster Schritt bei Wiederaufnahme:** Task 3 (PortfolioPositionRepository + Flyway-Migration)
-  erklären und per Subagent umsetzen lassen — siehe Plan-Datei. Das MCP-Nebenthema (siehe unten)
-  ist bewusst pausiert und nicht Teil dieses nächsten Schritts.
+- **Nachträgliche Modellkorrektur (2026-07-23, vor Task 3 entdeckt):** Nutzerfrage aufgedeckt, dass
+  `PortfolioPosition` mit genau einem `quantity`/`entryPrice`/`purchaseDate` pro ISIN Teilkäufe und
+  Teilverkäufe nicht abbilden kann. Zwei Optionen abgewogen:
+  - **Option 1 (gewählt):** Position bleibt eine Zeile pro ISIN (aggregierter Nettobestand).
+    `entryPrice` wird zum **mengengewichteten Durchschnittspreis**, `purchaseDate` bleibt das Datum
+    des **Erstkaufs** (ändert sich bei Nachkäufen nicht). Neue Aggregat-Methoden `recordPurchase`
+    (erhöht Menge, rechnet Durchschnittspreis neu) und `recordSale` (verringert Menge, Preis bleibt
+    unverändert, Verkauf über Bestand hinaus wird abgelehnt; Menge 0 → Position gilt als
+    `isClosed()` und wird vom Service gelöscht). Zieht auch Task-3-Korrektur nach sich:
+    `findByTicker` → **`findByIsin`**, da ISIN (nicht Ticker) die eindeutige Kennung ist und für
+    das Zusammenführen von Nachkäufen gebraucht wird. Task 4 wird von "addPosition" auf
+    "buy/sell" umgestellt.
+  - **Option 2 (vermerkt, nicht umgesetzt):** vollständiges Transaktions-/Lot-Modell (jeder Kauf/
+    Verkauf als eigener Datensatz, Position als Read-Model aus Transaktionen berechnet, FIFO-
+    Kostenbasis möglich). Genauer, aber mehr Infrastruktur — würde Richtung Event-Sourcing gehen,
+    das die Design-Spec (Abschnitt 7.1) bewusst ausschließt. Für später vorgemerkt, falls z. B. eine
+    exakte FIFO-Kostenbasis fürs Steuerjahr gebraucht wird.
+  - Plan-Datei entsprechend angepasst: Task 2 um `recordPurchase`/`recordSale` erweitert, Task 3
+    `findByIsin` statt `findByTicker`, Task 4 auf `buy`/`sell` (`BuyPositionRequest`/
+    `SellPositionRequest`, `PositionNotFoundException`) umgestellt, Task 5 um `POST /api/portfolio/sell`
+    ergänzt (`POST /api/portfolio` bleibt Pfad-/JSON-kompatibel, Task 6 braucht daher keine Änderung).
+    Task 9/10 (Frontend, noch nicht umgesetzt) sind mit einem Hinweis im Plan markiert: Funktionsname
+    `addPosition` bei Umsetzung in `buyPosition` umbenennen; ein Sell-Formular ist bewusst nicht Teil
+    von Phase 1.
+- **Aggregat-Erweiterung `recordPurchase`/`recordSale`/`isClosed`: fertig, geprüft (Approved),
+  noch nicht committet** — Commit-Befehl siehe unten, vom Nutzer manuell auszuführen.
+- **Nächster Schritt bei Wiederaufnahme:** Nach dem Commit der Aggregat-Erweiterung direkt mit
+  Task 3 (PortfolioPositionRepository + Flyway-Migration, mit `findByIsin`) weitermachen — siehe
+  Plan-Datei. Das MCP-Nebenthema (siehe unten) ist bewusst pausiert und nicht Teil dieses nächsten
+  Schritts.
 
 ## Nebenthema: MCP (Model Context Protocol) — Lernthema, pausiert
 
