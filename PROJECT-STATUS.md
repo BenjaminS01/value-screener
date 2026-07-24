@@ -178,3 +178,26 @@ API-Keys) laufen ausschließlich über Umgebungsvariablen, nie über Dateien im 
 Risiko 1 aus der Design-Spec: ob der gewählte Fundamentaldaten-Anbieter (Kandidat: Financial
 Modeling Prep) den Screener-Endpunkt tatsächlich im Free-Tier freigibt — relevant erst ab Phase 2
 (Screening-Pipeline), nicht blockierend für Phase 1.
+
+## Phase 1 abgeschlossen (2026-07-24)
+
+Alle 13 Tasks umgesetzt, committed, per Task-Review geprüft. Finaler Whole-Branch-Review (gesamte
+Historie, 19 Commits, Modell: Opus) fand keinen Critical-Fund. Ein Important-Fund (fehlender
+globaler Exception-Handler — Domain-Exceptions wie `PositionNotFoundException` oder
+`IllegalArgumentException` bei unbekannter ISIN/Overselling/fehlerhafter ISIN landeten als HTTP 500
+statt 404/400) wurde noch vor Abschluss gefixt: `PortfolioExceptionHandler`
+(`@RestControllerAdvice`, scoped auf `PortfolioController`) + 3 neue Tests, unabhängig vom Reviewer
+erneut verifiziert (33/33 Backend-Tests grün).
+
+**Backlog für Phase 2 (Minor-Funde aus dem finalen Review, keine Blocker für Phase 1):**
+- `@Transactional` auf `PortfolioService.buy`/`sell` ergänzen (aktuell TOCTOU-Fenster bei
+  gleichzeitigem Anlegen derselben ISIN — bei Single-User heute irrelevant, aber Phase 2 könnte
+  durch einen Scheduler echte Nebenläufigkeit einführen).
+- Regressionstest, der sicherstellt, dass der öffentliche Endpunkt (`GET /api/portfolio/public`)
+  nie `quantity`/`entryPrice`/`isin` im JSON exponiert (aktuell nur strukturell durch die DTO
+  garantiert, nicht durch einen expliziten Test abgesichert).
+- Frontend-Fehlermeldungen in `AddPositionForm`/`portfolioApi.ts` sind statuscode-blind (z. B.
+  falsches Passwort zeigt nur generische "401"-Meldung) — Politur, kein Blocker.
+- Vor Phase 4 (AWS-Deployment): CORS-Policy fehlt noch (Dev funktioniert nur über den
+  Vite-`/api`-Proxy), HTTP Basic Auth erfordert zwingend HTTPS in Produktion — beides für den
+  Phase-4-Plan vormerken.

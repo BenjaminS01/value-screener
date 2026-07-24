@@ -9,6 +9,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -63,5 +65,44 @@ class PortfolioControllerTest {
                                 {"isin":"US0378331005","quantity":4}
                                 """))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void sellingUnknownIsinReturnsNotFound() throws Exception {
+        doThrow(new PositionNotFoundException("US0378331005"))
+                .when(portfolioService).sell(any());
+
+        mockMvc.perform(post("/api/portfolio/sell")
+                        .contentType("application/json")
+                        .content("""
+                                {"isin":"US0378331005","quantity":4}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void sellingMoreThanOwnedQuantityReturnsBadRequest() throws Exception {
+        doThrow(new IllegalArgumentException("sale quantity must not exceed current holding"))
+                .when(portfolioService).sell(any());
+
+        mockMvc.perform(post("/api/portfolio/sell")
+                        .contentType("application/json")
+                        .content("""
+                                {"isin":"US0378331005","quantity":1000}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void buyingWithMalformedIsinReturnsBadRequest() throws Exception {
+        doThrow(new IllegalArgumentException("isin must be a valid 12-character ISIN"))
+                .when(portfolioService).buy(any());
+
+        mockMvc.perform(post("/api/portfolio")
+                        .contentType("application/json")
+                        .content("""
+                                {"ticker":"AAPL","isin":"NOTANISIN123","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 }
