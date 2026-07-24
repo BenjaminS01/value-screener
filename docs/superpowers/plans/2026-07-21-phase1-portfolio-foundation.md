@@ -2168,7 +2168,6 @@ npm test
 4. Die Liste zeigt danach `AAPL` — Stückzahl und Einstiegspreis sind nirgends sichtbar.
 5. "Impressum" im Menü öffnen (siehe nächste Aufgabe) und prüfen, dass die Platzhalter-Angaben
    vor einem echten Live-Gang durch echte Daten ersetzt werden.
-\`\`\`
 ```
 
 - [ ] **Step 3: Manuelle End-to-End-Prüfung durchführen**

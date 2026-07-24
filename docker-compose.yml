@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: value_screener
+      POSTGRES_USER: value_screener
+      POSTGRES_PASSWORD: value_screener
+    ports:
+      - "5432:5432"
+    volumes:
+      - value-screener-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  value-screener-postgres-data:
