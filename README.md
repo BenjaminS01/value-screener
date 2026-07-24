@@ -1,5 +1,7 @@
 # Value Screener
 
+[![CI](https://github.com/BenjaminS01/value-screener/actions/workflows/ci.yml/badge.svg)](https://github.com/BenjaminS01/value-screener/actions/workflows/ci.yml)
+
 Persönliches Tool für Value-Investing nach Buffett-Prinzipien. Siehe `PROJECT-STATUS.md` und
 `docs/superpowers/specs/2026-07-21-value-screener-design.md` für den vollständigen Kontext.
 
