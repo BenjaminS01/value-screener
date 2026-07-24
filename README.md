@@ -5,6 +5,20 @@
 Persönliches Tool für Value-Investing nach Buffett-Prinzipien. Siehe `PROJECT-STATUS.md` und
 `docs/superpowers/specs/2026-07-21-value-screener-design.md` für den vollständigen Kontext.
 
+## Company Research Agent (in Entwicklung)
+
+Ein eigenständiger, serverless MCP-Server (`company-research-agent/`), der zu Portfolio-Positionen
+und Screening-Kandidaten aktuelle, quellenbelegte Informationen recherchiert — vor allem aus
+Quartalsberichten — und damit die KI-Bewertung mit echtem, aktuellem Kontext statt nur
+Kennzahlen versorgt. Läuft als eigener Claude-Agent mit Web-Search-Tool, abgesichert durch mehrere
+Guardrails (deskriptive Formulierung, Fakten-Abgleich, Quellenverweis- statt Zitat-Pflicht,
+Prompt-Injection-Widerstand). Bewusst als unabhängiges Sub-Projekt konzipiert, parallel zur
+Hauptanwendung entwickelbar.
+
+Design: [`docs/superpowers/specs/2026-07-24-company-research-agent-design.md`](docs/superpowers/specs/2026-07-24-company-research-agent-design.md).
+Umsetzung läuft aktuell in einem separaten Git-Worktree auf Branch `feature/company-research-agent`
+(siehe `PROJECT-STATUS.md` für den genauen Stand).
+
 ## Phase 1: Projekt-Grundgerüst + Portfolio-Grundfunktion
 
 ### Voraussetzungen
