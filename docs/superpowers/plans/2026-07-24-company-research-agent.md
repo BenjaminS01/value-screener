@@ -432,7 +432,7 @@ class ResearchPromptBuilderTest {
     void instructsDescriptiveNotRecommendingWording() {
         String prompt = builder.build("AAPL", "Apple Inc.");
 
-        assertThat(prompt).contains("never phrase findings as a recommendation");
+        assertThat(prompt).contains("Never phrase findings as a recommendation");
     }
 
     @Test
