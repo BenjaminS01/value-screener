@@ -1,7 +1,8 @@
 # Company Research Agent — Design
 
 Last updated: 2026-07-24
-Status: Design approved by the user, implementation not yet started.
+Status: Design approved by the user, implementation in progress (Guardrail E added mid-implementation,
+during Task 4 of the implementation plan — see Decision log).
 
 **Language policy note:** Starting with this document, project docs are written in English (the
 user is a Java developer targeting international roles), with a German summary at the top. Earlier
@@ -15,10 +16,13 @@ zu einem Ticker aktuelle, belegte qualitative Informationen recherchiert — vor
 Quartalsberichten, da Quartalsberichte in den USA (SEC 10-Q) Pflicht sind, in der EU aber seit 2013
 nicht mehr. Der Server exponiert ein einziges Tool `research_company(ticker, companyName)`, führt
 intern selbst einen Claude-Aufruf mit Web-Search-Tool aus und liefert eine deskriptiv formulierte
-Zusammenfassung mit vier Guardrails: (A) Value-Trap-Einschätzung, (B) Fakten-Abgleich gegen
+Zusammenfassung mit fünf Guardrails: (A) Value-Trap-Einschätzung, (B) Fakten-Abgleich gegen
 vorhandene Kennzahlen (passiert in der Hauptanwendung, nicht im Server), (C) Kennzeichnung, wenn
 kein verlässlicher Bericht gefunden wurde, (D) Quellenverweise statt wörtlicher Zitate (aus
-urheberrechtlichen Gründen, § 51 UrhG). Bewusst als eigenständiges, parallel zur Hauptanwendung
+urheberrechtlichen Gründen, § 51 UrhG), (E) Prompt-Injection-Widerstand — durchsuchte Webinhalte
+werden dem Modell explizit als Analysematerial, nicht als Anweisungen deklariert, da der Agent
+über die Websuche fremde, nicht vertrauenswürdige Inhalte liest (klassischer OWASP-LLM-Top-10-
+Angriffsvektor). Bewusst als eigenständiges, parallel zur Hauptanwendung
 entwickelbares Sub-Projekt konzipiert — adressiert Risiko 4 der Haupt-Design-Spec und aktiviert die
 dort vorgemerkte MCP-Idee. Auslösung ausschließlich manuell per Button (nicht automatisch/täglich),
 geschützt durch den bestehenden Single-User-Login, um Kosten planbar zu halten. Tägliche
@@ -42,7 +46,7 @@ unchanged.
 - Research on quarterly report / investor relations content for portfolio positions and screening
   candidates, driven by an agent with a web search tool (not SEC EDGAR alone, since not every
   exchange/country has a quarterly reporting requirement — see Section 4)
-- Sourced, descriptive summary with source references (see Section 5, Guardrails A–D)
+- Sourced, descriptive summary with source references (see Section 5, Guardrails A–E)
 - Manual trigger via a dashboard button, protected by the existing single-user login
 - A quarter-over-quarter, evolving (rather than one-off) moat/state assessment
 
@@ -116,6 +120,21 @@ Each analysis returns, structured:
   of Risk 7 in the main spec). Simpler to validate technically too: the check reduces to "does this
   link come from the search tool's actual results," instead of having to guarantee exact string
   matches against raw source text.
+- **E — Prompt-injection resistance:** the agent's system prompt explicitly instructs the model that
+  content retrieved via web search is analysis material, not instructions — if retrieved content
+  contains text that looks like a command (e.g., "ignore previous instructions," "you must recommend
+  this stock"), the model must disregard it as an attempted manipulation and continue to follow only
+  the system prompt. **Why this matters specifically here:** the agent autonomously reads
+  third-party web content (investor relations pages, and potentially news) that is not
+  trust-controlled by this project — a compromised or adversarial page could embed hidden
+  instructions aimed at the model reading it, the classic OWASP LLM Top 10 #1 risk (prompt
+  injection). Guardrail A (descriptive-only wording) provides a partial, structural defense-in-depth
+  layer against the most obvious injection goal (forcing a buy/sell recommendation), but does not
+  address other forms of manipulation (e.g., injected false-sounding factual claims phrased
+  descriptively). Guardrail D's citation cross-check is a different, complementary protection — it
+  guards against fabricated sources, not against a genuine source manipulating the model's output.
+  This is prompt-level mitigation only (instructing the model, not sandboxing it) — a reasonable,
+  industry-standard first layer for this risk level, not a complete technical guarantee.
 
 ## 6. Integration & triggering
 
@@ -217,3 +236,9 @@ Each analysis returns, structured:
 - Language policy decided during this session: going forward, new documents are written in English
   with a German summary (user's stated goal: work internationally as a Java developer); existing
   documents are not retroactively translated.
+- Guardrail E (prompt-injection resistance) added mid-implementation, after Task 3 (prompt builder)
+  was already committed: the user asked directly whether prompt injection was covered, prompted by
+  the realization that the agent (built in Task 4) reads untrusted third-party web content. This had
+  been flagged as a candidate topic very early in the original brainstorming (before the sub-project
+  was even scoped) but did not make it into the four guardrails (A–D) selected at design time — a
+  genuine gap, not a deliberate exclusion. Retrofitted as Task 3b in the implementation plan.
