@@ -2,7 +2,8 @@
 
 Last updated: 2026-07-24
 Status: Design approved by the user, implementation in progress (Guardrail E added mid-implementation,
-during Task 4 of the implementation plan — see Decision log).
+during Task 4 of the implementation plan; stack upgraded to Spring Boot 4 / Spring AI 2.0.0 GA during
+Task 4, see Decision log).
 
 **Language policy note:** Starting with this document, project docs are written in English (the
 user is a Java developer targeting international roles), with a German summary at the top. Earlier
@@ -67,7 +68,9 @@ unchanged.
   regardless of actual usage (parallel to the already-rejected llm-broker always-on concern in
   `PROJECT-STATUS.md`). Cold-start latency is not critical since the call is not on the
   synchronous UI path of a live interaction, but behind a button with an expected wait.
-- **Language/stack: Java/Spring**, consistent with the rest of the portfolio.
+- **Language/stack: Java 21/Spring**, on Spring Boot 4.x / Spring AI 2.0.0 (diverges from the
+  `backend/` module's Spring Boot 3.x — required by `AnthropicWebSearchTool`, see Decision log;
+  acceptable because this module has no shared dependency or deployment with `backend/`).
 - **Transport: MCP over Streamable HTTP** behind a Lambda Function URL (stdio doesn't fit the
   Lambda request/response model).
 - **Interface: a single tool** `research_company(ticker, companyName)` → a structured result with
@@ -242,3 +245,19 @@ Each analysis returns, structured:
   been flagged as a candidate topic very early in the original brainstorming (before the sub-project
   was even scoped) but did not make it into the four guardrails (A–D) selected at design time — a
   genuine gap, not a deliberate exclusion. Retrofitted as Task 3b in the implementation plan.
+- Stack upgraded from Spring Boot 3.x / Spring AI 1.1.8 to **Spring Boot 4.x / Spring AI 2.0.0 GA**
+  during Task 4: `AnthropicWebSearchTool` and citation-with-URL support (`Citation.getUrl()`,
+  `Citation.ofWebSearchResultLocation(...)`) — the mechanism Guardrail D's technical enforcement
+  depends on — do not exist anywhere in the 1.x line; they were introduced in Spring AI 2.0.0-M3 as
+  part of the Anthropic module's rewrite onto the official `com.anthropic:anthropic-java` SDK, which
+  hard-requires Spring Boot 4. Task 1's original 1.1.8 pin (see that task's note) was a reasonable
+  choice at the time it was made but turned out to be incompatible with a requirement (Guardrail D's
+  citation cross-check) that wasn't yet coded when the pin was chosen. Discovered when Task 4's first
+  implementation attempt silently papered over the missing APIs (invented a local `Citation`
+  stand-in, dropped the web-search-tool wiring entirely) — caught by inspecting the resolved
+  dependency jar directly rather than trusting the plan's assumed package names. Confirmed both
+  Spring Boot 4 (GA since November 2025, 4.1.0 stable since June 2026) and Spring AI 2.0.0 (GA since
+  June 12, 2026) are mature/GA, not milestone builds, before deciding to move; `aws-serverless-java-container`
+  (Task 9's deployment adapter) already supports Spring Boot 4. This module's isolation from
+  `backend/` (Section 3) is what makes the version divergence from the rest of the portfolio
+  acceptable — no shared dependency or shared deployment forces version alignment.

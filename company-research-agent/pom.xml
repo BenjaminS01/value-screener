@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.1</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
@@ -19,10 +19,10 @@
 
     <properties>
         <java.version>21</java.version>
-        <!-- Pinned to the latest Spring Boot 3.x-compatible line. spring-ai-bom 2.0.0 (GA since
-             2026-06-12) requires Spring Boot 4.0 and cannot load in this Spring Boot 3.x project;
-             re-evaluate only if this module's Spring Boot version changes. -->
-        <spring-ai.version>1.1.8</spring-ai.version>
+        <!-- Pinned to spring-ai-bom 2.0.0 GA (requires Spring Boot 4.x, used here). See the
+             Decision log in docs/superpowers/specs/2026-07-24-company-research-agent-design.md
+             for the full reasoning behind this module's stack choice. -->
+        <spring-ai.version>2.0.0</spring-ai.version>
     </properties>
 
     <dependencyManagement>

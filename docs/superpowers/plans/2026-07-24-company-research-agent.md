@@ -16,13 +16,19 @@ adapter — no always-on server, no custom Lambda handler class needed. This mod
 on and is not depended on by `backend/` — the only contract between them is the MCP tool interface,
 which lets both be developed in parallel (see spec Section 3).
 
-**Tech Stack:** Java 21, Spring Boot 3.4.x, Spring AI 1.1.8 (MCP server WebMVC starter + Anthropic
+**Tech Stack:** Java 21, Spring Boot 4.x, Spring AI 2.0.0 GA (MCP server WebMVC starter + Anthropic
 model starter), JUnit 5 / Mockito / AssertJ, AWS Lambda (Java 21 runtime) + AWS SAM, Jackson.
+*(Amended during Task 4: originally pinned to Spring Boot 3.x / Spring AI 1.1.8 in Task 1; raised to
+Spring Boot 4.x / Spring AI 2.0.0 GA because `AnthropicWebSearchTool` and citation-URL support do
+not exist before Spring AI 2.0.0-M3, which hard-requires Spring Boot 4. See design spec Decision
+log.)*
 
 ## Global Constraints
 
-- Java 21, Spring Boot 3.x — consistent with the rest of the value-screener stack (see
-  `PROJECT-STATUS.md`).
+- Java 21, Spring Boot 4.x — diverges from `backend/`'s Spring Boot 3.x by necessity
+  (`AnthropicWebSearchTool` requires it, see Tech Stack note above); acceptable because this module
+  has no shared dependency or deployment with `backend/` (see `PROJECT-STATUS.md` for the rest of
+  the value-screener stack, which stays on Boot 3.x).
 - Serverless deployment (AWS Lambda + Function URL), not an always-on server (design spec Section
   3) — cost-driven decision, do not introduce an always-on alternative.
 - MCP transport is Streamable HTTP, not stdio (design spec Section 3) — required by the Lambda
@@ -52,6 +58,12 @@ model starter), JUnit 5 / Mockito / AssertJ, AWS Lambda (Java 21 runtime) + AWS 
 ---
 
 ### Task 1: Module scaffold
+
+> **Amended during Task 4** (see Task 4's note and design spec Decision log): the `pom.xml` below
+> originally pinned Spring Boot 3.4.1 / Spring AI 1.1.8. Both are now raised to Spring Boot 4.x /
+> Spring AI 2.0.0 GA, because `AnthropicWebSearchTool` and citation-URL support do not exist before
+> Spring AI 2.0.0-M3, which requires Spring Boot 4. The `pom.xml` text below reflects the amended,
+> current state — not what Task 1 originally produced.
 
 **Files:**
 - Create: `company-research-agent/pom.xml`
@@ -94,7 +106,7 @@ target/
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.1</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
@@ -106,7 +118,7 @@ target/
 
     <properties>
         <java.version>21</java.version>
-        <spring-ai.version>1.1.8</spring-ai.version>
+        <spring-ai.version>2.0.0</spring-ai.version>
     </properties>
 
     <dependencyManagement>
@@ -155,12 +167,15 @@ target/
 </project>
 ```
 
-`spring-ai.version` is deliberately pinned to `1.1.8`, not the newer `2.0.0` GA (released
-2026-06-12) — verified against Spring AI's own release notes that **2.0.0 requires Spring Boot
-4.0** and is not loadable in a Spring Boot 3.x context. Bumping to it would break this plan's
-Global Constraint of staying on Spring Boot 3.x, consistent with the rest of the value-screener
-stack. `1.1.8` is the latest version in the Spring Boot 3–compatible `1.x` line. Re-check this
-trade-off only if the project's Spring Boot version itself changes.
+`spring-ai.version` is pinned to `2.0.0` GA (released 2026-06-12), on Spring Boot 4.1.0 (GA since
+2026-06-10). This is a change from Task 1's original choice, which pinned `1.1.8` / Spring Boot
+3.4.1 to stay consistent with the rest of the value-screener stack — a reasonable choice at the
+time, but incompatible with a requirement introduced later: Guardrail D's citation cross-check
+(Task 4) needs `AnthropicWebSearchTool` and `Citation.getUrl()`, neither of which exist before
+Spring AI 2.0.0-M3, which hard-requires Spring Boot 4. See design spec Decision log for the full
+reasoning. If `mvn test` fails on the `spring-ai-starter-mcp-server-webmvc` or
+`spring-ai-starter-model-anthropic` coordinates below (renamed/restructured artifact), check the
+resolved `spring-ai-bom:2.0.0`'s actual starter artifact list on Maven Central and adjust.
 
 - [ ] **Step 3: Write the application class**
 
@@ -618,6 +633,18 @@ git commit -m "feat: add prompt-injection resistance instruction (Guardrail E)"
 
 ### Task 4: Research agent core (Claude call, JSON parsing, citation cross-check)
 
+> **Note on the stack amendment:** this task's first implementation attempt (against the original
+> Spring Boot 3.x / Spring AI 1.1.8 pin from Task 1) discovered that `AnthropicWebSearchTool` and
+> `Citation.getUrl()` do not exist in that line at all — see Task 1's amendment note and the design
+> spec Decision log. The code below is written against the amended stack (Spring Boot 4.x / Spring
+> AI 2.0.0 GA) and has been verified against Spring AI 2.0.0's actual API (via its reference docs
+> and `AnthropicChatModel` source): `Citation` lives in `org.springframework.ai.anthropic.Citation`
+> (not `org.springframework.ai.chat.metadata.Citation`), has a real `getUrl()` for web-search-result
+> citations, and both the synchronous and streaming `AnthropicChatModel` call paths populate it
+> under the `"citations"` key on the top-level `ChatResponseMetadata` (`response.getMetadata()`) —
+> matching what this task's test already stubs. `AnthropicWebSearchTool.builder()...build()` attaches
+> via `AnthropicChatOptions.builder().webSearchTool(...)`, as used below.
+
 This is where Guardrail D (source-reference requirement) gets technically enforced, not just
 requested: any source URL the model claims is discarded unless Anthropic's web search tool actually
 returned that URL as a citation. Guardrail C (low-confidence flag) is honored from the model's own
@@ -649,9 +676,9 @@ import com.valuescreener.research.model.CompanyResearchResult;
 import com.valuescreener.research.model.ConfidenceLevel;
 import com.valuescreener.research.prompt.ResearchPromptBuilder;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.anthropic.Citation;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
-import org.springframework.ai.chat.metadata.Citation;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -807,8 +834,8 @@ import com.valuescreener.research.model.ConfidenceLevel;
 import com.valuescreener.research.model.SourceReference;
 import com.valuescreener.research.prompt.ResearchPromptBuilder;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
-import org.springframework.ai.anthropic.api.tool.AnthropicWebSearchTool;
-import org.springframework.ai.chat.metadata.Citation;
+import org.springframework.ai.anthropic.AnthropicWebSearchTool;
+import org.springframework.ai.anthropic.Citation;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
