@@ -152,9 +152,12 @@ target/
 </project>
 ```
 
-Before running the next step, check Maven Central for the current latest stable (non-milestone)
-`spring-ai-bom` version and adjust `spring-ai.version` if a newer one exists — `1.1.8` is the
-latest confirmed stable version as of writing this plan.
+`spring-ai.version` is deliberately pinned to `1.1.8`, not the newer `2.0.0` GA (released
+2026-06-12) — verified against Spring AI's own release notes that **2.0.0 requires Spring Boot
+4.0** and is not loadable in a Spring Boot 3.x context. Bumping to it would break this plan's
+Global Constraint of staying on Spring Boot 3.x, consistent with the rest of the value-screener
+stack. `1.1.8` is the latest version in the Spring Boot 3–compatible `1.x` line. Re-check this
+trade-off only if the project's Spring Boot version itself changes.
 
 - [ ] **Step 3: Write the application class**
 

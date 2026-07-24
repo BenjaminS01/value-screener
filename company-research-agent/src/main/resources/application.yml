@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: company-research-agent
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+    mcp:
+      server:
+        name: company-research-agent
+        version: 0.1.0
+        protocol: STREAMABLE
+        type: SYNC
+        annotation-scanner:
+          enabled: true
+
+research:
+  agent:
+    timeout-seconds: 55
