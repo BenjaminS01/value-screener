@@ -1,9 +1,36 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-07-21
-Aktuelle Phase: **Implementierung Phase 1 läuft** (Subagent-Driven Development nach Plan).
+Letztes Update: 2026-07-24
+Aktuelle Phase: **Phase 1 abgeschlossen** (siehe Abschnitt weiter unten). Parallel dazu läuft die
+Umsetzung des Company-Research-Agent-Sub-Projekts in einem eigenen Worktree (siehe unten).
 
 Dieses Dokument fasst den Stand zusammen, damit eine neue Session ohne erneute Erklärung anschließen kann.
+
+## Hinweis für diese Session: paralleles Worktree für den Company Research Agent
+
+Falls du (eine neue Claude-Code-Session) dieses Verzeichnis
+(`/mnt/c/Users/PCUser/dev/value-screener`, Branch `main`) geöffnet hast: dieses Verzeichnis ist
+bewusst unangetastet und frei für Arbeit an der Hauptanwendung (`backend/`, `frontend/`) — nutz es
+dafür ohne Rücksicht auf das Folgende.
+
+Parallel dazu läuft in einem **eigenen Git-Worktree** unter
+`/mnt/c/Users/PCUser/dev/value-screener-research` (Branch `feature/company-research-agent`, von
+`main` bei Commit `7e9e14a` abgezweigt) die Umsetzung des Company Research Agent — ein
+eigenständiges, serverless MCP-Server-Sub-Projekt (`company-research-agent/`), das Quartalsberichte
+recherchiert. Design: `docs/superpowers/specs/2026-07-24-company-research-agent-design.md`.
+Implementierungsplan: `docs/superpowers/plans/2026-07-24-company-research-agent.md` (per
+Subagent-Driven Development abgearbeitet, Fortschritt in
+`.superpowers/sdd/progress.md` **im Worktree**, nicht in diesem Verzeichnis — Worktrees teilen sich
+zwar die Git-Historie, aber nicht git-ignorierte Scratch-Dateien).
+
+**Warum ein Worktree statt direkt auf `main`:** damit diese Session (Hauptanwendung) und die andere
+Session (Company Research Agent) gleichzeitig arbeiten können, ohne sich gegenseitig unfertige
+Dateien im selben Arbeitsverzeichnis zu überschreiben. Beide Worktrees teilen sich dasselbe
+`.git`-Verzeichnis; Commits in einem sind über `git log`/`git fetch` auch vom anderen aus sichtbar.
+
+**Zusammenführen:** noch nicht entschieden/erfolgt — wenn der Company-Research-Agent-Plan
+abgeschlossen ist, wird `feature/company-research-agent` regulär nach `main` gemerged (Nutzer
+entscheidet Zeitpunkt und Methode, wie bei allen Git-Operationen in diesem Projekt).
 
 ## Idee
 
