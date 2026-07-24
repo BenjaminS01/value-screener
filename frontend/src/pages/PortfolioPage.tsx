@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react'
-import { fetchPublicPositions, PublicPosition } from '../api/portfolioApi'
+import { Credentials, fetchPublicPositions, PublicPosition } from '../api/portfolioApi'
+import { AddPositionForm } from '../components/AddPositionForm'
+import { LoginForm } from '../components/LoginForm'
 
 export function PortfolioPage() {
   const [positions, setPositions] = useState<PublicPosition[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [credentials, setCredentials] = useState<Credentials | null>(null)
 
-  useEffect(() => {
+  function loadPositions() {
     fetchPublicPositions()
       .then(setPositions)
       .catch((err: Error) => setError(err.message))
+  }
+
+  useEffect(() => {
+    loadPositions()
   }, [])
 
   if (error) {
@@ -23,6 +30,11 @@ export function PortfolioPage() {
           <li key={position.ticker}>{position.companyName} ({position.ticker})</li>
         ))}
       </ul>
+      {credentials ? (
+        <AddPositionForm credentials={credentials} onAdded={loadPositions} />
+      ) : (
+        <LoginForm onLogin={setCredentials} />
+      )}
     </section>
   )
 }
