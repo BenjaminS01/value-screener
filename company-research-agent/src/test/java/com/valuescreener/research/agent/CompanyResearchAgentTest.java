@@ -1,5 +1,6 @@
 package com.valuescreener.research.agent;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.valuescreener.research.model.CompanyResearchResult;
 import com.valuescreener.research.model.ConfidenceLevel;
@@ -88,6 +89,60 @@ class CompanyResearchAgentTest {
 
         assertThatThrownBy(() -> agent.research("EXMP", "Example Corp"))
                 .isInstanceOf(ResearchResponseParseException.class);
+    }
+
+    @Test
+    void throwsResearchTimeoutExceptionWhenChatModelCallExceedsTimeout() {
+        ChatModel slowChatModel = mock(ChatModel.class);
+        when(slowChatModel.call(any(Prompt.class))).thenAnswer(invocation -> {
+            Thread.sleep(500);
+            throw new IllegalStateException("should have timed out before returning");
+        });
+        CompanyResearchAgent agentWithShortTimeout =
+                new CompanyResearchAgent(slowChatModel, new ResearchPromptBuilder(), new ObjectMapper(), 0);
+
+        assertThatThrownBy(() -> agentWithShortTimeout.research("EXMP", "Example Corp"))
+                .isInstanceOf(ResearchTimeoutException.class);
+    }
+
+    @Test
+    void ignoresUnknownJsonFieldsInModelResponse() {
+        ObjectMapper lenientMapper = new ObjectMapper()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CompanyResearchAgent lenientAgent =
+                new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), lenientMapper, 55);
+        String responseJson = """
+                {
+                  "summary": "Revenue grew 8% year over year.",
+                  "valueTrapAssessment": "No structural headwinds mentioned.",
+                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": "Revenue grew 8%"}],
+                  "noReliableReportFound": false,
+                  "unexpectedNewField": "some future model output"
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+
+        CompanyResearchResult result = lenientAgent.research("EXMP", "Example Corp");
+
+        assertThat(result.confidence()).isEqualTo(ConfidenceLevel.HIGH);
+    }
+
+    @Test
+    void dropsSourcesWithBlankClaimAndFallsBackToLowConfidence() {
+        String responseJson = """
+                {
+                  "summary": "Revenue grew 8% year over year.",
+                  "valueTrapAssessment": "No structural headwinds mentioned.",
+                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": ""}],
+                  "noReliableReportFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+
+        CompanyResearchResult result = agent.research("EXMP", "Example Corp");
+
+        assertThat(result.confidence()).isEqualTo(ConfidenceLevel.LOW);
+        assertThat(result.sources()).isEmpty();
     }
 
     private void stubChatModelResponse(String responseText, List<String> citedUrls) {

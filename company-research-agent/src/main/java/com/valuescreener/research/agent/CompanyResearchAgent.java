@@ -14,8 +14,15 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 @Component
@@ -36,12 +43,10 @@ public class CompanyResearchAgent {
         this.timeoutSeconds = timeoutSeconds;
     }
 
+    private final Executor executor = Executors.newVirtualThreadPerTaskExecutor();
+
     public CompanyResearchResult research(String ticker, String companyName) {
-        ChatResponse response = chatModel.call(new Prompt(
-                promptBuilder.build(ticker, companyName),
-                AnthropicChatOptions.builder()
-                        .webSearchTool(AnthropicWebSearchTool.builder().build())
-                        .build()));
+        ChatResponse response = callWithTimeout(ticker, companyName);
 
         RawResearchResponse raw = parse(response.getResult().getOutput().getText());
 
@@ -55,6 +60,7 @@ public class CompanyResearchAgent {
         Set<String> citedUrls = extractCitedUrls(response);
         List<SourceReference> verifiedSources = raw.sources().stream()
                 .filter(source -> citedUrls.contains(source.url()))
+                .filter(source -> source.claim() != null && !source.claim().isBlank())
                 .map(source -> new SourceReference(source.url(), source.claim()))
                 .toList();
 
@@ -72,6 +78,30 @@ public class CompanyResearchAgent {
                 CompanyResearchResult.CURRENT_PROMPT_VERSION);
     }
 
+    private ChatResponse callWithTimeout(String ticker, String companyName) {
+        Prompt prompt = new Prompt(
+                promptBuilder.build(ticker, companyName),
+                AnthropicChatOptions.builder()
+                        .webSearchTool(AnthropicWebSearchTool.builder().build())
+                        .build());
+
+        CompletableFuture<ChatResponse> future =
+                CompletableFuture.supplyAsync(() -> chatModel.call(prompt), executor);
+        try {
+            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new ResearchTimeoutException(
+                    "Research for " + ticker + " did not complete within " + timeoutSeconds + "s", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ResearchTimeoutException("Research for " + ticker + " was interrupted", e);
+        } catch (ExecutionException e) {
+            throw new ResearchTimeoutException(
+                    "Research for " + ticker + " failed: " + e.getCause().getMessage(), e.getCause());
+        }
+    }
+
     private RawResearchResponse parse(String responseText) {
         try {
             return objectMapper.readValue(responseText, RawResearchResponse.class);
@@ -81,7 +111,6 @@ public class CompanyResearchAgent {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private Set<String> extractCitedUrls(ChatResponse response) {
         Object citations = response.getMetadata().get("citations");
         if (!(citations instanceof List<?> citationList)) {
