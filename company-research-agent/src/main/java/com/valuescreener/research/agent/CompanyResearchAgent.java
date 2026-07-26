@@ -1,5 +1,6 @@
 package com.valuescreener.research.agent;
 
+import com.anthropic.models.messages.Model;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.valuescreener.research.model.CompanyResearchResult;
 import com.valuescreener.research.model.ConfidenceLevel;
@@ -13,6 +14,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
@@ -28,19 +31,27 @@ import java.util.stream.Collectors;
 @Component
 public class CompanyResearchAgent {
 
+    private static final Logger log = LoggerFactory.getLogger(CompanyResearchAgent.class);
+
     private final ChatModel chatModel;
     private final ResearchPromptBuilder promptBuilder;
     private final ObjectMapper objectMapper;
     private final long timeoutSeconds;
+    private final String model;
+    private final long webSearchMaxUses;
 
     public CompanyResearchAgent(ChatModel chatModel,
                                  ResearchPromptBuilder promptBuilder,
                                  ObjectMapper objectMapper,
-                                 @Value("${research.agent.timeout-seconds:55}") long timeoutSeconds) {
+                                 @Value("${research.agent.timeout-seconds:55}") long timeoutSeconds,
+                                 @Value("${spring.ai.anthropic.chat.model:claude-sonnet-5}") String model,
+                                 @Value("${research.agent.web-search-max-uses:5}") long webSearchMaxUses) {
         this.chatModel = chatModel;
         this.promptBuilder = promptBuilder;
         this.objectMapper = objectMapper;
         this.timeoutSeconds = timeoutSeconds;
+        this.model = model;
+        this.webSearchMaxUses = webSearchMaxUses;
     }
 
     private final Executor executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -82,7 +93,8 @@ public class CompanyResearchAgent {
         Prompt prompt = new Prompt(
                 promptBuilder.build(ticker, companyName),
                 AnthropicChatOptions.builder()
-                        .webSearchTool(AnthropicWebSearchTool.builder().build())
+                        .model(Model.of(model))
+                        .webSearchTool(AnthropicWebSearchTool.builder().maxUses(webSearchMaxUses).build())
                         .build());
 
         CompletableFuture<ChatResponse> future =
@@ -91,6 +103,11 @@ public class CompanyResearchAgent {
             return future.get(timeoutSeconds, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             future.cancel(true);
+            // future.cancel(true) only stops us from waiting locally: the underlying OkHttp
+            // call blocks on a plain socket read, which does not react to Thread.interrupt(),
+            // so the request to Anthropic keeps running (and gets billed) in the background.
+            log.warn("Research for {} timed out locally after {}s; the underlying Anthropic "
+                    + "request may still be running and billed server-side", ticker, timeoutSeconds);
             throw new ResearchTimeoutException(
                     "Research for " + ticker + " did not complete within " + timeoutSeconds + "s", e);
         } catch (InterruptedException e) {

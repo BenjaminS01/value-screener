@@ -6,6 +6,8 @@ import com.valuescreener.research.model.CompanyResearchResult;
 import com.valuescreener.research.model.ConfidenceLevel;
 import com.valuescreener.research.prompt.ResearchPromptBuilder;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.Citation;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
@@ -20,13 +22,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CompanyResearchAgentTest {
 
     private final ChatModel chatModel = mock(ChatModel.class);
     private final CompanyResearchAgent agent =
-            new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), new ObjectMapper(), 55);
+            new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), new ObjectMapper(), 55, "claude-sonnet-5", 5);
 
     @Test
     void returnsHighConfidenceResultWithSourcesVerifiedAgainstCitations() {
@@ -99,7 +102,7 @@ class CompanyResearchAgentTest {
             throw new IllegalStateException("should have timed out before returning");
         });
         CompanyResearchAgent agentWithShortTimeout =
-                new CompanyResearchAgent(slowChatModel, new ResearchPromptBuilder(), new ObjectMapper(), 0);
+                new CompanyResearchAgent(slowChatModel, new ResearchPromptBuilder(), new ObjectMapper(), 0, "claude-sonnet-5", 5);
 
         assertThatThrownBy(() -> agentWithShortTimeout.research("EXMP", "Example Corp"))
                 .isInstanceOf(ResearchTimeoutException.class);
@@ -110,7 +113,7 @@ class CompanyResearchAgentTest {
         ObjectMapper lenientMapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         CompanyResearchAgent lenientAgent =
-                new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), lenientMapper, 55);
+                new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), lenientMapper, 55, "claude-sonnet-5", 5);
         String responseJson = """
                 {
                   "summary": "Revenue grew 8% year over year.",
@@ -143,6 +146,26 @@ class CompanyResearchAgentTest {
 
         assertThat(result.confidence()).isEqualTo(ConfidenceLevel.LOW);
         assertThat(result.sources()).isEmpty();
+    }
+
+    @Test
+    void capsWebSearchUsesToBoundCostAndLatencyPerRequest() {
+        String responseJson = """
+                {
+                  "summary": "Revenue grew 8% year over year.",
+                  "valueTrapAssessment": "No structural headwinds mentioned.",
+                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": "Revenue grew 8%"}],
+                  "noReliableReportFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+
+        agent.research("EXMP", "Example Corp");
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
+        assertThat(options.getWebSearchTool().getMaxUses()).isEqualTo(5L);
     }
 
     private void stubChatModelResponse(String responseText, List<String> citedUrls) {

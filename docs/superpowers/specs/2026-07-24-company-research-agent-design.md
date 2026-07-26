@@ -261,3 +261,89 @@ Each analysis returns, structured:
   (Task 9's deployment adapter) already supports Spring Boot 4. This module's isolation from
   `backend/` (Section 3) is what makes the version divergence from the rest of the portfolio
   acceptable — no shared dependency or shared deployment forces version alignment.
+- Chat model pinned to `claude-sonnet-5` (`spring.ai.anthropic.chat.model` in `application.yml`)
+  during Task 7's manual wire-level check: without an explicit model, Spring AI 2.0.0 defaults to
+  `claude-haiku-4-5-20251001`, and the live call failed with a 400 from Anthropic — Haiku 4.5 does
+  not support Programmatic Tool Calling, which the hosted `web_search` tool now requires by default
+  (part of Anthropic's "improved web search with dynamic filtering"). Confirmed via Anthropic's own
+  model-compatibility table that only Sonnet/Opus/Fable-tier models (not Haiku) support it. Checked
+  whether Spring AI 2.0.0's `AnthropicWebSearchTool` builder could instead override this directly
+  (set `allowed_callers: ["direct"]` on the tool, as Anthropic's error message itself suggests) —
+  it can't; the builder only exposes `allowedDomains`/`blockedDomains`/`maxUses`/`userLocation`, no
+  `allowedCallers` escape hatch — so the model choice was the only available lever. Chose Sonnet 5
+  over Opus 5 for the cost/quality balance appropriate to a bounded, single-ticker research-and-
+  summarize task (user's explicit choice when asked). This is a genuine spec gap, not a Task
+  4/5/6 implementation defect — the plan never pinned a chat model at all before this.
+- The `application.yml` property alone turned out to be insufficient: decompiling
+  `AnthropicChatModel.createRequest(...)` showed that when `Prompt.getOptions()` is already an
+  `AnthropicChatOptions` instance (true here, since `CompanyResearchAgent` always builds one to
+  attach the web search tool), it's used as-is with **no merge** against the property-configured
+  default options — so a `model` left unset on the per-request options falls through to the
+  Anthropic SDK's own hardcoded default (Haiku 4.5), regardless of `application.yml`. Real fix:
+  `CompanyResearchAgent` now takes the model as a constructor parameter
+  (`@Value("${spring.ai.anthropic.chat.model:claude-sonnet-5}")`) and sets it explicitly via
+  `.model(com.anthropic.models.messages.Model.of(model))` on the per-request builder — a genuine
+  constructor-signature change to already-committed Task 4/5 code, not just a config tweak.
+  Discovered live during Task 7's manual check (first two attempts after the YAML-only fix still
+  failed with the identical Haiku error). Also found and fixed a second, unrelated layering issue
+  while diagnosing this: `src/test/resources/application.yml` (a minimal test-only config with a
+  dummy API key, from Task 1) shadows `src/main/resources/application.yml` entirely on the test
+  classpath, so the new `@Value` needed its own default (`:claude-sonnet-5`) — matching the existing
+  pattern already used for `timeoutSeconds` — rather than duplicating the model into the test config.
+- **Cost/latency guardrail added after a real Sonnet 5 call took >55s and cost more than $1**:
+  `AnthropicWebSearchTool.builder()` was previously called with no `maxUses`, so the model could
+  issue an unbounded number of web searches per single research call. Added
+  `research.agent.web-search-max-uses` (default 5) and wired it into the per-request
+  `AnthropicWebSearchTool.builder().maxUses(...)`. Separately, decompiling the OkHttp-based call
+  path confirmed `future.cancel(true)` in `callWithTimeout(...)` does NOT actually abort the
+  in-flight request: `chatModel.call(...)` blocks on a plain OkHttp socket read, which does not
+  react to `Thread.interrupt()` (OkHttp calls are only cancellable via the `okhttp3.Call` object
+  itself, which Spring AI's `ChatModel` abstraction does not expose). So a "timeout" on our side
+  only stops us from waiting — the real Anthropic request, and its cost, keeps running server-side
+  regardless. This is now logged as a warning on timeout and documented in code; `maxUses` is the
+  actual cost bound, not the timeout. A full fix (true cancellation) would require bypassing Spring
+  AI's `ChatModel` abstraction to talk to the raw `com.anthropic` client directly — judged out of
+  scope for this task given the size of that change relative to the risk.
+- **Follow-up session: cost simulation and candidate cost/quality improvements, without any live
+  API call.** Prompted by a report from a separate session that a single research call had cost
+  "about $1". Re-derived the request `CompanyResearchAgent` actually builds (model, prompt text,
+  web-search tool config) purely from the source and `application.yml`, without touching the real
+  `ANTHROPIC_API_KEY` (explicit user constraint). Findings:
+  - The fixed instructional part of `ResearchPromptBuilder`'s prompt is small (~460 tokens,
+    ~1.8K characters for a representative ticker) — not the cost driver.
+  - The documented ">$1" incident above (the `maxUses` guardrail entry) predates that guardrail:
+    it happened with *unbounded* web searches. With today's default `maxUses(5)`, a single call is
+    modeled as landing roughly in the $0.08–$0.25 range for typical cases, with $0.80–$1.20 only
+    plausible in a worst case of heavy adaptive thinking plus large accumulated search-result
+    content in a single request — still possible, just less likely now than when the >$1 sample was
+    taken.
+  - Decompiled the resolved `spring-ai-anthropic-2.0.0.jar`
+    (`AnthropicChatOptions.Builder`, `AnthropicCacheOptions`, `AnthropicWebSearchTool.Builder`) to
+    check which cost/quality levers Spring AI 2.0.0 actually exposes beyond what
+    `CompanyResearchAgent` currently uses (`model`, `webSearchTool.maxUses`). Confirmed available
+    but unused: `.effort(OutputConfig.Effort)`, `.thinkingAdaptive()` / `.thinkingDisabled()`,
+    `.cacheOptions(AnthropicCacheOptions)`, and `AnthropicWebSearchTool.Builder.allowedDomains(...)`.
+  - Candidate improvements identified, in priority order, **none implemented yet** — the user asked
+    to record these for a later session rather than act on them now:
+    1. Log `usage` from `response.getMetadata()` (input/output/cache tokens) per research call.
+       Currently there is no per-call cost visibility beyond what's manually checked in the
+       Anthropic console; this is a prerequisite for evaluating any of the levers below with real
+       data instead of estimates.
+    2. Set `effort` explicitly (e.g. `OutputConfig.Effort.MEDIUM`) instead of relying on the
+       implicit default (`high`, with adaptive thinking on by default for `claude-sonnet-5`) —
+       likely the largest unused lever on the thinking-token side, independent of search count.
+       Trade-off: needs an empirical quality comparison before adopting.
+    3. Set `allowedDomains(...)` on `AnthropicWebSearchTool.builder()` to trusted financial/
+       regulatory sources (e.g. SEC EDGAR, investor-relations domains, major financial news).
+       Plausibly reduces both wasted search rounds on low-quality pages and the untrusted-content
+       surface that Guardrail E (prompt-injection resistance) has to defend against.
+    4. Restructure `ResearchPromptBuilder` so the static instruction block precedes the
+       interpolated ticker/company name (currently interpolated first, which would defeat any
+       future prompt caching). Not useful today — the fixed prompt is below Sonnet 5's 1024-token
+       cache minimum — but prepares for caching once the instruction block grows.
+    5. Revisit the deferred true-cancellation fix from the guardrail entry above (bypass Spring
+       AI's `ChatModel` to use the raw `com.anthropic` client with a real cancellable
+       `okhttp3.Call`). `maxUses` is currently the only real cost ceiling; a client-side timeout
+       still does not stop server-side billing.
+    6. Re-tune `research.agent.web-search-max-uses` (currently 5) empirically, once (1) provides
+       real per-call token data to tune against.
