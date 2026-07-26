@@ -323,8 +323,9 @@ Each analysis returns, structured:
     `CompanyResearchAgent` currently uses (`model`, `webSearchTool.maxUses`). Confirmed available
     but unused: `.effort(OutputConfig.Effort)`, `.thinkingAdaptive()` / `.thinkingDisabled()`,
     `.cacheOptions(AnthropicCacheOptions)`, and `AnthropicWebSearchTool.Builder.allowedDomains(...)`.
-  - Candidate improvements identified, in priority order, **none implemented yet** — the user asked
-    to record these for a later session rather than act on them now:
+  - Candidate improvements identified, in priority order, **none implemented yet at the time** — the
+    user asked to record these for a later session rather than act on them then. Item 1 was
+    implemented in the following session (see next entry).
     1. Log `usage` from `response.getMetadata()` (input/output/cache tokens) per research call.
        Currently there is no per-call cost visibility beyond what's manually checked in the
        Anthropic console; this is a prerequisite for evaluating any of the levers below with real
@@ -347,3 +348,57 @@ Each analysis returns, structured:
        still does not stop server-side billing.
     6. Re-tune `research.agent.web-search-max-uses` (currently 5) empirically, once (1) provides
        real per-call token data to tune against.
+- **Implemented candidate improvement 1: per-call usage logging.** `CompanyResearchAgent.research()`
+  now logs `response.getMetadata().getUsage()` (promptTokens, completionTokens, totalTokens,
+  cacheReadInputTokens, cacheWriteInputTokens) right after `callWithTimeout(...)` returns, before
+  parsing. Verified via `javap` on `AnthropicChatModel` that Spring AI already aggregates usage
+  across an internal multi-turn tool-use loop via `UsageCalculator.getCumulativeUsage(...)` before
+  returning the `ChatResponse` — so a single log line after one `chatModel.call(prompt)` already
+  reflects the *whole* research call's token cost (all web_search rounds included), not just the
+  final turn. **Confirmed limitation while implementing this**: Anthropic's own `Usage` object has
+  no separate thinking-token count — `com.anthropic...Usage.outputTokens()` maps 1:1 onto Spring
+  AI's `completionTokens`, bundling thinking and the final answer into one number. This log line can
+  only give an indirect signal (a `completionTokens` count far above the ~400-600 tokens the final
+  JSON answer alone needs implies heavy thinking); isolating actual thinking-token spend would
+  require additionally inspecting the raw `ThinkingBlock` content length, not attempted here.
+  Usage is `null` on a client-side timeout (no response is ever returned), so `logUsage(...)` warns
+  instead of logging in that case rather than throwing — covered by
+  `warnsInsteadOfFailingWhenUsageMetadataIsMissing` in `CompanyResearchAgentTest`, alongside
+  `logsTokenUsageAfterASuccessfulCall` which asserts on the log content via a Logback
+  `ListAppender` attached in `@BeforeEach`/detached in `@AfterEach`.
+- **Manual simulation of a real research call for AAPL, and a resulting scope question on
+  `valueTrapAssessment`.** To sanity-check the prompt and the cost/thinking analysis above without
+  a live API call, the controller manually executed `ResearchPromptBuilder`'s exact prompt text for
+  ticker AAPL / Apple Inc., substituting its own web search for the Anthropic-hosted `web_search`
+  tool. Two findings:
+  - **Search-round count exceeded the configured guardrail.** Disambiguating "most recent quarterly
+    report" took 7 search rounds, not the ≤5 the app enforces via `research.agent.web-search-max-uses`
+    — analyst "Q3 2026 preview" articles (Apple's non-calendar fiscal year) had to be distinguished
+    from the actually-filed Q2 FY2026 10-Q. In the real app this ambiguity would have hit the
+    `maxUses(5)` ceiling first, plausibly forcing an answer off the wrong/stale report rather than
+    costing more — a quality risk, not just a cost one. (The simulation's own token/dollar figures
+    are not valid evidence either way: the controller's web search tool pre-digests results into a
+    summary, unlike Anthropic's hosted `web_search` tool which returns raw snippets the model itself
+    must read and synthesize each round, and no extended-thinking tokens were actually incurred — so
+    no cost number from this exercise was carried over as an estimate.)
+  - **`valueTrapAssessment` asks for something the prompt never sources.** The prompt asks the model
+    to assess whether "the valuation appears explained by fundamentals," but never instructs it to
+    look up the company's actual valuation multiple (P/E, sector comparison) — the simulation needed
+    an ad hoc extra search for that, outside the prompt's own instructions. Checked against
+    `docs/superpowers/specs/2026-07-21-value-screener-design.md`: this is consistent with that spec's
+    intent, not an oversight to patch by adding a search instruction — the backend's planned Data
+    Provider Client / `FundamentalSnapshot` (Phase 2, not yet built) is meant to own valuation
+    numbers, with Guardrail B cross-checking the agent's qualitative claims against it *after* the
+    call, in the backend. Proposed resolution, in two parts:
+    1. **No code change needed for the search-count/ambiguity finding directly** — it's evidence for
+       candidate improvement 6 above (re-tune `web-search-max-uses` once real usage data exists) and
+       for candidate improvement 3 (`allowedDomains(...)` to steer straight at primary filings like
+       SEC EDGAR instead of analyst preview articles).
+    2. **For `valueTrapAssessment`**: keep the field qualitative-only (describe what management/risk
+       disclosures say, without the model judging whether that justifies the valuation) rather than
+       having the agent search for or guess at a valuation multiple. Once `FundamentalSnapshot` exists,
+       extend `research_company(ticker, companyName)` with a third parameter carrying the backend's
+       already-computed valuation figure, interpolated into the prompt as given context — not
+       re-derived by the model — so there is one source of truth for the number and one fewer search
+       round per call. Not implemented; recorded here for whenever Phase 2's Data Provider Client
+       lands.

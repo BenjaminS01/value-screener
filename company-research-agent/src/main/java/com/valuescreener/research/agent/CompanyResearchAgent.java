@@ -9,6 +9,7 @@ import com.valuescreener.research.prompt.ResearchPromptBuilder;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.AnthropicWebSearchTool;
 import org.springframework.ai.anthropic.Citation;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -58,6 +59,7 @@ public class CompanyResearchAgent {
 
     public CompanyResearchResult research(String ticker, String companyName) {
         ChatResponse response = callWithTimeout(ticker, companyName);
+        logUsage(ticker, response);
 
         RawResearchResponse raw = parse(response.getResult().getOutput().getText());
 
@@ -117,6 +119,23 @@ public class CompanyResearchAgent {
             throw new ResearchTimeoutException(
                     "Research for " + ticker + " failed: " + e.getCause().getMessage(), e.getCause());
         }
+    }
+
+    private void logUsage(String ticker, ChatResponse response) {
+        Usage usage = response.getMetadata().getUsage();
+        if (usage == null) {
+            log.warn("No usage metadata returned for research call on {}", ticker);
+            return;
+        }
+        // Anthropic's own usage object has no separate thinking-token count: completionTokens
+        // bundles thinking and the final answer together (confirmed via javap on the bundled
+        // spring-ai-anthropic jar -- com.anthropic Usage.outputTokens() maps 1:1 onto this field).
+        // A completionTokens figure far above the ~400-600 tokens the final JSON answer alone
+        // needs is the signal that most of it was spent thinking, not writing the answer.
+        log.info("Research usage for {}: promptTokens={}, completionTokens={}, totalTokens={}, "
+                        + "cacheReadInputTokens={}, cacheWriteInputTokens={}",
+                ticker, usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens(),
+                usage.getCacheReadInputTokens(), usage.getCacheWriteInputTokens());
     }
 
     private RawResearchResponse parse(String responseText) {
