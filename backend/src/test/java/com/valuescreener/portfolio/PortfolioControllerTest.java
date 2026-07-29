@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PortfolioController.class)
@@ -91,6 +92,18 @@ class PortfolioControllerTest {
                                 {"isin":"US0378331005","quantity":1000}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void neverExposesQuantityEntryPriceOrIsinInPublicResponse() throws Exception {
+        when(portfolioService.listPublicPositions())
+                .thenReturn(List.of(new PublicPortfolioPositionView("AAPL", "Apple Inc.")));
+
+        mockMvc.perform(get("/api/portfolio/public"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].quantity").doesNotExist())
+                .andExpect(jsonPath("$[0].entryPrice").doesNotExist())
+                .andExpect(jsonPath("$[0].isin").doesNotExist());
     }
 
     @Test
