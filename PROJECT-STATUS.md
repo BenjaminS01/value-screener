@@ -217,12 +217,28 @@ statt 404/400) wurde noch vor Abschluss gefixt: `PortfolioExceptionHandler`
 erneut verifiziert (33/33 Backend-Tests grün).
 
 **Backlog für Phase 2 (Minor-Funde aus dem finalen Review, keine Blocker für Phase 1):**
-- `@Transactional` auf `PortfolioService.buy`/`sell` ergänzen (aktuell TOCTOU-Fenster bei
-  gleichzeitigem Anlegen derselben ISIN — bei Single-User heute irrelevant, aber Phase 2 könnte
-  durch einen Scheduler echte Nebenläufigkeit einführen).
-- Regressionstest, der sicherstellt, dass der öffentliche Endpunkt (`GET /api/portfolio/public`)
-  nie `quantity`/`entryPrice`/`isin` im JSON exponiert (aktuell nur strukturell durch die DTO
-  garantiert, nicht durch einen expliziten Test abgesichert).
+- ~~`@Transactional` auf `PortfolioService.buy`/`sell` ergänzen~~ **erledigt (2026-07-29, noch nicht
+  committet)**: `@Transactional` auf beiden Methoden ergänzt. Bei der Umsetzung stellte sich heraus,
+  dass `@Transactional` allein das eigentliche TOCTOU-Problem nicht schließt — unter der
+  Standard-Isolationsstufe (`READ_COMMITTED`) können zwei gleichzeitige Transaktionen trotzdem
+  denselben veralteten Stand lesen und sich beim Speichern gegenseitig überschreiben ("Lost
+  Update"), z. B. bei zwei gleichzeitigen Nachkäufen auf dieselbe ISIN. Echter Schutz kam über ein
+  neues `@Version`-Feld auf `PortfolioPosition` (optimistisches Locking, Flyway-Migration
+  `V2__add_version_to_portfolio_position.sql`) — Hibernate wirft jetzt eine
+  `ObjectOptimisticLockingFailureException`, wenn eine veraltete Kopie gespeichert wird, statt die
+  Änderung still zu verlieren. Per TDD abgesichert in
+  `PortfolioPositionRepositoryTest.rejectsSaveOfAStaleCopyAfterAConcurrentUpdate` (zwei unabhängige,
+  über `TestEntityManager.detach(...)` entkoppelte Kopien derselben Zeile). Die im Backlog-Eintrag
+  genannte Race beim *gleichzeitigen Neuanlegen* derselben ISIN (zwei parallele Erstkäufe) bleibt
+  weiterhin durch den bestehenden `UNIQUE`-Constraint auf `isin` abgesichert (kein stiller
+  Datenverlust, aber aktuell noch kein sauber gemapptes HTTP-Ergebnis für diesen Fall — vorgemerkt,
+  nicht Teil dieses Fixes).
+- ~~Regressionstest für den öffentlichen Endpunkt~~ **erledigt (2026-07-29, noch nicht committet)**:
+  `PortfolioControllerTest.neverExposesQuantityEntryPriceOrIsinInPublicResponse` ergänzt. Da der
+  Test mit dem bestehenden Code sofort grün gewesen wäre (die Felder existieren strukturell gar
+  nicht auf `PublicPortfolioPositionView`), wurde die Verletzung kurz simuliert (Feld testweise
+  ergänzt, Fehlschlag beobachtet, zurückgesetzt), um die Kontrollwirkung des Tests nachzuweisen,
+  bevor er als Dauerzustand steht.
 - Frontend-Fehlermeldungen in `AddPositionForm`/`portfolioApi.ts` sind statuscode-blind (z. B.
   falsches Passwort zeigt nur generische "401"-Meldung) — Politur, kein Blocker.
 - Vor Phase 4 (AWS-Deployment): CORS-Policy fehlt noch (Dev funktioniert nur über den
