@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -38,6 +39,10 @@ public class PortfolioPosition {
 
     @Column(name = "purchase_date", nullable = false)
     private LocalDate purchaseDate;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     protected PortfolioPosition() {
         // JPA
