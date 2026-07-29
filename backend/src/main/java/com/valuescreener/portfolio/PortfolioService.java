@@ -1,6 +1,7 @@
 package com.valuescreener.portfolio;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -13,6 +14,7 @@ public class PortfolioService {
         this.repository = repository;
     }
 
+    @Transactional
     public void buy(BuyPositionRequest request) {
         PortfolioPosition position = repository.findByIsin(request.isin()).orElse(null);
 
@@ -27,6 +29,7 @@ public class PortfolioService {
         repository.save(position);
     }
 
+    @Transactional
     public void sell(SellPositionRequest request) {
         PortfolioPosition position = repository.findByIsin(request.isin())
                 .orElseThrow(() -> new PositionNotFoundException(request.isin()));
