@@ -51,6 +51,15 @@ Das vollständige, mit dem Nutzer abgestimmte Design steht in:
 
 Dort: Scope (in/out), Buffett-Kriterien-Set, Architektur/Komponenten, täglicher Datenfluss, Datenmodell, Tech-Stack/Deployment, offene Risiken, kompletter Entscheidungsverlauf.
 
+**Neuausrichtung Screening/AI Assessor (2026-07-30):** Abschnitt 3–5 sowie Risiko 1 und 3 aus
+Abschnitt 8 des obigen Designs (Screener-API, Data Provider Client, KI-Bewertung pro Kandidat) wurden
+grundlegend neu gedacht, nachdem sich beide Risiken in der Praxis bestätigt haben (Screener-Endpunkt
+kostenpflichtig, KI-Recherche-Kosten pro Call unvorhersehbar bis ~$1, siehe Company-Research-Agent-
+Kostenanalyse). Kein externer Fundamentaldaten-Anbieter mehr — stattdessen ein dreistufiger
+KI-Recherche-Trichter mit eigener, wachsender Wissensdatenbank. Vollständiges neues Design:
+[`docs/superpowers/specs/2026-07-30-screening-cost-redesign-design.md`](docs/superpowers/specs/2026-07-30-screening-cost-redesign-design.md).
+Status: Design abgestimmt, Implementierungsplan noch nicht geschrieben.
+
 ## Implementierungsplan (Phase 1)
 
 Vollständiger Task-für-Task-Plan (13 Tasks: Backend-Grundgerüst, Portfolio-Domäne mit TDD,
@@ -156,6 +165,13 @@ Besprochener Fahrplan, noch nicht fortgesetzt:
      adressiert direkt zwei offene Risiken aus der Design-Spec (Abschnitt 8): Risiko 4 (AI Assessor
      braucht echten aktuellen Kontext statt nur Kennzahlen) und Risiko 5 (Data-Provider-Anbindung
      muss austauschbar bleiben — MCP liefert dafür eine saubere Protokollgrenze).
+
+     **Überholt (2026-07-30):** entfällt so nicht mehr, da es laut Neuausrichtung
+     (`2026-07-30-screening-cost-redesign-design.md`) keinen Data-Provider-Client/Fundamentaldaten-
+     Anbieter mehr gibt. Ob eine MCP-Kapselung für die neuen Komponenten (Universe Provider, Sector
+     Benchmark Cache) noch sinnvoll ist, ist nicht entschieden — eher unwahrscheinlich, da beides
+     kleine, seltene Abrufe sind, kein Kandidat für eine Protokollgrenze wie ein austauschbarer
+     Datenanbieter.
    - MCP-Client vom AI Assessor zu einem externen Server (z. B. Web-Suche) für zusätzlichen
      qualitativen Kontext (News, Firmenbeschreibung) bei der Burggraben-Bewertung.
 
@@ -200,11 +216,13 @@ Doku, Code oder Commit-Historie — mit Ausnahme des Impressums (siehe Design-Sp
 das bewusst erst kurz vor Deployment mit echten Angaben befüllt wird. Zugangsdaten (Admin-Passwort,
 API-Keys) laufen ausschließlich über Umgebungsvariablen, nie über Dateien im Repo.
 
-## Offenes Risiko aus dem Design (weiterhin ungeprüft)
+## Offenes Risiko aus dem Design — jetzt geklärt (bestätigt, nicht entkräftet)
 
-Risiko 1 aus der Design-Spec: ob der gewählte Fundamentaldaten-Anbieter (Kandidat: Financial
-Modeling Prep) den Screener-Endpunkt tatsächlich im Free-Tier freigibt — relevant erst ab Phase 2
-(Screening-Pipeline), nicht blockierend für Phase 1.
+Risiko 1 aus der Design-Spec (ob der Screener-Endpunkt im Free-Tier verfügbar ist) hat sich bestätigt:
+er ist kostenpflichtig. Das war der Auslöser für die Neuausrichtung in
+[`2026-07-30-screening-cost-redesign-design.md`](docs/superpowers/specs/2026-07-30-screening-cost-redesign-design.md)
+— dort entfällt der Fundamentaldaten-Anbieter komplett, das Risiko ist damit gegenstandslos statt
+gelöst.
 
 ## Phase 1 abgeschlossen (2026-07-24)
 
