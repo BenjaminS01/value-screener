@@ -3,6 +3,8 @@
 Letztes Update: 2026-07-21
 Status: Design abgeschlossen und vom Nutzer freigegeben, Implementierung steht noch aus.
 
+**Hinweis (2026-07-30):** Der Ansatz hinter Abschnitt 3–5 sowie Risiko 1 und 3 aus Abschnitt 8 (Screener-API, Data Provider Client, KI-Bewertung pro Kandidat) wurde grundlegend neu gedacht, nachdem sich beide Risiken in der Praxis bestätigt haben (Screener-Endpunkt kostenpflichtig, KI-Recherche-Kosten pro Call unvorhersehbar bis ~$1). Der neue Ansatz (kein externer Fundamentaldaten-Anbieter mehr, dreistufiger KI-Recherche-Trichter mit eigener Wissensdatenbank) steht in [`docs/superpowers/specs/2026-07-30-screening-cost-redesign-design.md`](2026-07-30-screening-cost-redesign-design.md). Dieses Dokument bleibt als historischer Kontext (Zweck, Scope, Datenmodell-Grundlage, Compliance-Vorgaben in Abschnitt 9) weiterhin gültig — nur die Screening-/Bewertungs-Logik wurde ersetzt.
+
 **Wichtig:** Die Anwendung ist bewusst öffentlich erreichbar (Freelancer-Vorzeigeprojekt), wird aber vorerst nur vom Nutzer selbst zur eigenen Anlageentscheidung verwendet. Siehe Abschnitt 9 für die daraus folgenden Vorgaben (Formulierung, Disclaimer, Datensichtbarkeit).
 
 ## 1. Zweck
