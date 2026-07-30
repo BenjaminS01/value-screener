@@ -39,6 +39,18 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
 - **Bewusst zurückgestellt:** eine spätere, kostenlose Kurs-Anreicherung bereits recherchierter Firmen
   (um "wurde inzwischen günstig" ohne neue KI-Kosten zu erkennen) — erst bei Bedarf, wenn die reale
   Trefferquote der Zufallsrotation sich als zu niedrig erweist.
+- **Ergänzung (2026-07-30, Produktstrategie-Review):** Zweck geschärft — die App soll keinen fertigen
+  Anlage-Verdikt liefern, sondern einen Hinweis, der die eigene, tiefere Recherche des Nutzers wert
+  ist (Abschnitt 1). Daraus folgt: kein Tracking realisierter Rendite und keine periodische
+  Frische-Neuprüfung (beides erwogen, bewusst nicht umgesetzt — zu aufwändig für den eigentlichen
+  Zweck). Stattdessen zeigt das Dashboard pro Kriterium, auf welcher Stufe (0/1/2) und wann es geprüft
+  wurde (Abschnitt 7/9) — nutzt nur bereits vorhandene Daten, keine neuen Kosten.
+- **Weitere Ergänzung (gleiches Review):** Marktkapitalisierungs-Untergrenze für den Universe Provider
+  wieder aufgenommen (aus dem verworfenen Data-Provider-Entwurf übernommen, sonst geht Stage-2-Budget
+  an nicht recherchierbare Mikro-Caps verloren) und eine offene Lücke im Company-Research-Agent-Prompt
+  geschlossen: die Bewertungsfrage (`valueTrapAssessment`) wartete auf eine Kennzahl aus dem inzwischen
+  entfallenen Data Provider Client — diese Abhängigkeit wäre nie aufgelöst worden. Stattdessen liefert
+  jetzt Stage 1s ohnehin berechnetes KGV/KBV genau diese Zahl in den Stage-2-Prompt.
 
 ## 1. Purpose
 
@@ -47,6 +59,13 @@ fundamentally strong, fairly valued, and crisis-resistant — without depending 
 market-wide screener endpoint or an unpredictable, expensive per-candidate AI web-search call. The
 guiding cost target: AI research spend in the low single-digit euros per month, fully predictable,
 never spiking on a single call or a single visitor.
+
+**What "surfacing" means (clarified 2026-07-30):** the goal is not for the app to deliver a finished
+verdict the user acts on directly — it's a lead-generation tool. A Suggestion only needs to be
+promising enough to justify the user's own, deeper manual research before any real decision; it does
+not need to be a fully self-validated pick. This directly shapes Section 6/7/9 below: the app's job is
+to be honest about *how confidently* each criterion was established, not to hide that behind a binary
+pass/fail.
 
 ## 2. Scope
 
@@ -153,6 +172,12 @@ historical average, and isn't materially above its sector's cached benchmark.
 - **Universe Provider** — acquires and periodically refreshes the list of Gettex-tradable equities,
   deduplicated by company/ISIN (a single company often has multiple Gettex listings), grouped by
   sector and country of headquarters. Acquisition mechanics are an implementation detail (Section 2).
+  Carries a **market-cap floor to exclude micro-caps** (revived from the superseded data-provider-
+  client draft's own Section 2, where it was adopted for risk reasons and never actually dropped, just
+  never re-stated here) — Gettex lists many thinly traded, data-sparse secondary listings, and every
+  candidate the Selection Logic draws that turns out un-researchable in Stage 1/2 for lack of
+  available information is wasted budget against the shared cap (Section 8/10). No upper cutoff —
+  large, well-known opportunities should still surface.
 - **Sector Benchmark Cache** — small reference table of sector-average P/E ratios, refreshed
   periodically (e.g. quarterly) from free public sources, used for the valuation check in Section 6.
 - **Selection Logic** — the entry point into the funnel. Normally draws candidates weighted toward
@@ -176,6 +201,14 @@ historical average, and isn't materially above its sector's cached benchmark.
   3. A prompt scoped narrowly to the specific criteria in Section 6, not an open-ended "tell me
      everything about this company."
   4. An explicit, bounded thinking/effort budget instead of unconstrained reasoning.
+  5. **Stage 1's valuation figures (current P/E, P/B, Section 6) passed into the Stage 2 prompt as
+     given context**, resolving a previously-open item from the agent's own spec: its
+     `valueTrapAssessment` was left deliberately unable to judge "is the valuation explained by
+     fundamentals" because the prompt was never given an actual multiple, with the fix explicitly
+     deferred until a Data Provider Client / `FundamentalSnapshot` existed to supply one (see that
+     spec's decision log, 2026-07-26). That component is now permanently out of scope under this
+     redesign (Section 4) — the dependency would otherwise never resolve. Stage 1 already computes the
+     same figure for free, immediately before Stage 2 runs, and is now the fix's actual source instead.
 - **Knowledge Base** — persists every research outcome from every tier (pass and fail), with
   timestamp and tier reached. Powers the recency-weighted rotation and, over time, lets the real hit
   rate be measured (Section 11).
@@ -187,7 +220,13 @@ historical average, and isn't materially above its sector's cached benchmark.
   a specific Gettex ticker, (b) request a filtered random draw (sector/country). Public visitors never
   trigger new research of any kind — they only ever read already-completed results.
 - **Dashboard** — unchanged concept from the original design: shows Stage-2 "pass" outcomes as
-  Suggestions, publicly readable, no trigger capability for anonymous visitors.
+  Suggestions, publicly readable, no trigger capability for anonymous visitors. Per criterion
+  (Section 6), also surfaces which tier established it and the as-of date (e.g. "margin trend:
+  confirmed, Stage 2, 2026-07-30" vs. "moat: rough read, Stage 0, 2026-06-01") — sourced directly from
+  the provenance already captured per criterion in `ResearchRecord` (Section 9), no new research or
+  cost. This turns the dashboard from a binary pass/fail into a map of where a candidate is
+  well-verified vs. where it's still an untested read, which is exactly what the user needs to judge
+  whether it's worth spending their own research time on (Section 1).
 
 ## 8. Data flow
 
@@ -230,7 +269,11 @@ per position) since the position count is small enough not to be a cost concern.
 - **SectorBenchmark** — sector label, cached average P/E, date last refreshed.
 - **ResearchRecord** (the knowledge base entry) — ticker/ISIN, date, tier reached, per-tier
   outcome/reason, extracted structured fundamentals (P/E, P/B, ROE, margins, debt/equity, current
-  ratio, FCF trend) where obtained, qualitative business-model/moat text, final pass/fail.
+  ratio, FCF trend) where obtained, qualitative business-model/moat text, final pass/fail. Each
+  per-criterion value (Section 6) carries its own **tier-of-origin and as-of date**, not just the
+  record-level tier reached — e.g. a Stage-2 record can still have a moat read that was only ever
+  confirmed at Stage 0, and the dashboard (Section 7) needs that per-criterion granularity, not the
+  record's overall tier, to show it.
 - **Suggestion** — a view over `ResearchRecord` entries where the final outcome is "pass"; drives the
   public dashboard.
 - **PortfolioPosition** — unchanged from the 2026-07-21 design.
@@ -307,3 +350,30 @@ per position) since the position count is small enough not to be a cost concern.
   revisits combining a free quantitative pre-filter with this design's AI research funnel — it was not
   wrong, it simply arrived a day earlier than this session's own conclusion and the two were not
   reconciled before this design was finalized.
+- **2026-07-30, product-strategy review:** evaluated three candidate gaps against the actual product
+  goal (clarified in this same review, Section 1: a lead worth the user's own research time, not a
+  self-validated final verdict) — realized-return outcome tracking, staleness re-checks on already-
+  passed Suggestions, and per-criterion source confidence. Realized-return tracking was considered and
+  explicitly **not adopted now**: it only earns its cost if the app itself has to be trusted as the
+  decision-maker, which it deliberately isn't, so it's deferred to "later, if curious how the funnel
+  performs" rather than a design blocker. A full periodic staleness re-check pipeline (reusing Stage 1,
+  discussed and initially favored earlier in the same review) was also **not adopted**, in favor of
+  the far cheaper fix of simply displaying each Suggestion's existing `ResearchRecord` date — since the
+  user reviews every lead manually before acting, a visible age is enough, no new research cost or
+  pipeline needed. **Adopted:** per-criterion tier-of-origin and as-of-date, surfaced on the dashboard
+  (Section 7) from data the model already captures (Section 9) — this was judged the one gap that
+  actually serves "is this worth my research time," at zero additional cost. Considered rejecting a
+  live global price-data API (e.g. EODHD, per the superseded data-provider-client draft's own findings
+  that no free option exists internationally) as the mechanism for any of this — correctly avoided,
+  since none of the adopted fixes need one; reusing Stage 1's AI web search or plain existing
+  timestamps was sufficient in both cases considered.
+- **2026-07-30, product-strategy review, continued:** two further gaps identified, both adopted, both
+  zero-cost. (1) The Universe Provider had silently dropped the market-cap floor the superseded
+  data-provider-client draft had adopted for risk reasons — re-added, since an un-researchable
+  micro-cap draw wastes the same scarce Stage-2 budget this whole redesign exists to protect. (2) The
+  Company Research Agent's `valueTrapAssessment` gap (its spec's own decision log, 2026-07-26: prompt
+  never sources an actual valuation multiple, fix explicitly deferred until a Data Provider Client /
+  `FundamentalSnapshot` supplies one) was left pointing at a dependency that this redesign permanently
+  removes (Section 4) — it would never have resolved. Fixed by wiring Stage 1's already-computed P/E/
+  P/B (Section 6) into the Stage 2 prompt as context instead, added as cost/quality measure 5 in
+  Section 7.
