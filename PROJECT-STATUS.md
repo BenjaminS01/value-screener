@@ -1,9 +1,36 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-07-21
-Aktuelle Phase: **Implementierung Phase 1 läuft** (Subagent-Driven Development nach Plan).
+Letztes Update: 2026-07-24
+Aktuelle Phase: **Phase 1 abgeschlossen** (siehe Abschnitt weiter unten). Parallel dazu läuft die
+Umsetzung des Company-Research-Agent-Sub-Projekts in einem eigenen Worktree (siehe unten).
 
 Dieses Dokument fasst den Stand zusammen, damit eine neue Session ohne erneute Erklärung anschließen kann.
+
+## Hinweis für diese Session: paralleles Worktree für den Company Research Agent
+
+Falls du (eine neue Claude-Code-Session) dieses Verzeichnis
+(`/mnt/c/Users/PCUser/dev/value-screener`, Branch `main`) geöffnet hast: dieses Verzeichnis ist
+bewusst unangetastet und frei für Arbeit an der Hauptanwendung (`backend/`, `frontend/`) — nutz es
+dafür ohne Rücksicht auf das Folgende.
+
+Parallel dazu läuft in einem **eigenen Git-Worktree** unter
+`/mnt/c/Users/PCUser/dev/value-screener-research` (Branch `feature/company-research-agent`, von
+`main` bei Commit `7e9e14a` abgezweigt) die Umsetzung des Company Research Agent — ein
+eigenständiges, serverless MCP-Server-Sub-Projekt (`company-research-agent/`), das Quartalsberichte
+recherchiert. Design: `docs/superpowers/specs/2026-07-24-company-research-agent-design.md`.
+Implementierungsplan: `docs/superpowers/plans/2026-07-24-company-research-agent.md` (per
+Subagent-Driven Development abgearbeitet, Fortschritt in
+`.superpowers/sdd/progress.md` **im Worktree**, nicht in diesem Verzeichnis — Worktrees teilen sich
+zwar die Git-Historie, aber nicht git-ignorierte Scratch-Dateien).
+
+**Warum ein Worktree statt direkt auf `main`:** damit diese Session (Hauptanwendung) und die andere
+Session (Company Research Agent) gleichzeitig arbeiten können, ohne sich gegenseitig unfertige
+Dateien im selben Arbeitsverzeichnis zu überschreiben. Beide Worktrees teilen sich dasselbe
+`.git`-Verzeichnis; Commits in einem sind über `git log`/`git fetch` auch vom anderen aus sichtbar.
+
+**Zusammenführen:** noch nicht entschieden/erfolgt — wenn der Company-Research-Agent-Plan
+abgeschlossen ist, wird `feature/company-research-agent` regulär nach `main` gemerged (Nutzer
+entscheidet Zeitpunkt und Methode, wie bei allen Git-Operationen in diesem Projekt).
 
 ## Idee
 
@@ -190,12 +217,28 @@ statt 404/400) wurde noch vor Abschluss gefixt: `PortfolioExceptionHandler`
 erneut verifiziert (33/33 Backend-Tests grün).
 
 **Backlog für Phase 2 (Minor-Funde aus dem finalen Review, keine Blocker für Phase 1):**
-- `@Transactional` auf `PortfolioService.buy`/`sell` ergänzen (aktuell TOCTOU-Fenster bei
-  gleichzeitigem Anlegen derselben ISIN — bei Single-User heute irrelevant, aber Phase 2 könnte
-  durch einen Scheduler echte Nebenläufigkeit einführen).
-- Regressionstest, der sicherstellt, dass der öffentliche Endpunkt (`GET /api/portfolio/public`)
-  nie `quantity`/`entryPrice`/`isin` im JSON exponiert (aktuell nur strukturell durch die DTO
-  garantiert, nicht durch einen expliziten Test abgesichert).
+- ~~`@Transactional` auf `PortfolioService.buy`/`sell` ergänzen~~ **erledigt (2026-07-29, noch nicht
+  committet)**: `@Transactional` auf beiden Methoden ergänzt. Bei der Umsetzung stellte sich heraus,
+  dass `@Transactional` allein das eigentliche TOCTOU-Problem nicht schließt — unter der
+  Standard-Isolationsstufe (`READ_COMMITTED`) können zwei gleichzeitige Transaktionen trotzdem
+  denselben veralteten Stand lesen und sich beim Speichern gegenseitig überschreiben ("Lost
+  Update"), z. B. bei zwei gleichzeitigen Nachkäufen auf dieselbe ISIN. Echter Schutz kam über ein
+  neues `@Version`-Feld auf `PortfolioPosition` (optimistisches Locking, Flyway-Migration
+  `V2__add_version_to_portfolio_position.sql`) — Hibernate wirft jetzt eine
+  `ObjectOptimisticLockingFailureException`, wenn eine veraltete Kopie gespeichert wird, statt die
+  Änderung still zu verlieren. Per TDD abgesichert in
+  `PortfolioPositionRepositoryTest.rejectsSaveOfAStaleCopyAfterAConcurrentUpdate` (zwei unabhängige,
+  über `TestEntityManager.detach(...)` entkoppelte Kopien derselben Zeile). Die im Backlog-Eintrag
+  genannte Race beim *gleichzeitigen Neuanlegen* derselben ISIN (zwei parallele Erstkäufe) bleibt
+  weiterhin durch den bestehenden `UNIQUE`-Constraint auf `isin` abgesichert (kein stiller
+  Datenverlust, aber aktuell noch kein sauber gemapptes HTTP-Ergebnis für diesen Fall — vorgemerkt,
+  nicht Teil dieses Fixes).
+- ~~Regressionstest für den öffentlichen Endpunkt~~ **erledigt (2026-07-29, noch nicht committet)**:
+  `PortfolioControllerTest.neverExposesQuantityEntryPriceOrIsinInPublicResponse` ergänzt. Da der
+  Test mit dem bestehenden Code sofort grün gewesen wäre (die Felder existieren strukturell gar
+  nicht auf `PublicPortfolioPositionView`), wurde die Verletzung kurz simuliert (Feld testweise
+  ergänzt, Fehlschlag beobachtet, zurückgesetzt), um die Kontrollwirkung des Tests nachzuweisen,
+  bevor er als Dauerzustand steht.
 - Frontend-Fehlermeldungen in `AddPositionForm`/`portfolioApi.ts` sind statuscode-blind (z. B.
   falsches Passwort zeigt nur generische "401"-Meldung) — Politur, kein Blocker.
 - Vor Phase 4 (AWS-Deployment): CORS-Policy fehlt noch (Dev funktioniert nur über den
