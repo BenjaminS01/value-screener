@@ -293,3 +293,17 @@ per position) since the position count is small enough not to be a cost concern.
   past the cost target.
 - Explicitly deferred: live/cheap price-refresh enrichment of already-researched companies (until the
   real hit rate is known to need it).
+- **2026-07-30, discovered after this design was drafted:** a parallel, uncommitted draft
+  (`docs/superpowers/specs/superseded/2026-07-29-data-provider-client-design.md`) had researched
+  and partially designed a genuinely free numeric-fundamentals path — SEC EDGAR bulk data for US
+  fundamentals + a free-tier commercial provider used *only* for daily price, with KGV/KBV/market cap
+  computed in-app, USA-only for now (Germany/Switzerland confirmed to have no free bulk source at
+  all). This directly undercuts this design's founding premise that no free numeric source exists.
+  Considered and explicitly not adopted: the user decided this document's AI-only approach stands
+  as the current direction, specifically to keep one coherent design rather than merging two
+  differently-shaped solutions to the same problem. The prior draft's per-country provider research
+  (Section 4 of that document: SEC EDGAR, EDINET, Companies House/UK-SEF, `filings.xbrl.org`, EODHD/
+  FMP/Finnhub/Twelve Data cost and ToS findings) remains valid, reusable research if a future session
+  revisits combining a free quantitative pre-filter with this design's AI research funnel — it was not
+  wrong, it simply arrived a day earlier than this session's own conclusion and the two were not
+  reconciled before this design was finalized.
