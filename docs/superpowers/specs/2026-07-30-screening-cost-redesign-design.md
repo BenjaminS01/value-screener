@@ -92,6 +92,15 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
   Finanzen, Informationstechnologie, Kommunikationsdienste, Versorger, Immobilien), nicht das volle
   lizenzierte GICS-System — passend zu dem, was Finanzseiten ohnehin ausweisen, keine eigene
   Klassifizierungsarbeit nötig.
+- **Ergänzung (2026-07-31, Coverage Map & Watchlist-Nachprüfung):** die tägliche automatische
+  Ziehung gewichtet jetzt zusätzlich zur "am längsten nicht geprüft"-Regel aktiv nach
+  Branchen-Unterrepräsentation (aus der Wissensdatenbank), auf Wunsch des Nutzers, statt die Verteilung
+  nur passiv in einer Coverage Map anzuzeigen — die Karte zeigt genau dieses Signal, das die Ziehung
+  ohnehin schon nutzt. Neu: ein vierter, betreibernur zugänglicher Auslöseweg **Watchlist-Nachprüfung**
+  — auf Wunsch des Nutzers manuell statt automatisch/periodisch: der Betreiber wählt einen Eintrag aus
+  der "nur an Bewertung gescheitert"-Watchlist, es wird nur Stage 1 erneut ausgeführt (nie Stage 2),
+  berührt das gemeinsame Budget also gar nicht. Eine volle Stage-2-Nachprüfung bleibt eine separate,
+  bewusste Entscheidung über den bestehenden Ticker-Auslöseweg.
 
 ## 1. Purpose
 
@@ -277,15 +286,23 @@ historical average, and isn't materially above its sector's cached benchmark.
   Keyed by the same 11-sector taxonomy as the Universe Provider above, so a candidate's sector (already
   captured during research) maps directly to its benchmark row with no separate lookup logic.
 - **Selection Logic** — the entry point into the funnel. Normally draws candidates weighted toward
-  "longest since last checked" and stratified across sectors (the automatic daily path), but accepts
-  three trigger modes:
-  1. automatic daily draw (unfiltered, weighted-random)
+  "longest since last checked" (the automatic daily path), but accepts four trigger modes:
+  1. automatic daily draw (weighted-random)
   2. operator-supplied filters (sector and/or country of headquarters) for an on-demand filtered
      random draw
   3. operator-supplied specific ticker (must be in the Universe Provider's Gettex list)
+  4. **operator-triggered watchlist re-check (added 2026-07-31)** — see the Watchlist Re-check bullet
+     below; distinct from modes 1–3 because it doesn't enter the three-tier funnel from Stage 0, it
+     re-runs Stage 1 only on an existing candidate.
 
-  All three modes feed the *same* three-tier funnel (Section 5) — there is no separate code path for
-  manual vs. automatic candidates.
+  Modes 1–3 all feed the *same* three-tier funnel (Section 5) — there is no separate code path for
+  manual vs. automatic new-candidate draws. **Sector balancing (added 2026-07-31, sharpened from
+  "stratified across sectors"):** the automatic daily draw's weighting is not just recency-based — it
+  also actively weights toward sectors that are currently under-represented in the Knowledge Base
+  relative to the others (the same 11-sector taxonomy used throughout, Section 7 above), so the slow
+  1–2/day rotation doesn't drift toward covering a few sectors deeply while others stay empty. This is
+  the same coverage data the Coverage Map (below) displays — the map is the visible readout of the
+  exact signal already driving the draw, not a separate calculation.
 - **Company Research Agent** (existing component, extended) — Stage 0 and Stage 1 are new,
   lightweight steps added ahead of the existing agent. Stage 2 itself (the existing agent) is
   tightened with four cost measures already identified but not yet implemented in its own spec's
@@ -306,15 +323,35 @@ historical average, and isn't materially above its sector's cached benchmark.
      redesign (Section 4) — the dependency would otherwise never resolve. Stage 1 already computes the
      same figure for free, immediately before Stage 2 runs, and is now the fix's actual source instead.
 - **Knowledge Base** — persists every research outcome from every tier (pass and fail), with
-  timestamp and tier reached. Powers the recency-weighted rotation and, over time, lets the real hit
-  rate be measured (Section 11).
+  timestamp and tier reached. Powers the recency-weighted **and now sector-balanced** rotation (see
+  Selection Logic above) and, over time, lets the real hit rate be measured (Section 11).
+- **Coverage Map (added 2026-07-31)** — operator-facing view showing how many candidates have been
+  checked so far per sector (the 11-sector taxonomy) and country, drawn directly from the Knowledge
+  Base — the same counts already used to drive the Selection Logic's sector-balancing weight above,
+  just made visible. Purpose: lets the operator aim the filtered-random and specific-ticker manual
+  trigger paths at genuinely under-covered areas instead of guessing, and shows concretely how the
+  accepted "coverage speed sacrificed for budget discipline" trade-off (Section 11, risk 1) is playing
+  out over time. No new research or cost — pure read of existing data.
 - **Scheduler** — triggers one automatic daily batch via the Selection Logic. Per the user's explicit
   budget/coverage-speed trade-off (Section 11), the daily figure is deliberately small — on the order
   of 1–2 Stage-2 executions per day — favoring cost discipline over how fast the universe gets
   covered.
-- **Manual trigger paths** — both operator-only, protected by the existing single-user login: (a) pick
-  a specific Gettex ticker, (b) request a filtered random draw (sector/country). Public visitors never
-  trigger new research of any kind — they only ever read already-completed results.
+- **Manual trigger paths** — all operator-only, protected by the existing single-user login: (a) pick a
+  specific Gettex ticker, (b) request a filtered random draw (sector/country), (c) **trigger a Watchlist
+  Re-check (added 2026-07-31, see below)**. Public visitors never trigger new research of any kind —
+  they only ever read already-completed results.
+- **Watchlist Re-check (added 2026-07-31)** — an operator-only manual trigger, separate from the
+  three-tier funnel entry points above: picks an entry from the "valuation-only" rejected-candidates
+  sub-group (Section 7 Rejected-candidates list) and re-runs **Stage 1 only** to refresh its current
+  P/E/P/B against the same historical/sector-benchmark check (Section 6). Deliberately **not** a Stage 2
+  re-run and **not** automatic/scheduled — a candidate that already passed every fundamental check and
+  only failed on price doesn't need its fundamentals re-verified, just a cheap current-price read,
+  triggered when the operator is specifically curious. Doesn't touch the shared Stage-2 budget cap
+  (Section 10) at all, since it never invokes Stage 2. If the refreshed valuation now clears the bar,
+  the result is logged as a new `ResearchRecord` entry (the existing append-only, never-overwrite
+  pattern, Section 5); a full Stage 2 re-run is then a separate, deliberate decision via the existing
+  specific-ticker manual trigger — this re-check only produces a stronger signal, it doesn't
+  auto-cascade into spending the capped budget.
 - **Dashboard** — restructured as a **screener overview + drill-down** (decided 2026-07-31), not a flat
   list or a feed, so a growing knowledge base stays scannable and comparable across many candidates:
   - **Overview table**, one row per Suggestion, sortable/filterable: ticker, company, sector (the
@@ -360,10 +397,12 @@ historical average, and isn't materially above its sector's cached benchmark.
 ## 8. Data flow
 
 ```
-Trigger (any of the three):
-  (a) Scheduler (daily, automatic, unfiltered weighted-random)
+Trigger (any of a-c enters the funnel below; d is separate, see note):
+  (a) Scheduler (daily, automatic, weighted-random: recency + sector-balance)
   (b) Operator: filtered random draw (sector/country)
   (c) Operator: specific Gettex ticker
+  (d) Operator: Watchlist Re-check — bypasses the funnel below entirely, re-runs Stage 1 only on
+      an existing "valuation-only" rejected candidate, no Stage-2 budget touched (Section 7)
         │
         ▼
   Selection Logic picks one candidate (or, for (c), uses the given one)
@@ -593,3 +632,15 @@ per position) since the position count is small enough not to be a cost concern.
   granularity the already-found free sector-P/E sources report at. A finer GICS industry-group split
   (~24) was considered and rejected — at 1–2 Stage-2 executions/day, candidates would accumulate too
   slowly per group to make a finer split useful.
+- **2026-07-31, continued:** asked for further product ideas; two were proposed and both refined by
+  the user before adoption. (1) **Coverage Map** — proposed as a passive transparency view; the user
+  asked to also actively keep sectors balanced, not just display the imbalance. Adopted: the automatic
+  daily draw's weighting (Selection Logic, Section 7) now factors in sector under-representation from
+  the Knowledge Base directly, not just recency; the Coverage Map is the visible readout of that same
+  signal, not a separate calculation. (2) **Targeted cheap re-check for "valuation-only" watchlist
+  entries** — proposed as a periodic/automatic re-check; the user asked for it to be an
+  operator-triggered manual action instead. Adopted as a fourth trigger mode, **Watchlist Re-check**
+  (Section 7): operator picks a watchlist entry, re-runs Stage 1 only (never Stage 2, never touches the
+  shared budget cap), logged as a new `ResearchRecord` entry per the existing append-only pattern; a
+  full Stage 2 re-run remains a separate, deliberate decision via the existing specific-ticker trigger,
+  not an automatic cascade.
