@@ -1,6 +1,6 @@
 # Screening & Research Cost Redesign — Design
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 Status: Design approved by the user in this brainstorming session, implementation not started.
 
 **Relationship to earlier specs:** this document replaces the *approach* behind Sections 3–5 and
@@ -51,6 +51,47 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
   geschlossen: die Bewertungsfrage (`valueTrapAssessment`) wartete auf eine Kennzahl aus dem inzwischen
   entfallenen Data Provider Client — diese Abhängigkeit wäre nie aufgelöst worden. Stattdessen liefert
   jetzt Stage 1s ohnehin berechnetes KGV/KBV genau diese Zahl in den Stage-2-Prompt.
+- **Ergänzung (2026-07-31, Produktstrategie-Review):** Stage 1 fragt jetzt zusätzlich zu KGV/KBV/ROE/
+  Verschuldungsgrad auch die *aktuellen Einzelwerte* (nicht den Trend) von Marge, FCF-Vorzeichen und
+  Gewinn-ggü.-Vorjahr ab — kostenlos, da meist auf derselben Kennzahlen-Seite. Dient als früher
+  Ablehnungsfilter: ein Kandidat, dessen aktuelles Jahr schon offensichtlich schlecht ist, verbraucht
+  nicht erst das knappe Stage-2-Budget. Die eigentliche Mehrjahres-Trendbestätigung bleibt weiterhin
+  ausschließlich Aufgabe von Stage 2.
+- **Ergänzung (2026-07-31, fachliche Prüfung):** Zinsdeckungsgrad (EBIT / Zinsaufwand) als neues
+  Stage-2-Kriterium aufgenommen — Verschuldungsgrad allein zeigt nur die Bilanzstruktur, nicht ob die
+  laufenden Zinsen aus dem operativen Ergebnis leicht bedienbar sind. **Ausdrücklich als kostenseitig
+  ungeprüft markiert:** anders als die übrigen Stage-2-Kriterien steht diese Kennzahl nicht zuverlässig
+  auf einer Standard-Kennzahlen-Seite; ob die Beschaffung teuer wird (zusätzliche Suchrunden), muss die
+  Umsetzung noch klären — genau die Art von unvorhersehbaren Mehrkosten, die dieses Redesign eigentlich
+  vermeiden soll (Abschnitt 3, Risiko 3).
+- **Ergänzung (2026-07-31, Speicherung & Anzeige):** Jeder `ResearchRecord` speichert jetzt zusätzlich
+  pro Kriterium den **Quellenverweis** und den bereits vom Company-Research-Agent erzeugten
+  **Value-Trap-Assessment-/Low-Confidence-Text** (beides bisher erzeugt, aber nie gespeichert) sowie bei
+  Ablehnung, **welches konkrete Kriterium** den Fail ausgelöst hat. Im Dashboard zeigen Vorschläge (Pass)
+  jetzt auch den Quellenverweis pro Kriterium — der Nutzer kann seine eigene Recherche genau dort
+  fortsetzen, wo die KI aufgehört hat. Neu: eine **öffentliche Liste abgelehnter Kandidaten** (nicht nur
+  intern) — auf ausdrücklichen Wunsch des Nutzers **ohne** die technische Stufe/das Kriterium zu zeigen,
+  nur Firma, Datum und eine neutrale Kategorie (z. B. "Bewertung", "finanzielle Stabilität"). Die vollen
+  technischen Details bleiben unbeschränkt in `ResearchRecord`/Wissensdatenbank für Betreiber und
+  Rotationslogik erhalten.
+- **Ergänzung (2026-07-31, Managementqualität):** neues qualitatives Stage-2-Kriterium
+  **Managementqualität/Kapitalallokation** (Aktienrückkäufe vs. Verwässerung, disziplinierte
+  Übernahmen) — läuft in derselben Tiefenrecherche wie die Burggraben-Einschätzung mit, kein separater
+  Aufwand. Ergänzt um **Insider-/Gründeranteil** als billigen Stage-1-Wert (gleiche Kennzahlen-Seite wie
+  KGV/KBV) als Proxy für eigenes investiertes Kapital des Managements. Kundenkonzentration,
+  regulatorische Risiken und aktuelle Negativschlagzeilen bewusst nicht als eigene Kriterien aufgenommen
+  — fließen bereits in die bestehende qualitative Einschätzung und den Value-Trap-Check ein.
+- **Ergänzung (2026-07-31, Darstellung & Branchen):** Dashboard neu als **Screener-Übersicht mit
+  Detailseite** statt flacher Liste — sortierbare/filterbare Tabelle (Bewertungsabstand zu eigener
+  Historie/Branchenschnitt, neuer **Verifizierungstiefe-Indikator**, z. B. "5/8 Kriterien auf Stage 2
+  bestätigt", berechnet aus bereits vorhandenen Daten, keine neue Speicherung) plus Detailseite pro
+  Vorschlag mit allen Kriterien einzeln inkl. Quellenverweis. Auf der Ablehnungsliste wird die Gruppe
+  "nur an Bewertung gescheitert" (fundamental gut, aktuell nur zu teuer) hervorgehoben — praktisch eine
+  kostenlose Watchlist. Außerdem geklärt: **Branchenschema** — die 11 GICS-typischen Obersektoren
+  (Energie, Grundstoffe, Industrie, Nicht-Basiskonsumgüter, Basiskonsumgüter, Gesundheitswesen,
+  Finanzen, Informationstechnologie, Kommunikationsdienste, Versorger, Immobilien), nicht das volle
+  lizenzierte GICS-System — passend zu dem, was Finanzseiten ohnehin ausweisen, keine eigene
+  Klassifizierungsarbeit nötig.
 
 ## 1. Purpose
 
@@ -140,12 +181,56 @@ got.
 |---|---|---|---|
 | Understandable business model | Basic "what does this company do" description | very low | Stage 0 |
 | Recognizable moat (rough read) | Often inferable from general/trained knowledge for known companies | low | Stage 0 (rough), deepened in Stage 2 |
+| Management quality / capital allocation (added 2026-07-31) | Qualitative read on buyback-vs-dilution history and M&A discipline, alongside the moat write-up in the same deep research pass | low incremental (same research pass as moat) | Stage 2 |
+| Insider/founder ownership share (added 2026-07-31) | Standard key-statistics figure on most finance pages, supports the management-quality read above | low, same search hit as P/E/P/B | Stage 1 |
 | Current P/E, P/B | Standard key-statistics figure on almost any finance page | low, one search hit | Stage 1 |
 | Current ROE, debt/equity | Same standard key-statistics page as above | low | Stage 1 |
 | Current ratio | Sometimes on the same page, sometimes needs a balance-sheet detail | medium | Stage 1 if available, else Stage 2 |
-| Margin trend (stable/growing) | Needs multi-year history | high | Stage 2 |
-| Free cash flow positive & growing | Cash-flow-statement-specific, multi-period | high | Stage 2 |
-| No strong profit decline over 5–10 years | Multi-year history — the most expensive criterion to verify | highest | Stage 2 |
+| Current-year net margin (single point, not the trend) | Same key-statistics page as P/E/ROE | low, same search hit | Stage 1 (reject filter only) |
+| Current-year FCF sign (positive/negative, not the trend) | Often on the same page's cash-flow summary line | low, same search hit | Stage 1 (reject filter only) |
+| Current-year net income vs. prior year (single point, not the trend) | Often on the same page's earnings summary | low, same search hit | Stage 1 (reject filter only) |
+| Margin trend (stable/growing, multi-year) | Needs multi-year history | high | Stage 2 |
+| Free cash flow positive & growing (multi-year) | Cash-flow-statement-specific, multi-period | high | Stage 2 |
+| No strong profit decline over 5–10 years (multi-year) | Multi-year history — the most expensive criterion to verify | highest | Stage 2 |
+| Interest coverage (EBIT / interest expense) | Not on standard key-statistics pages — needs income-statement line items (EBIT, interest expense), **cost to obtain not yet confirmed cheap, see caveat below** | unknown, likely medium–high | Stage 2 |
+
+**New criterion, cost not yet confirmed (added 2026-07-31):** debt/equity (already checked, Stage 1)
+only shows balance-sheet structure, not whether current earnings comfortably cover the interest actually
+owed — a company can look safe on D/E and still be tight on debt service if its debt is short-term or
+variable-rate. Interest coverage catches that. Unlike the Stage-1 snapshot values above, this is *not*
+reliably on a single standard key-statistics page — EBIT and interest expense are often income-statement
+detail. **Before this is treated as a standard, always-on Stage 2 check, implementation must confirm it
+doesn't quietly reintroduce the same kind of per-candidate search-cost blowup this whole redesign exists
+to avoid (Section 3, Risk 3)** — if the agent needs extra search rounds specifically to dig this figure
+out, it competes with the fixed round ceiling and effort budget (Section 7) and its actual cost must be
+checked against those, not assumed free just because the other multi-year criteria already share Stage
+2's cost.
+
+**Management quality / capital allocation (added 2026-07-31):** moat and business model describe
+whether the business itself is good; they say nothing about whether the people running it allocate its
+capital well. Buffett weighs this almost as heavily as the moat itself — a good business can still be a
+bad investment under management that dilutes shareholders or chases empire-building acquisitions
+instead of sensible buybacks/reinvestment. Folded into the same Stage-2 deep-research pass that already
+produces the moat/business-model write-up (low incremental cost, same research call), covering
+buyback-vs-dilution history and capital-allocation discipline (sensible M&A vs. growth-for-its-own-sake).
+Supported by **insider/founder ownership share** as a cheap Stage-1 snapshot value (same
+key-statistics page as P/E/P/B) — meaningful insider ownership is a proxy for management having its own
+capital at stake alongside outside shareholders ("skin in the game"). Deliberately **not** added as
+separate formal criteria: customer concentration, regulatory/legal red flags, recent negative news —
+these are judged to already surface naturally within the existing qualitative write-up and the
+`valueTrapAssessment` guardrail when material, and formalizing them as standalone checks would pad the
+criteria list without adding real signal.
+
+**Stage 1 as an early reject filter for Stage 2's criteria (added 2026-07-31):** margin trend, FCF
+growth, and multi-year profit stability are Stage-2-only criteria because they need *trend* data — but
+each one's *current single-year value* (this year's margin, this year's FCF sign, this year's net
+income vs. last year) is typically visible on the same key-statistics page Stage 1 already visits for
+P/E/P/B/ROE/D-E, at no extra search cost. Stage 1 now captures these current-year values too, purely as
+a reject filter — a candidate whose current year is already clearly bad (e.g. FCF negative, profit down
+sharply) is rejected before the scarce Stage-2 budget (Section 10) is spent on it. This does not replace
+Stage 2's job: confirming *stability/growth over 5–10 years* still requires the full multi-year lookup,
+which only Stage 2 does. A candidate can still fail at Stage 2 even after passing this Stage-1 filter,
+if the trend turns out weak despite a fine current-year snapshot.
 
 **Valuation check (industry-relative, but without live peer research):** the original design computed
 an industry median for free because it was a side effect of the paid screener's market-wide result
@@ -177,9 +262,20 @@ historical average, and isn't materially above its sector's cached benchmark.
   never re-stated here) — Gettex lists many thinly traded, data-sparse secondary listings, and every
   candidate the Selection Logic draws that turns out un-researchable in Stage 1/2 for lack of
   available information is wasted budget against the shared cap (Section 8/10). No upper cutoff —
-  large, well-known opportunities should still surface.
+  large, well-known opportunities should still surface. **Sector taxonomy (decided 2026-07-31):** the
+  fixed set of 11 top-level GICS-style sector names (Energy, Materials, Industrials, Consumer
+  Discretionary, Consumer Staples, Health Care, Financials, Information Technology, Communication
+  Services, Utilities, Real Estate) — not the full licensed GICS structure (industry groups/
+  sub-industries), just the well-known top-level names as informal categories. Chosen because almost
+  every finance page already reports a company's sector using this scheme or something close enough
+  for the researching LLM to normalize into it during the Stage 0/1/2 search it's already doing — no
+  separate classification research or maintained mapping table needed. A finer breakdown (GICS industry
+  groups, ~24) was considered and rejected: at 1–2 Stage-2 executions/day, candidates accumulate too
+  slowly per group for a finer split to be useful for filtering.
 - **Sector Benchmark Cache** — small reference table of sector-average P/E ratios, refreshed
   periodically (e.g. quarterly) from free public sources, used for the valuation check in Section 6.
+  Keyed by the same 11-sector taxonomy as the Universe Provider above, so a candidate's sector (already
+  captured during research) maps directly to its benchmark row with no separate lookup logic.
 - **Selection Logic** — the entry point into the funnel. Normally draws candidates weighted toward
   "longest since last checked" and stratified across sectors (the automatic daily path), but accepts
   three trigger modes:
@@ -219,14 +315,47 @@ historical average, and isn't materially above its sector's cached benchmark.
 - **Manual trigger paths** — both operator-only, protected by the existing single-user login: (a) pick
   a specific Gettex ticker, (b) request a filtered random draw (sector/country). Public visitors never
   trigger new research of any kind — they only ever read already-completed results.
-- **Dashboard** — unchanged concept from the original design: shows Stage-2 "pass" outcomes as
-  Suggestions, publicly readable, no trigger capability for anonymous visitors. Per criterion
-  (Section 6), also surfaces which tier established it and the as-of date (e.g. "margin trend:
-  confirmed, Stage 2, 2026-07-30" vs. "moat: rough read, Stage 0, 2026-06-01") — sourced directly from
-  the provenance already captured per criterion in `ResearchRecord` (Section 9), no new research or
-  cost. This turns the dashboard from a binary pass/fail into a map of where a candidate is
-  well-verified vs. where it's still an untested read, which is exactly what the user needs to judge
-  whether it's worth spending their own research time on (Section 1).
+- **Dashboard** — restructured as a **screener overview + drill-down** (decided 2026-07-31), not a flat
+  list or a feed, so a growing knowledge base stays scannable and comparable across many candidates:
+  - **Overview table**, one row per Suggestion, sortable/filterable: ticker, company, sector (the
+    11-sector taxonomy above), country, valuation delta (current P/E vs. the company's own historical
+    average *and* vs. the cached sector benchmark — the actual buy-signal information, not a raw
+    multiple), a **verification-depth indicator** (e.g. "5/8 criteria confirmed at Stage 2"), and the
+    as-of date. Verification depth is a new derived summary computed from the per-criterion
+    tier-of-origin data already captured in `ResearchRecord` (Section 9) — no new research or cost, just
+    an aggregate view of data already there. Sortable by valuation delta (surfaces the most compelling
+    value candidates first), verification depth, or recency.
+  - **Detail page per Suggestion** (drill-down from a table row): every criterion individually, with
+    value, tier, as-of date, and **source reference** (URL/page the figure came from) — the Company
+    Research Agent already produces this per its own guardrails (source-reference, not verbatim quote),
+    it was just never persisted or displayed before; showing it directly serves Section 1's purpose,
+    since the user's own follow-up research can start exactly where the AI's did instead of re-finding
+    the same figures. Also shows the qualitative moat/business-model/management-capital-allocation text
+    in full, plus any value-trap or low-confidence caveats — not hidden behind a binary pass.
+  
+  This turns the dashboard from a binary pass/fail into a map of where a candidate is well-verified vs.
+  where it's still an untested read, which is exactly what the user needs to judge whether it's worth
+  spending their own research time on (Section 1).
+- **Rejected-candidates list (added 2026-07-31, public)** — a second public list, alongside
+  Suggestions, of candidates that did **not** pass, at any tier. Unlike Suggestions, this list
+  deliberately does **not** show which internal tier/criterion caused the rejection (that's
+  implementation detail, not user-facing information) — a Stage-0 no-search LLM judgment and a full
+  Stage-2 research fail are very different in reliability, and showing the raw tier alongside a
+  negative claim about a named company risks implying more confidence than a shallow tier actually
+  earned. Instead, each entry shows the company name/ticker, the as-of date, and **one neutral category**
+  from a small fixed set (e.g. "valuation", "financial stability", "profitability trend", "business
+  clarity") describing which pillar didn't clear the bar — derived from the already-stored per-criterion
+  fail reason (Section 9) but translated away from raw pipeline detail. Phrasing follows the same
+  descriptive-not-imperative wording policy already established for all AI-generated text in the
+  original design (`2026-07-21-value-screener-design.md`, Section 9) — e.g. "valuation currently above
+  historical range" rather than any stronger claim. The full technical detail (exact tier, criterion,
+  values) remains in the underlying `ResearchRecord`, unrestricted, for the operator's own use and for
+  rotation logic (Section 7 Knowledge Base) — only the public list view is simplified. **Highlighted
+  sub-group (added 2026-07-31): "valuation-only" rejects** — candidates whose *only* failing category
+  is "valuation" (i.e. fundamentally sound, just currently priced above their own history/sector
+  benchmark) are surfaced as their own group at the top of the list, not mixed in with fundamentally
+  weak rejects. For a value investor these are effectively a free watchlist — "good business, wrong
+  price, right now" — derived purely from the category field already stored, no new research or cost.
 
 ## 8. Data flow
 
@@ -240,19 +369,19 @@ Trigger (any of the three):
   Selection Logic picks one candidate (or, for (c), uses the given one)
         │
         ▼
-  Stage 0 (no search) ──clearly bad──> reject, log in Knowledge Base, stop
-        │ promising / uncertain
-        ▼
-  Stage 1 (bounded search) ──confirmed bad──> reject, log in Knowledge Base, stop
-        │ confirmed potential
-        ▼
-  Stage 2 (full research, tightened per Section 7)
-        │
-        ▼
-  Result (pass or fail) logged in Knowledge Base
-        │ pass only
-        ▼
-  Suggestion visible on public Dashboard
+  Stage 0 (no search) ──clearly bad──┐
+        │ promising / uncertain      │
+        ▼                            │
+  Stage 1 (bounded search) ──confirmed bad──┤
+        │ confirmed potential        │
+        ▼                            │
+  Stage 2 (full research, tightened per Section 7) ──fail──┤
+        │ pass                       │
+        ▼                            ▼
+  Suggestion visible on        Rejected candidate: logged in Knowledge Base (full detail,
+  public Dashboard (full       any tier) + shown on public Rejected-candidates list
+  detail, incl. source refs)   (name/ticker + date + neutral category only, no tier/
+                                criterion detail)
 ```
 
 All three trigger modes draw against **one shared daily/monthly budget** for Stage 2 (Section 9) —
@@ -265,17 +394,35 @@ per position) since the position count is small enough not to be a cost concern.
 ## 9. Data model
 
 - **UniverseEntry** — ticker(s), ISIN, company name, sector, country of headquarters, listing
-  venue(s) on Gettex.
-- **SectorBenchmark** — sector label, cached average P/E, date last refreshed.
+  venue(s) on Gettex. **`sector` is one of the 11 fixed GICS-style top-level names (Section 7)**, not a
+  free-text field — keeps grouping/filtering and the `SectorBenchmark` lookup consistent.
+- **SectorBenchmark** — sector label (same 11-value fixed set as `UniverseEntry.sector`), cached
+  average P/E, date last refreshed.
 - **ResearchRecord** (the knowledge base entry) — ticker/ISIN, date, tier reached, per-tier
   outcome/reason, extracted structured fundamentals (P/E, P/B, ROE, margins, debt/equity, current
-  ratio, FCF trend) where obtained, qualitative business-model/moat text, final pass/fail. Each
-  per-criterion value (Section 6) carries its own **tier-of-origin and as-of date**, not just the
-  record-level tier reached — e.g. a Stage-2 record can still have a moat read that was only ever
-  confirmed at Stage 0, and the dashboard (Section 7) needs that per-criterion granularity, not the
-  record's overall tier, to show it.
+  ratio, current-year FCF sign, current-year net income vs. prior year, interest coverage,
+  insider/founder ownership share, FCF trend) where obtained, qualitative business-model/moat/
+  management-capital-allocation text, final pass/fail. Each per-criterion value
+  (Section 6) carries its own **tier-of-origin and as-of date**, not just the record-level tier reached
+  — e.g. a Stage-2 record can still have a moat read that was only ever confirmed at Stage 0, and the
+  dashboard (Section 7) needs that per-criterion granularity, not the record's overall tier, to show it.
+  **Added 2026-07-31, to support the dashboard changes in Section 7:** each per-criterion value also
+  carries a **source reference** (URL/page it was read from) where obtained by search (Stage 1/2 only —
+  Stage 0 has no source, it's trained knowledge); the record also carries the qualitative
+  **value-trap-assessment and low-confidence-flag** text the Company Research Agent already produces
+  per its own spec's guardrails (previously not persisted); and, for a "fail" outcome, **which specific
+  criterion caused it**, not just the final fail verdict — needed both to derive the public
+  Rejected-candidates list's neutral category (Section 7) and to let the funnel's thresholds be tuned
+  later (Section 11, risk 2).
 - **Suggestion** — a view over `ResearchRecord` entries where the final outcome is "pass"; drives the
-  public dashboard.
+  public dashboard's overview table and full-detail listing, including source references. The overview
+  table's **verification-depth indicator** (Section 7) is computed on the fly from this record's
+  per-criterion tier-of-origin data — not a separately stored field.
+- **RejectedCandidate (added 2026-07-31)** — a view over `ResearchRecord` entries where the final
+  outcome is "fail", at any tier; exposes only company identity, as-of date, and one neutral category
+  (Section 7) derived from the record's per-criterion fail reason — deliberately narrower than
+  `ResearchRecord` itself, which keeps the full tier/criterion/value detail for the operator and the
+  rotation logic (Section 7 Knowledge Base).
 - **PortfolioPosition** — unchanged from the 2026-07-21 design.
 - **FundamentalAlert** — same concept as the original design, but now sourced from a fresh
   `ResearchRecord` on a held position rather than a snapshot diff against provider data.
@@ -314,6 +461,12 @@ per position) since the position count is small enough not to be a cost concern.
 6. **Valuation comparison is now approximate**, using a cached sector-median lookup instead of a true
    live peer computation from the same screening run (as the original design had, for free, as a side
    effect of the paid screener). This is an accepted precision-for-cost trade-off.
+7. **Interest coverage's actual search cost is unconfirmed (Section 6).** It was added to the Stage-2
+   criteria set on financial merit alone; unlike the other Stage-2 criteria it isn't known to sit on a
+   standard page, so it must be verified during implementation not to reintroduce the same
+   unpredictable multi-round search cost this redesign exists to eliminate (Section 3, Risk 3). If it
+   turns out expensive to obtain reliably, it should be dropped or downgraded to "best effort" rather
+   than kept as a mandatory pass/fail criterion.
 
 ## Decision log
 
@@ -377,3 +530,66 @@ per position) since the position count is small enough not to be a cost concern.
   removes (Section 4) — it would never have resolved. Fixed by wiring Stage 1's already-computed P/E/
   P/B (Section 6) into the Stage 2 prompt as context instead, added as cost/quality measure 5 in
   Section 7.
+- **2026-07-31, product-strategy review:** examined which specific values Stage 1 and Stage 2 should
+  each search for, given the fixed constraints (Stage 1 = one bounded search hit, Stage 2 = the scarce
+  1–2/day budget). Found that margin trend, FCF growth, and multi-year profit stability — all
+  Stage-2-only criteria — each have a *current single-year value* that's typically on the same
+  key-statistics page Stage 1 already visits, at no extra cost. Adopted: Stage 1 now also captures these
+  current-year values as an early reject filter (Section 6), so candidates already obviously bad this
+  year don't consume Stage-2 budget just to have that confirmed the expensive way. Stage 2 keeps sole
+  responsibility for confirming the actual multi-year trend/stability — this change only adds an earlier
+  rejection path, it does not shift any trend-confirmation work out of Stage 2.
+- **2026-07-31, continued:** reviewed the full criteria set from first principles (quality, moat,
+  safety, valuation) against Section 6, to check nothing substantively important was missing from a
+  value-investing standpoint. Found one genuine gap: **interest coverage (EBIT / interest expense)** —
+  debt/equity alone shows balance-sheet structure but not whether current earnings comfortably service
+  the debt actually owed. Adopted as a Stage-2 criterion, but explicitly flagged as **cost-unconfirmed**
+  (Section 6, Section 11 risk 7) — unlike the other Stage-2 criteria, it isn't known to sit on a
+  standard finance page, and this redesign exists specifically to avoid reintroducing the kind of
+  unpredictable multi-round search cost that motivated it in the first place (Section 3, Risk 3); its
+  actual cost must be checked during implementation, not assumed. Other candidate additions (buyback/
+  dilution trend, revenue growth, FCF yield as its own metric) were considered and explicitly **not
+  adopted** — judged as nice-to-have signals that would pad the criteria list without changing the core
+  "cheap, good, safe company" verdict, in line with keeping the list short and disciplined rather than
+  redundant.
+- **2026-07-31, continued:** reviewed what should be stored per research outcome vs. what the user
+  should actually see. Adopted: `ResearchRecord` now also persists a **source reference** per
+  criterion (the Company Research Agent already produces one per its own guardrails, it was just never
+  kept), the **value-trap-assessment/low-confidence-flag** text (also already produced, also not
+  previously persisted), and **which specific criterion caused a fail**, not just the final verdict —
+  all at zero extra research cost, purely a matter of not discarding data already generated. On the
+  dashboard: Suggestions (passes) now also surface the source reference per criterion, directly serving
+  the "start your own research where the AI's left off" goal (Section 1). Also adopted, after asking the
+  user directly: a **public Rejected-candidates list**, not just an operator-only view as first proposed
+  — the user considers it publicly useful. To keep it safe given the existing descriptive-not-imperative
+  wording policy (`2026-07-21-value-screener-design.md`, Section 9), the user explicitly asked that it
+  **not** expose which internal tier/criterion caused a rejection (Section 7) — only company identity,
+  date, and one neutral category from a small fixed set. The full technical detail stays in
+  `ResearchRecord`/Knowledge Base, unrestricted, for the operator and rotation logic.
+- **2026-07-31, continued:** asked whether anything beyond the standard ratios was worth capturing.
+  Adopted **management quality / capital allocation** (buyback-vs-dilution history, M&A discipline) as
+  a new Stage-2 qualitative criterion, folded into the same research pass as the moat/business-model
+  write-up — Buffett weighs this nearly as heavily as the moat itself, and it was entirely absent from
+  the criteria set until now. Supported by **insider/founder ownership share** as a cheap Stage-1
+  snapshot value (same key-statistics page as P/E/P/B), used as a proxy for management having its own
+  capital at stake. Considered and explicitly **not adopted** as separate formal criteria: customer
+  concentration, regulatory/legal red flags, recent negative news — judged to already surface naturally
+  within the existing qualitative write-up and `valueTrapAssessment` guardrail when material, so
+  formalizing them would pad the criteria list without adding real signal.
+- **2026-07-31, continued:** designed how results are actually presented, from the standpoint of "can
+  the user efficiently scan many candidates and get analysis ideas" (Section 1). Adopted a
+  **screener-overview + drill-down** dashboard structure (Section 7) over a flat list or feed: a
+  sortable/filterable overview table (valuation delta vs. own history/sector benchmark, a new
+  **verification-depth indicator** derived on the fly from existing per-criterion tier data, no new
+  storage) plus a detail page per Suggestion with full per-criterion breakdown and source references.
+  On the Rejected-candidates list, adopted highlighting a **"valuation-only" sub-group** — candidates
+  that failed *only* on valuation are fundamentally sound and just priced above their historical/sector
+  norm right now, effectively a free watchlist, surfaced separately from fundamentally weak rejects.
+  Also resolved an open modeling gap: **sector grouping had no defined taxonomy.** Adopted the 11
+  top-level GICS-style sector names (not the full licensed GICS structure, just the well-known top-level
+  labels) as the fixed scheme for `UniverseEntry.sector`, the `SectorBenchmark` table, and dashboard
+  filtering — chosen because it's what most finance pages already report (so the researching LLM
+  normalizes into it during search it's already doing, no separate classification step) and matches the
+  granularity the already-found free sector-P/E sources report at. A finer GICS industry-group split
+  (~24) was considered and rejected — at 1–2 Stage-2 executions/day, candidates would accumulate too
+  slowly per group to make a finer split useful.
