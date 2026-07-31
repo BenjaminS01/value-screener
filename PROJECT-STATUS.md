@@ -66,6 +66,11 @@ ist damit der wichtigste der vier Kostenhebel. Für den Universe Provider wurde 
 kostenloser Datenweg gefunden (Börse-München-Pflichtdatenfeed). Neu benannt: der tägliche
 Scheduler-Lauf braucht einen MCP-Client vom Backend zum separat deploybaren Company-Research-Agent.
 
+**Stage-1-Mechanismus final entschieden (2026-07-31):** zwei getrennte MCP-Tools mit getrennten
+Ausgabetypen (`research_company` für Stage 2, `quick_research_company` für Stage 1), gleiche interne
+Agent-Mechanik. Damit ist Schritt 1 der oben genannten Reihenfolge erledigt — nächster Schritt: Schritt
+2 (Company-Research-Agent-Design-Spec auf den vollen Kriterienkatalog + neues Stage-1-Tool aktualisieren).
+
 ## Implementierungsplan (Phase 1)
 
 Vollständiger Task-für-Task-Plan (13 Tasks: Backend-Grundgerüst, Portfolio-Domäne mit TDD,

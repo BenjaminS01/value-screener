@@ -129,6 +129,15 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
   Umsetzungsarbeit. Neu benannt, noch nicht im Architektur-Abschnitt festgehalten: der tägliche
   Scheduler-Lauf braucht einen MCP-Client vom Backend zum separat deploybaren Company-Research-Agent
   (Lambda) übers Netz — bisher stillschweigend vorausgesetzt, nicht explizit entschieden.
+- **Ergänzung (2026-07-31, Stage-1-Mechanismus final entschieden):** Stage 1 nutzt denselben
+  Agent-Mechanismus wie Stage 2 (gleiche Websuche-/Zitat-/Timeout-Guardrails), aber als **zwei getrennte
+  MCP-Tools mit zwei getrennten Ausgabetypen** — `research_company` (Stage 2, voller Kriterienkatalog)
+  und `quick_research_company` (Stage 1, nur die numerische Momentaufnahme) — statt einem Tool mit
+  Modus-Flag. Schärfer als die ursprüngliche Notiz vom 30.07., weil die Auswahl der Stufe von
+  deterministischem Backend-Code getroffen wird, nicht von einem LLM, das zwischen Tools wählt; zwei
+  saubere Typen passen außerdem direkt auf die ohnehin unterschiedlichen Felder von `ResearchRecord`
+  pro Stufe (Section 9). Löst den seit 30.07. offenen Punkt, Schritt 1 der Umsetzungsreihenfolge ist
+  damit erledigt.
 
 ## 1. Purpose
 
@@ -332,7 +341,20 @@ historical average, and isn't materially above its sector's cached benchmark.
   the same coverage data the Coverage Map (below) displays — the map is the visible readout of the
   exact signal already driving the draw, not a separate calculation.
 - **Company Research Agent** (existing component, extended) — Stage 0 and Stage 1 are new,
-  lightweight steps added ahead of the existing agent. Stage 2 itself (the existing agent) is
+  lightweight steps added ahead of the existing agent. **Stage 1 mechanism, decided 2026-07-31:**
+  Stage 1 reuses the same underlying agent mechanism as Stage 2 (Claude + Anthropic's hosted
+  `web_search` tool, same citation-cross-check/prompt-injection/timeout/usage-logging guardrails), just
+  bounded differently (`maxUses(1)` instead of `5`, a narrowly scoped prompt asking only for the
+  handful of Stage-1 figures in Section 6). Concretely: **two separate MCP tools with two separate
+  output records** — `research_company` (Stage 2, full Section 6 criteria set) and
+  `quick_research_company` (Stage 1, just the numeric snapshot) — rather than one tool with a mode
+  flag and a single result type with mode-dependent empty fields. Rejected: a wholly separate,
+  simpler search mechanism outside the agent (would reopen the "which fixed provider" question this
+  redesign deliberately avoids, Section 4, and duplicate infrastructure for the same underlying task).
+  Chosen over a single-tool/mode-flag variant because Selection Logic (deterministic backend code, not
+  an LLM choosing between tools) gets no benefit from one self-describing tool, while two clearly-typed
+  results map directly onto `ResearchRecord`'s (Section 9) already-different Stage-1-vs-Stage-2 field
+  sets instead of fighting them. Stage 2 itself (the existing agent) is
   tightened with four cost measures already identified but not yet implemented in its own spec's
   decision log. **Code-vs-spec gap confirmed 2026-07-31:** the currently committed
   `ResearchPromptBuilder`/`CompanyResearchResult` (Tasks 3/4 of the agent's own plan) still implement
@@ -716,14 +738,18 @@ per position) since the position count is small enough not to be a cost concern.
   Dashboard, Sector Benchmark Cache, Scheduler) has no code yet, so carries no reconciliation risk.
 
   **Agreed reconciliation sequence, to execute before writing the full implementation plan:**
-  1. Resolve the still-open Stage 1 mechanism decision (Option A vs. B — see the 2026-07-30
-     paused-mid-discussion note in Section 7 above; not yet confirmed).
+  1. ~~Resolve the still-open Stage 1 mechanism decision~~ **Done, 2026-07-31** — see the "Stage 1
+     mechanism, decided 2026-07-31" note in Section 7 above (two MCP tools/output records sharing one
+     underlying agent mechanism, not a mode flag; not a separate search path either).
   2. Update the Company Research Agent's own design spec
      (`2026-07-24-company-research-agent-design.md`) so its Stage 2 output contract is the full
-     Section 6 criteria set, with the four cost measures and cost/quality measure 5 (Section 7 above)
-     as mandatory parts of that spec, not optional follow-ups.
+     Section 6 criteria set, and its own scope now also covers the new `quick_research_company` tool
+     (Stage 1), with the four cost measures and cost/quality measure 5 (Section 7 above) as mandatory
+     parts of that spec, not optional follow-ups.
   3. Rewrite `ResearchPromptBuilder` and `CompanyResearchResult` (plus their tests) against that
-     updated spec — this supersedes Tasks 3/4 of the agent's plan, rather than extending them.
+     updated spec, and add the new Stage-1 prompt builder + output record for
+     `quick_research_company` — this supersedes Tasks 3/4 of the agent's plan, rather than extending
+     them.
   4. Only then attempt the first real end-to-end live call, against the tightened, properly-scoped
      version. Rationale for this order over testing the current prompt first: the current prompt has
      no search-round cap or domain restriction — it is the same shape that already produced the
@@ -783,3 +809,18 @@ per position) since the position count is small enough not to be a cost concern.
   - **Overall verdict:** no finding here invalidates the design's approach; the reconciliation sequence
     already agreed (previous entry) remains correct, with its step 4 now carrying explicit checkpoint
     criteria rather than being an open-ended "try it and see."
+- **2026-07-31, Stage 1 mechanism decided (reconciliation step 1, closes the item paused since
+  2026-07-30):** confirmed Option A over Option B — Stage 1 reuses the Company Research Agent's
+  underlying mechanism (Claude + hosted `web_search`, same guardrails) rather than a separate, simpler
+  search path; Option B was rejected again for the same reasons as when first raised (reopens the
+  "which fixed provider" question, duplicates infrastructure). Refined further, beyond what was
+  tentatively noted on 2026-07-30: rather than one `research_company` tool taking a mode flag and
+  returning one result type with mode-dependent empty fields, adopted **two separate MCP tools with two
+  separate output records** — `research_company` (Stage 2) and `quick_research_company` (Stage 1) —
+  sharing the same internal agent call machinery (web-search options, citation cross-check, timeout,
+  usage logging) but with independently typed, independently scoped prompts and results. Rationale:
+  Selection Logic decides which stage to run as deterministic backend code, not an LLM choosing between
+  tool descriptions, so a single "self-describing" tool buys nothing here, while two clean types map
+  directly onto `ResearchRecord`'s (Section 9) already-different Stage-1 vs. Stage-2 field sets. Written
+  into Section 7 (Company Research Agent bullet) and reconciliation step 1/2 above. Unblocks
+  reconciliation step 2 (updating the Company Research Agent's own design spec).
