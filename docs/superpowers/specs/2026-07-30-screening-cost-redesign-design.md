@@ -114,6 +114,21 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
   und -Code (Prompt/Modell) auf den vollen Kriterienkatalog umschreiben, dann erster echter Live-Call
   gegen die neue Version, erst danach der breite Implementierungsplan für die restlichen, komplett
   neuen Komponenten.
+- **Ergänzung (2026-07-31, Machbarkeitsprüfung):** Plan als grundsätzlich umsetzbar bewertet, mit einer
+  offenen zentralen Wette: das Kostenziel (niedrige einstellige Euro/Monat bei 1–2 Stage-2-Läufen/Tag)
+  ist bisher nur geschätzt, nie an einem echten erfolgreichen Call bestätigt — der einzige reale Call
+  landete beim Worst Case (~$1, plus Fehler). Extern bestätigt: die Websuche-Tool-Gebühr selbst ist mit
+  $0.01/Suche trivial: der eigentliche Kostentreiber ist, dass Websuche-Inhalte bei **jeder weiteren
+  Gesprächsrunde erneut als Input-Tokens abgerechnet werden** — Kosten wachsen also mit der Anzahl
+  Suchrunden überproportional, nicht linear. Damit ist der Suchrunden-Deckel (Maßnahme 2) der wichtigste
+  Hebel, wichtiger als Domain-Einschränkung. Der Suchrunden-Deckel selbst tauscht aber Kostenrisiko gegen
+  Korrektheitsrisiko (AAPL-Simulation brauchte 7 Runden, Deckel liegt bei 5) — bekanntes, akzeptiertes
+  Risiko, hier nochmal explizit verortet. Für den Universe Provider wurde ein plausibler kostenloser
+  Datenweg gefunden (Börse-München-Pflichtdatenfeed für verzögerte Vor-/Nachhandelsdaten, EU-
+  Transparenzpflicht) — vorher nur eine offene Frage, jetzt ein konkreter Ansatzpunkt, Details bleiben
+  Umsetzungsarbeit. Neu benannt, noch nicht im Architektur-Abschnitt festgehalten: der tägliche
+  Scheduler-Lauf braucht einen MCP-Client vom Backend zum separat deploybaren Company-Research-Agent
+  (Lambda) übers Netz — bisher stillschweigend vorausgesetzt, nicht explizit entschieden.
 
 ## 1. Purpose
 
@@ -352,7 +367,14 @@ historical average, and isn't materially above its sector's cached benchmark.
 - **Scheduler** — triggers one automatic daily batch via the Selection Logic. Per the user's explicit
   budget/coverage-speed trade-off (Section 11), the daily figure is deliberately small — on the order
   of 1–2 Stage-2 executions per day — favoring cost discipline over how fast the universe gets
-  covered.
+  covered. **Invocation topology gap (found 2026-07-31, feasibility review):** the Company Research
+  Agent is a separately deployed module (Lambda, MCP over Streamable HTTP, per its own spec), while the
+  Scheduler/Selection Logic live in `backend/` (App Runner) — so the daily run needs an **MCP client
+  from `backend/` to the Company Research Agent's Lambda over the network**, not a direct in-process
+  call. This was implicitly assumed, not yet explicitly designed; needs to be named as its own item in
+  the implementation plan (reconciliation sequence step 5 above), and ties back into the originally
+  paused MCP learning thread (see `docs/superpowers/specs/2026-07-21-value-screener-design.md` Risks
+  4/5).
 - **Manual trigger paths** — all operator-only, protected by the existing single-user login: (a) pick a
   specific Gettex ticker, (b) request a filtered random draw (sector/country), (c) **trigger a Watchlist
   Re-check (added 2026-07-31, see below)**. Public visitors never trigger new research of any kind —
@@ -523,6 +545,24 @@ per position) since the position count is small enough not to be a cost concern.
    unpredictable multi-round search cost this redesign exists to eliminate (Section 3, Risk 3). If it
    turns out expensive to obtain reliably, it should be dropped or downgraded to "best effort" rather
    than kept as a mandatory pass/fail criterion.
+8. **The Section 10 cost target is still an estimate, not an empirical result (added 2026-07-31,
+   feasibility review).** The only real Company Research Agent call to date landed at the worst-case
+   end of the original cost analysis (~$1, and it errored) — the low/typical estimates the 1–2/day
+   budget target relies on have never been confirmed with a real successful call against the *tightened*
+   prompt. Externally confirmed during this review: the web-search tool's own per-search fee is trivial
+   ($0.01/search), so the real cost driver is that search-result content is re-billed as input tokens on
+   every subsequent conversation turn — cost compounds with search-round count rather than growing
+   linearly with it. This makes the search-round ceiling (Section 7, cost measure 2) the single most
+   load-bearing lever of the four, more so than domain restriction, and means the reconciliation
+   sequence's step 4 live call (see Decision log above) is the actual test of whether the Section 10
+   target is achievable at all, not just a smoke test of the plumbing.
+9. **Stage 0's realistic filtering yield may be lower than the funnel table implies (added 2026-07-31,
+   feasibility review).** Stage 0 must advance any "uncertain" verdict rather than reject it (Section 5),
+   and a broad Gettex universe includes many companies an LLM's trained knowledge covers only thinly. In
+   practice this likely means most candidates cascade to Stage 1 regardless of Stage 0, with Stage 0
+   mainly catching clearly-bad, well-known companies for free. Not a design flaw — the "never reject
+   uncertain for cost reasons" rule is correct — but the near-zero-cost tier should not be expected to do
+   most of the funnel's actual filtering work once real volume is measured (Section 9, Knowledge Base).
 
 ## Decision log
 
@@ -690,6 +730,56 @@ per position) since the position count is small enough not to be a cost concern.
      ~$1/error outcome (Section 3) — so validating it live now would likely repeat that known failure
      mode without learning anything about the actual target architecture, whereas rewriting first
      means the first live test is meaningful and tests the thing that will actually ship.
+     **Explicit checkpoint (added 2026-07-31, feasibility review):** this call is also the real test
+     of the cost target in Section 10 (1–2 Stage-2 executions/day, low single-digit euros/month), which
+     has never been empirically confirmed — see the feasibility review Decision log entry below. If the
+     real per-call cost lands materially above roughly $0.05–0.10, the daily frequency and/or the
+     search-round ceiling need to be revisited before step 5, not silently assumed to average out.
   5. Write the implementation plan for the remaining, entirely greenfield redesign components
      (Universe Provider, Selection Logic, Knowledge Base, Dashboard, Scheduler, Stage 0/1 wiring) only
      after step 4 succeeds.
+- **2026-07-31, feasibility review session:** asked directly whether this plan is realistically
+  implementable, separate from whether it's internally coherent (the reconciliation session above).
+  Verified rather than just asserted several load-bearing assumptions:
+  - **Confirmed low-risk:** the four Stage-2 cost measures (Section 7) are not just a plan — their APIs
+    (`allowedDomains(...)`, `.effort(...)`, `.thinkingAdaptive()`/`.thinkingDisabled()` on
+    `AnthropicChatOptions`/`AnthropicWebSearchTool`) were already confirmed present via `javap` in the
+    Company Research Agent spec's own decision log, just unused. Same for `maxUses(...)`, already live
+    in production code — meaning Stage 1 Option A (Section 7's paused mechanism question) is a trivial
+    config/prompt change on the existing builder, reinforcing it as the right call once made.
+  - **Confirmed low-risk:** the Sector Benchmark Cache's free sources were already researched and
+    confirmed in an earlier session (Siblis Research, GuruFocus, FullRatio, Basis Report) — no new risk
+    found here.
+  - **De-risked:** the Universe Provider's data source, previously an open implementation question
+    (Section 2), now has a concrete, plausible free candidate — Börse München publishes a free delayed
+    pre-/post-trade data file feed for its Regulated Market (MUNA) and Free Trading (MUNB, i.e. gettex)
+    segments, required under EU market-transparency rules. Exact format/parsing remains implementation
+    work, but the premise that a free source exists is now evidenced, not just assumed.
+  - **New risk found:** confirmed via external research that Anthropic's hosted web-search tool charges
+    a flat $0.01/search (trivial on its own — 5 searches = $0.05), but that search-result content is
+    **re-billed as input tokens on every subsequent conversation turn**, so real cost compounds with
+    search-round count rather than scaling linearly with it. This reframes cost measure 2
+    (search-round ceiling) as the single most load-bearing of the four cost measures, ahead of domain
+    restriction — worth prioritizing first if the Task 3/4 rewrite (reconciliation step 3) is staged.
+    Written into Section 11, risk 8.
+  - **New risk found:** the Section 10 cost target (1–2 Stage-2 executions/day, low single-digit
+    euros/month) has never been empirically validated — the only real call to date hit the worst-case
+    end of the original estimate (~$1) and errored. The reconciliation sequence's step 4 live call is
+    therefore not just an infrastructure smoke test but the actual test of this target; an explicit
+    checkpoint (~$0.05–0.10/call) was added to that step above and to Section 11, risk 8.
+  - **New risk found:** Stage 0's realistic filtering yield is likely lower in practice than the funnel
+    table (Section 5) implies, since "uncertain" verdicts must always advance and a broad Gettex
+    universe includes many companies an LLM knows only thinly. Not a flaw in the rule itself — recorded
+    as Section 11, risk 9, to set expectations once real volume is measured.
+  - **New gap found:** the daily Scheduler (`backend/`, App Runner) invoking the Company Research Agent
+    (a separately deployed Lambda, per its own spec) requires an MCP client over the network — implicit
+    in the architecture but never explicitly named as a component to build. Added to the Scheduler
+    bullet in Section 7 and flagged as an implementation-plan item (reconciliation step 5).
+  - **Scope acknowledged, not a blocker:** the remaining greenfield surface (Universe Provider,
+    Selection Logic, Knowledge Base, Sector Benchmark Cache, Scheduler, budget-cap enforcement across
+    three trigger paths, and a multi-view Dashboard) is substantial for a solo side project. Nothing in
+    it is individually hard, and the user has already explicitly accepted slow progress ("Tempo ist mir
+    egal," Section 11 risk 1) — noted here only so the total build size is explicit, not a surprise.
+  - **Overall verdict:** no finding here invalidates the design's approach; the reconciliation sequence
+    already agreed (previous entry) remains correct, with its step 4 now carrying explicit checkpoint
+    criteria rather than being an open-ended "try it and see."

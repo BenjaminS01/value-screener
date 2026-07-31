@@ -56,6 +56,16 @@ Redesigns — siehe Decision-Log der Redesign-Spec (letzter Eintrag) für die ve
 Reihenfolge: erst Stage-1-Mechanismus entscheiden, dann Company-Research-Agent-Spec/-Code umschreiben,
 dann erster echter Live-Call, erst danach der breite Implementierungsplan.
 
+**Machbarkeitsprüfung (2026-07-31):** Plan als grundsätzlich umsetzbar bewertet (Details: Decision-Log
+der Redesign-Spec, Eintrag "feasibility review session"). Wichtigste Erkenntnis: das Kostenziel ist
+bisher nur geschätzt, nie an einem echten erfolgreichen Call bestätigt — der geplante Live-Call in
+Schritt 4 der oben genannten Reihenfolge trägt jetzt einen expliziten Prüfwert (~$0.05–0.10/Call),
+statt offen zu bleiben. Außerdem neu erkannt: Websuche-Kosten wachsen überproportional mit der
+Suchrunden-Zahl (Inhalte werden bei jeder Gesprächsrunde erneut abgerechnet) — der Suchrunden-Deckel
+ist damit der wichtigste der vier Kostenhebel. Für den Universe Provider wurde ein plausibler
+kostenloser Datenweg gefunden (Börse-München-Pflichtdatenfeed). Neu benannt: der tägliche
+Scheduler-Lauf braucht einen MCP-Client vom Backend zum separat deploybaren Company-Research-Agent.
+
 ## Implementierungsplan (Phase 1)
 
 Vollständiger Task-für-Task-Plan (13 Tasks: Backend-Grundgerüst, Portfolio-Domäne mit TDD,
