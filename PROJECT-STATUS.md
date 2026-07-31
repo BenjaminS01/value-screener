@@ -48,6 +48,14 @@ KI-Recherche-Trichter mit eigener, wachsender Wissensdatenbank. Vollständiges n
 [`docs/superpowers/specs/2026-07-30-screening-cost-redesign-design.md`](docs/superpowers/specs/2026-07-30-screening-cost-redesign-design.md).
 Status: Design abgestimmt, Implementierungsplan noch nicht geschrieben.
 
+**Code-Abgleich (2026-07-31):** bestehender Code gegen dieses Redesign geprüft, um eine
+Weiterentwicklung in die falsche Richtung zu vermeiden. Ergebnis: Phase 1 (Portfolio/Auth) ist
+komplett unberührt. Die Company-Research-Agent-Infrastruktur (Tasks 1–7) bleibt nutzbar, aber Prompt
+und Ausgabemodell decken noch den alten, schmalen Scope ab, nicht den vollen Kriterienkatalog des
+Redesigns — siehe Decision-Log der Redesign-Spec (letzter Eintrag) für die vereinbarte
+Reihenfolge: erst Stage-1-Mechanismus entscheiden, dann Company-Research-Agent-Spec/-Code umschreiben,
+dann erster echter Live-Call, erst danach der breite Implementierungsplan.
+
 ## Implementierungsplan (Phase 1)
 
 Vollständiger Task-für-Task-Plan (13 Tasks: Backend-Grundgerüst, Portfolio-Domäne mit TDD,

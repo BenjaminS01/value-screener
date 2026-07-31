@@ -1,7 +1,9 @@
 # Screening & Research Cost Redesign — Design
 
 Last updated: 2026-07-31
-Status: Design approved by the user in this brainstorming session, implementation not started.
+Status: Design approved by the user. Implementation not started; a code-vs-spec reconciliation pass
+(2026-07-31) found the design to be otherwise sound but identified one required rewrite before the
+full implementation plan can be written — see the last Decision log entry for the agreed sequence.
 
 **Relationship to earlier specs:** this document replaces the *approach* behind Sections 3–5 and
 Risks 1/3 of `2026-07-21-value-screener-design.md` (the Screening Engine, the Data Provider Client,
@@ -101,6 +103,17 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
   der "nur an Bewertung gescheitert"-Watchlist, es wird nur Stage 1 erneut ausgeführt (nie Stage 2),
   berührt das gemeinsame Budget also gar nicht. Eine volle Stage-2-Nachprüfung bleibt eine separate,
   bewusste Entscheidung über den bestehenden Ticker-Auslöseweg.
+- **Ergänzung (2026-07-31, Code-Abgleich):** bestehender Code gegen dieses Redesign geprüft, damit die
+  Umsetzung nicht in die falsche Richtung läuft. Ergebnis: Phase 1 (`backend/`, Portfolio/Auth) ist
+  komplett unberührt. Die Company-Research-Agent-Infrastruktur (Tasks 1–7) bleibt nutzbar, aber ihr
+  Prompt und Ausgabemodell decken noch den alten, schmalen Scope vom 24.07. ab — nicht den vollen
+  Section-6-Kriterienkatalog. Alle übrigen Redesign-Komponenten (Stage 0/1, Universe Provider,
+  Selection Logic, Knowledge Base, Dashboard, Sector Benchmark Cache, Scheduler) existieren im Code
+  noch gar nicht — dort besteht kein Konfliktrisiko. Vereinbarte Reihenfolge (Details im
+  Entscheidungsverlauf unten): erst Stage-1-Mechanismus entscheiden, dann Company-Research-Agent-Spec
+  und -Code (Prompt/Modell) auf den vollen Kriterienkatalog umschreiben, dann erster echter Live-Call
+  gegen die neue Version, erst danach der breite Implementierungsplan für die restlichen, komplett
+  neuen Komponenten.
 
 ## 1. Purpose
 
@@ -306,7 +319,11 @@ historical average, and isn't materially above its sector's cached benchmark.
 - **Company Research Agent** (existing component, extended) — Stage 0 and Stage 1 are new,
   lightweight steps added ahead of the existing agent. Stage 2 itself (the existing agent) is
   tightened with four cost measures already identified but not yet implemented in its own spec's
-  decision log:
+  decision log. **Code-vs-spec gap confirmed 2026-07-31:** the currently committed
+  `ResearchPromptBuilder`/`CompanyResearchResult` (Tasks 3/4 of the agent's own plan) still implement
+  only the original 2026-07-24 scope (`summary` + `valueTrapAssessment` + `sources`) — none of the
+  Section 6 criteria below are in the prompt or output model yet. This needs a rewrite against an
+  updated agent spec, not an incremental extension (see Decision log).
   1. Web search restricted to primary sources first (e.g. SEC EDGAR, official investor-relations
      pages) instead of open web search — directly targets the fiscal-quarter-disambiguation cost
      driver found in the AAPL simulation.
@@ -644,3 +661,35 @@ per position) since the position count is small enough not to be a cost concern.
   shared budget cap), logged as a new `ResearchRecord` entry per the existing append-only pattern; a
   full Stage 2 re-run remains a separate, deliberate decision via the existing specific-ticker trigger,
   not an automatic cascade.
+- **2026-07-31, code-vs-spec reconciliation session:** with a written design now stable and an
+  unfinished, already-started codebase underneath it (Phase 1 portfolio foundation + Company Research
+  Agent Tasks 1–7), explicitly compared the two to make sure resuming implementation doesn't run in
+  the wrong direction or leave anything half-reconciled. Findings: Phase 1 (`backend/`, portfolio CRUD
+  + auth) is fully unaffected — `PortfolioPosition` is unchanged per Section 9, no rework needed. The
+  Company Research Agent's infrastructure (Spring AI wiring, MCP tool exposure, timeout handling,
+  citation cross-check guardrail, prompt-injection resistance, usage logging) remains reusable — it was
+  never coupled to the now-removed Data Provider Client. Its prompt (`ResearchPromptBuilder`) and
+  output model (`CompanyResearchResult`), however, still implement only the narrow original
+  2026-07-24 scope — none of this design's Section 6 criteria (P/E, P/B, ROE, D/E, current ratio,
+  margin trend, FCF, interest coverage, moat, management quality, insider ownership) are represented.
+  Everything else in this redesign (Stage 0/1, Universe Provider, Selection Logic, Knowledge Base,
+  Dashboard, Sector Benchmark Cache, Scheduler) has no code yet, so carries no reconciliation risk.
+
+  **Agreed reconciliation sequence, to execute before writing the full implementation plan:**
+  1. Resolve the still-open Stage 1 mechanism decision (Option A vs. B — see the 2026-07-30
+     paused-mid-discussion note in Section 7 above; not yet confirmed).
+  2. Update the Company Research Agent's own design spec
+     (`2026-07-24-company-research-agent-design.md`) so its Stage 2 output contract is the full
+     Section 6 criteria set, with the four cost measures and cost/quality measure 5 (Section 7 above)
+     as mandatory parts of that spec, not optional follow-ups.
+  3. Rewrite `ResearchPromptBuilder` and `CompanyResearchResult` (plus their tests) against that
+     updated spec — this supersedes Tasks 3/4 of the agent's plan, rather than extending them.
+  4. Only then attempt the first real end-to-end live call, against the tightened, properly-scoped
+     version. Rationale for this order over testing the current prompt first: the current prompt has
+     no search-round cap or domain restriction — it is the same shape that already produced the
+     ~$1/error outcome (Section 3) — so validating it live now would likely repeat that known failure
+     mode without learning anything about the actual target architecture, whereas rewriting first
+     means the first live test is meaningful and tests the thing that will actually ship.
+  5. Write the implementation plan for the remaining, entirely greenfield redesign components
+     (Universe Provider, Selection Logic, Knowledge Base, Dashboard, Scheduler, Stage 0/1 wiring) only
+     after step 4 succeeds.
