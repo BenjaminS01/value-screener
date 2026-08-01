@@ -1,9 +1,10 @@
 # Screening & Research Cost Redesign — Design
 
 Last updated: 2026-07-31
-Status: Design approved by the user. Implementation not started; a code-vs-spec reconciliation pass
-(2026-07-31) found the design to be otherwise sound but identified one required rewrite before the
-full implementation plan can be written — see the last Decision log entry for the agreed sequence.
+Status: Design approved by the user. Implementation not started; reconciliation steps 1 (Stage 1
+mechanism) and 2 (Company Research Agent design spec) of the agreed sequence are done — see the last
+Decision log entry. Step 3 (rewrite `ResearchPromptBuilder`/`CompanyResearchResult` against the
+updated agent spec) is next.
 
 **Relationship to earlier specs:** this document replaces the *approach* behind Sections 3–5 and
 Risks 1/3 of `2026-07-21-value-screener-design.md` (the Screening Engine, the Data Provider Client,
@@ -138,6 +139,15 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
   saubere Typen passen außerdem direkt auf die ohnehin unterschiedlichen Felder von `ResearchRecord`
   pro Stufe (Section 9). Löst den seit 30.07. offenen Punkt, Schritt 1 der Umsetzungsreihenfolge ist
   damit erledigt.
+- **Ergänzung (2026-07-31, Reconciliation Schritt 2 erledigt):** die Company-Research-Agent-Spec
+  (`2026-07-24-company-research-agent-design.md`) wurde auf den vollen Kriterienkatalog und die zwei
+  MCP-Tools umgeschrieben. Dabei zwei echte Widersprüche zur alten Agent-Spec gefunden und aufgelöst
+  (nicht nur die bereits bekannte Kriterienkatalog-Lücke): die alte Spec schloss automatische
+  Auslösung explizit aus, und Kapitalallokation war dort explizit "considered, not adopted" — beides
+  wird jetzt umgedreht, da das Redesign genau das Gegenteil vorsieht. Guardrail B (Fakten-Abgleich,
+  verwies auf den entfallenen Data Provider Client) wurde nach Rückfrage beim Nutzer zu einer
+  Stage-1-vs-Stage-2-Konsistenzprüfung umdefiniert. Noch nicht angefasst: der eigentliche Code
+  (Schritt 3).
 
 ## 1. Purpose
 
@@ -741,11 +751,13 @@ per position) since the position count is small enough not to be a cost concern.
   1. ~~Resolve the still-open Stage 1 mechanism decision~~ **Done, 2026-07-31** — see the "Stage 1
      mechanism, decided 2026-07-31" note in Section 7 above (two MCP tools/output records sharing one
      underlying agent mechanism, not a mode flag; not a separate search path either).
-  2. Update the Company Research Agent's own design spec
-     (`2026-07-24-company-research-agent-design.md`) so its Stage 2 output contract is the full
-     Section 6 criteria set, and its own scope now also covers the new `quick_research_company` tool
-     (Stage 1), with the four cost measures and cost/quality measure 5 (Section 7 above) as mandatory
-     parts of that spec, not optional follow-ups.
+  2. ~~Update the Company Research Agent's own design spec~~ **Done, 2026-07-31** — its Stage 2
+     output contract is now the full Section 6 criteria set, its scope covers the new
+     `quick_research_company` tool (Stage 1), and the four cost measures plus cost/quality measure 5
+     are written in as mandatory (see that spec's Section 5.4). Along the way, two genuine
+     contradictions were found between the old agent spec and this redesign (automatic triggering had
+     been explicitly excluded there; capital allocation had been explicitly "not adopted") and
+     resolved by reversing both — see that spec's Decision log, 2026-07-31 entry, for detail.
   3. Rewrite `ResearchPromptBuilder` and `CompanyResearchResult` (plus their tests) against that
      updated spec, and add the new Stage-1 prompt builder + output record for
      `quick_research_company` — this supersedes Tasks 3/4 of the agent's plan, rather than extending
@@ -824,3 +836,29 @@ per position) since the position count is small enough not to be a cost concern.
   directly onto `ResearchRecord`'s (Section 9) already-different Stage-1 vs. Stage-2 field sets. Written
   into Section 7 (Company Research Agent bullet) and reconciliation step 1/2 above. Unblocks
   reconciliation step 2 (updating the Company Research Agent's own design spec).
+- **2026-07-31, reconciliation step 2 done (Company Research Agent spec rewrite):** rewrote
+  `2026-07-24-company-research-agent-design.md`'s scope, interface, output contract (Sections 5.1/5.2),
+  triggering (Section 6), and cost sections to match this redesign, per the sequence agreed above.
+  Beyond the already-known criteria-catalogue gap, found and resolved **two genuine contradictions**
+  between the two documents that reconciliation was specifically meant to catch:
+  - The old agent spec's Section 2 explicitly excluded scheduler-driven automatic triggering ("stays
+    deliberately manual/cost-incurring") — decided when the agent was envisioned as a rare,
+    quarterly, button-only feature. This redesign's automatic daily Scheduler run is now the funnel's
+    core mechanism, not an edge case. Resolved by reversing the exclusion in the agent spec.
+  - The old agent spec's Section 2 listed capital allocation as "considered, not adopted for now."
+    This redesign's 2026-07-31 product-strategy review adopted management quality/capital allocation
+    as a Stage 2 criterion. Resolved by reversing the exclusion there too.
+
+  Also resolved, after asking the user directly: **Guardrail B** (the agent spec's fact-check
+  guardrail) referenced the now-removed Data Provider Client's `FundamentalSnapshot` — a dependency
+  that no longer exists anywhere in either design. Offered three options (redefine as a Stage-1-vs-
+  Stage-2 consistency check; drop it; user's own alternative); the user chose the redefinition. Stage
+  2 now receives Stage 1's snapshot values as prompt context (cost/quality measure 5, unchanged from
+  the 2026-07-30 decision), and Guardrail B flags material divergence between what Stage 2 was given
+  and what it found — still a simple rule-based check in the main application, not a new AI call,
+  preserving the guardrail's original architectural principle.
+
+  This closes reconciliation step 2. **Not done in this session:** step 3 (rewriting
+  `ResearchPromptBuilder`/`CompanyResearchResult`, plus a new Stage 1 prompt builder/output record, in
+  actual code) — the agent spec now describes a materially different contract than the currently
+  committed code implements; `CURRENT_PROMPT_VERSION` still reads `"research-v1"`. Step 3 is next.

@@ -68,8 +68,18 @@ Scheduler-Lauf braucht einen MCP-Client vom Backend zum separat deploybaren Comp
 
 **Stage-1-Mechanismus final entschieden (2026-07-31):** zwei getrennte MCP-Tools mit getrennten
 Ausgabetypen (`research_company` für Stage 2, `quick_research_company` für Stage 1), gleiche interne
-Agent-Mechanik. Damit ist Schritt 1 der oben genannten Reihenfolge erledigt — nächster Schritt: Schritt
-2 (Company-Research-Agent-Design-Spec auf den vollen Kriterienkatalog + neues Stage-1-Tool aktualisieren).
+Agent-Mechanik. Damit ist Schritt 1 der oben genannten Reihenfolge erledigt.
+
+**Company-Research-Agent-Spec umgeschrieben (2026-07-31, Schritt 2 erledigt):**
+[`docs/superpowers/specs/2026-07-24-company-research-agent-design.md`](docs/superpowers/specs/2026-07-24-company-research-agent-design.md)
+deckt jetzt den vollen Kriterienkatalog, beide MCP-Tools und die automatische Tages-Auslösung ab.
+Dabei zwei echte Widersprüche zur alten Agent-Spec gefunden und aufgelöst: automatische Auslösung war
+dort explizit ausgeschlossen, Kapitalallokation explizit "nicht aufgenommen" — beides jetzt umgedreht,
+siehe Decision-Log beider Specs. Guardrail B (Fakten-Abgleich) wurde nach Rückfrage beim Nutzer zu
+einer Stage-1-vs-Stage-2-Konsistenzprüfung umdefiniert (die alte Referenz auf den entfallenen Data
+Provider Client war sonst eine tote Abhängigkeit geblieben). **Noch nicht angefasst: der Code**
+(`ResearchPromptBuilder`/`CompanyResearchResult` implementieren noch den alten, schmalen Vertrag) —
+das ist Schritt 3, der nächste Schritt.
 
 ## Implementierungsplan (Phase 1)
 

@@ -1,9 +1,15 @@
 # Company Research Agent — Design
 
-Last updated: 2026-07-24
+Last updated: 2026-07-31
 Status: Design approved by the user, implementation in progress (Guardrail E added mid-implementation,
 during Task 4 of the implementation plan; stack upgraded to Spring Boot 4 / Spring AI 2.0.0 GA during
-Task 4, see Decision log).
+Task 4, see Decision log). **Extended 2026-07-31** (reconciliation step 2 of
+`2026-07-30-screening-cost-redesign-design.md`): scope, interface, output contract, triggering, and
+cost model updated for the full Section 6 criteria set from that spec and the new Stage 1 tool. Two
+prior scope exclusions in this document (automatic/scheduler triggering; capital allocation as a
+criterion) are reversed by this update — see Decision log. The actual code
+(`ResearchPromptBuilder`/`CompanyResearchResult`) has not yet been rewritten to match — that is
+reconciliation step 3, still pending.
 
 **Language policy note:** Starting with this document, project docs are written in English (the
 user is a Java developer targeting international roles), with a German summary at the top. Earlier
@@ -29,13 +35,32 @@ dort vorgemerkte MCP-Idee. Auslösung ausschließlich manuell per Button (nicht 
 geschützt durch den bestehenden Single-User-Login, um Kosten planbar zu halten. Tägliche
 News-Suche wurde bewusst nicht aufgenommen (Kosten, widerspricht der bestehenden Dedup-Logik).
 
+**Ergänzung (2026-07-31, Abgleich mit dem Screening-Cost-Redesign):** dieser Server ist jetzt nicht
+mehr nur der qualitative Zusatz zu einem separaten Data Provider Client (der im Redesign komplett
+entfällt), sondern die einzige Quelle für sowohl quantitative Kennzahlen als auch qualitative
+Einschätzung. Statt eines Tools gibt es jetzt **zwei**: `research_company` (Stufe 2, voller
+Kriterienkatalog) und neu `quick_research_company` (Stufe 1, nur die numerische Momentaufnahme,
+`maxUses(1)`), die denselben internen Mechanismus teilen. **Zwei bisherige Scope-Ausschlüsse dieses
+Dokuments werden hiermit aufgehoben**, weil sie dem Redesign widersprechen: automatische/tägliche
+Auslösung durch den Scheduler ist jetzt Kernmechanismus (statt ausschließlich manuell), und
+Management-Qualität/Kapitalallokation ist jetzt ein aufgenommenes Kriterium (statt "considered, not
+adopted"). Details siehe Decision log unten und die verlinkte Redesign-Spec.
+
 ## 1. Purpose
 
-A standalone, AI-powered research agent that provides current, sourced qualitative information
-about a ticker/company — primarily from quarterly reports — as a complement to the purely
-quantitative metrics already delivered by the existing Data Provider Client. It does not replace
-any existing component; it enriches `Suggestion` (moat assessment) and `FundamentalAlert` (change
-explanation) from the main design spec with real, current context.
+A standalone, AI-powered research agent that provides current, sourced information about a
+ticker/company — both quantitative (P/E, P/B, ROE, debt/equity, margins, free cash flow, interest
+coverage) and qualitative (moat, management quality/capital allocation, value-trap assessment) —
+primarily from quarterly reports and standard key-statistics pages.
+
+**Scope widened 2026-07-31** (per `2026-07-30-screening-cost-redesign-design.md`): this agent was
+originally meant to complement the purely quantitative metrics delivered by a separate Data Provider
+Client. That component was dropped entirely from the overall design (paid screener endpoint, no free
+market-wide data path) — there is no other component left computing fundamentals. Split into a
+bounded Stage 1 snapshot tool and a full Stage 2 research tool (Section 3), this agent is now the
+single source of both the numeric and the qualitative side. It enriches `ResearchRecord` (the
+redesign spec's knowledge-base entry, Section 9 there), which `Suggestion` and `FundamentalAlert`
+are views over.
 
 Not a trading signal, not a buy/sell recommendation — like the main spec, the agent remains an
 analysis/research-support tool, and the wording policy from Section 9 of the main spec applies
@@ -48,14 +73,39 @@ unchanged.
   candidates, driven by an agent with a web search tool (not SEC EDGAR alone, since not every
   exchange/country has a quarterly reporting requirement — see Section 4)
 - Sourced, descriptive summary with source references (see Section 5, Guardrails A–E)
+- **The full Section 6 criteria set from `2026-07-30-screening-cost-redesign-design.md`** (added
+  2026-07-31): quantitative (P/E, P/B, ROE, debt/equity, current ratio, margin trend, free cash
+  flow, interest coverage, insider/founder ownership) and qualitative (moat, management
+  quality/capital allocation, value-trap assessment) — not just a free-text summary (see Section 5).
+- **A second tool, `quick_research_company`** (added 2026-07-31), for the bounded Stage 1 numeric
+  snapshot — see Section 3.
+- **Automatic daily triggering via the Scheduler** (added 2026-07-31, reverses this document's
+  original exclusion — see Decision log), in addition to the existing manual button trigger.
+- **Management quality / capital allocation as a qualitative Stage 2 criterion** (added 2026-07-31,
+  reverses this document's original exclusion — see Decision log), alongside a supporting
+  insider/founder-ownership snapshot value at Stage 1.
+- **Per-criterion source reference and value-trap/low-confidence text, persisted** (added
+  2026-07-31) — both already produced per the existing guardrails, now explicitly required as
+  stored output rather than transient text, to support the redesign's dashboard drill-down.
 - Manual trigger via a dashboard button, protected by the existing single-user login
 - A quarter-over-quarter, evolving (rather than one-off) moat/state assessment
 
 ### Explicitly out of scope
 - Daily/automatic news search for existing positions (cost risk, and conflicts with the main
   spec's existing dedup/quiet logic — see Decision Log)
-- Automatic triggering by the scheduler (stays deliberately manual/cost-incurring, see Section 6)
-- Capital allocation assessment as its own dimension (considered, not adopted for now)
+- Realized-return outcome tracking and periodic staleness re-checks on already-passed Suggestions
+  (both considered and explicitly not adopted in the redesign spec's product-strategy review — see
+  that spec's Decision log, 2026-07-30)
+- Live/cheap price enrichment of already-researched companies without new AI cost ("Approach B" in
+  the redesign spec) — deliberately deferred there, not part of this agent's scope either
+
+**Two exclusions reversed 2026-07-31** (see Decision log): this document previously excluded
+*automatic triggering by the scheduler* and *capital allocation assessment* — both are now
+required, adopted parts of scope above, because the redesign spec that supersedes the Screening
+Engine/Data Provider Client (`2026-07-30-screening-cost-redesign-design.md`) makes automatic daily
+triggering the core mechanism and explicitly adopted management quality/capital allocation as a
+criterion. Left in place here only as a record of what changed and why — do not treat either as
+still excluded.
 
 ## 3. Architecture
 
@@ -73,8 +123,23 @@ unchanged.
   acceptable because this module has no shared dependency or deployment with `backend/`).
 - **Transport: MCP over Streamable HTTP** behind a Lambda Function URL (stdio doesn't fit the
   Lambda request/response model).
-- **Interface: a single tool** `research_company(ticker, companyName)` → a structured result with
-  summary text, value-trap assessment, source references, and a confidence flag (see Section 5).
+- **Interface: two MCP tools sharing one internal agent mechanism** (decided 2026-07-31 — see the
+  redesign spec's Section 7 "Stage 1 mechanism" note and this document's Decision log):
+  - `research_company(ticker, companyName, stage1Snapshot)` — Stage 2, full deep research. Returns
+    a structured result with the complete Section 6 criteria set (quantitative + qualitative),
+    per-criterion source references, a value-trap assessment, and a confidence flag (see Section
+    5). The new `stage1Snapshot` parameter carries Stage 1's already-computed valuation figures
+    into the prompt as given context (cost/quality measure 5, Section 5).
+  - `quick_research_company(ticker, companyName)` — Stage 1, one bounded search step
+    (`AnthropicWebSearchTool.maxUses(1)`). Returns just the numeric snapshot fields from Section 5
+    (current P/E, P/B, ROE, debt/equity, insider ownership, plus the current-year-only reject-filter
+    values), no qualitative write-up.
+
+  Both tools call into the same underlying agent mechanism (web search options, citation
+  cross-check, timeout handling, usage logging) with independently scoped prompts and
+  independently typed results — not one tool with a mode flag. Chosen because Selection Logic in
+  the main backend picks the stage as deterministic code, not an LLM choosing between
+  self-describing tools.
 - **The intelligence lives in the server itself**, not in the calling application: the server runs
   its own Claude call with tool use internally (Anthropic's hosted web search tool, optionally an
   additional SEC EDGAR lookup tool for US tickers). Own Anthropic API key, own token/cost tracking,
@@ -94,35 +159,98 @@ unchanged.
   main spec; not a blocker for the design.
 - **Note:** this assessment is not legal advice, just a domain-level judgment call made in the
   context of this project.
+- **Search domain restriction (added 2026-07-31, cost/quality measure 1 from the redesign spec):**
+  `AnthropicWebSearchTool.allowedDomains(...)` is set to primary filings and established financial
+  data sources (e.g. SEC EDGAR, official investor-relations domains, major financial data sites)
+  as a first restriction layer, ahead of open web search. Directly targets the
+  fiscal-quarter-disambiguation cost driver found in the AAPL simulation (Decision log, 2026-07-26
+  entry — 7 search rounds spent distinguishing analyst preview articles from the actually-filed
+  10-Q) and reduces the untrusted-content surface Guardrail E has to defend against. The exact
+  domain list is an implementation detail, to be calibrated once real search volume exists
+  (reconciliation step 3/4).
 
 ## 5. Domain output & guardrails
 
-Each analysis returns, structured:
+**Rewritten 2026-07-31** (reconciliation step 2) to carry the full Section 6 criteria set from
+`2026-07-30-screening-cost-redesign-design.md`, split across the two tools from Section 3. Guardrails
+A, C, D, E are unchanged in principle from the original design; Guardrail B is redefined (see below)
+because the `FundamentalSnapshot`/Data Provider Client it originally cross-checked against no longer
+exists.
+
+### 5.1 Stage 1 output — `quick_research_company`
+
+One bounded search step, numeric only, each value carrying its own source reference:
+
+| Field | Purpose |
+|---|---|
+| Current P/E, P/B | Valuation snapshot (Section 6 valuation check, signal 2) |
+| Company's own ~5-year average P/E/P/B, if directly published by the source | Own-historical-range valuation signal (Section 6, signal 2) |
+| Current ROE, debt/equity | Quality/safety snapshot |
+| Current ratio, if available on the same source | Safety snapshot; falls through to Stage 2 if not found here |
+| Current-year net margin (single point) | Early reject filter for Stage 2's margin-trend criterion |
+| Current-year FCF sign (positive/negative) | Early reject filter for Stage 2's FCF-trend criterion |
+| Current-year net income vs. prior year (single point) | Early reject filter for Stage 2's profit-stability criterion |
+| Insider/founder ownership share | Cheap proxy supporting Stage 2's management-quality read |
+
+If no reliable current snapshot page can be found at all, the result carries a `noReliableDataFound`
+flag (parallel to Stage 2's `noReliableReportFound`, Guardrail C) instead of guessed values.
+
+### 5.2 Stage 2 output — `research_company`
+
+Full deep research, structured per the complete Section 6 criteria set, each criterion carrying its
+own source reference:
+
+| Field | Notes |
+|---|---|
+| Margin trend (multi-year) | Narrative + stable/growing/declining verdict |
+| Free cash flow trend (multi-year) | Narrative + positive-and-growing verdict |
+| Profit stability (no strong decline over 5–10 years) | Narrative + verdict; the most expensive criterion to verify |
+| Interest coverage (EBIT / interest expense) | **Best-effort, cost-unconfirmed** (redesign spec Section 11, risk 7) — not known to sit on a standard page; if obtaining it would blow the search-round ceiling, return it as unavailable rather than spending extra rounds |
+| Current ratio | Only if not already obtained at Stage 1 |
+| Moat / business-model assessment | Qualitative, unchanged from the original design's core purpose |
+| Management quality / capital allocation | **New 2026-07-31** — buyback-vs-dilution history, M&A discipline; produced in the same research pass as the moat assessment, no extra search round |
+| Value-trap assessment (Guardrail A) | Now informed by the `stage1Snapshot` context (Section 3) instead of being unable to reference an actual valuation multiple |
+
+Numeric thresholds for pass/fail against these criteria are **not** computed by this agent — same
+principle as the original Guardrail B design (fact-checking logic stays in the main application, not
+the MCP server, Section 3). The agent returns sourced facts and qualitative judgment; the backend's
+Selection Logic applies the thresholds (redesign spec Section 2, "calibrated during implementation").
+
+### 5.3 Guardrails
 
 - **A — Value-trap assessment:** worded descriptively (consistent with the wording policy in
   Section 9 of the main spec) — whether management commentary/risk factors offer an explanation for
   a low valuation beyond what the numbers alone show (e.g., structural challenges in a segment),
   rather than a judgmental warning ("Watch out, value trap"). This is the core added value over
   pure quantitative screening: distinguishing "cheap because overlooked" from "cheap because
-  structurally impaired."
-- **B — Fact check:** contradictions between the AI's claims and the existing `FundamentalSnapshot`
-  (e.g., text claims rising margin, numbers show the opposite) are automatically flagged. Happens
-  **in the main application**, not inside the MCP server — the server doesn't know about
-  `FundamentalSnapshot` (deliberately decoupled, see Section 3); it only returns its structured
-  research output, and the main application reconciles that output against its own metrics after
-  receiving it. No extra AI call needed — a simple rule-based comparison.
-- **C — Low-confidence flag:** explicitly shown when no reliable current report was found (see
-  Section 4), instead of falling back to stale training data. Prevents a thin/outdated answer from
-  looking as trustworthy as a well-sourced one.
-- **D — Source-reference requirement (instead of verbatim quotes):** every key claim gets a link to
-  the concrete source; the content is paraphrased in the model's own words rather than quoted
-  verbatim. **Rationale for this choice over direct quotes:** a link needs no quotation-right
+  structurally impaired." **Updated 2026-07-31:** now grounded in an actual valuation multiple, via
+  the `stage1Snapshot` context (Section 3) — previously this assessment could not reference the
+  company's own P/E/P/B at all (see the 2026-07-30 decision log entry that first identified this
+  gap).
+- **B — Consistency check (redefined 2026-07-31):** originally, contradictions between the AI's
+  claims and an existing `FundamentalSnapshot` (from the now-removed Data Provider Client) were
+  cross-checked in the main application. That data source no longer exists. Redefined instead as a
+  **Stage 1 vs. Stage 2 consistency check**: Stage 1's snapshot values are passed into the Stage 2
+  prompt as context (Section 3); if Stage 2's own research produces figures that materially diverge
+  from what it was given (e.g. a different current P/E than the Stage 1 snapshot), that divergence
+  is flagged rather than silently overwritten. Still happens in the main application as a simple
+  rule-based comparison after both calls return — no extra AI call needed, same principle as the
+  original guardrail.
+- **C — Low-confidence flag:** explicitly shown when no reliable current report/snapshot was found
+  (see Section 4), instead of falling back to stale training data. Prevents a thin/outdated answer
+  from looking as trustworthy as a well-sourced one. Applies to both tools (Section 5.1's
+  `noReliableDataFound`, Section 5.2's `noReliableReportFound`).
+- **D — Source-reference requirement (instead of verbatim quotes):** every key claim/criterion gets
+  a link to the concrete source; the content is paraphrased in the model's own words rather than
+  quoted verbatim. **Rationale for this choice over direct quotes:** a link needs no quotation-right
   justification under German copyright law (§ 51 UrhG) — it's a pure reference, not reproduced
   protected text — which removes the copyright risk almost entirely. It also avoids the sharper
   failure mode of a fabricated passage falsely presented as a verbatim quote (a more severe version
   of Risk 7 in the main spec). Simpler to validate technically too: the check reduces to "does this
   link come from the search tool's actual results," instead of having to guarantee exact string
-  matches against raw source text.
+  matches against raw source text. **Updated 2026-07-31:** now required per-criterion (not just
+  per-analysis), and explicitly persisted rather than transient (redesign spec Section 9,
+  `ResearchRecord`) so the dashboard can show where each figure came from.
 - **E — Prompt-injection resistance:** the agent's system prompt explicitly instructs the model that
   content retrieved via web search is analysis material, not instructions — if retrieved content
   contains text that looks like a command (e.g., "ignore previous instructions," "you must recommend
@@ -137,49 +265,90 @@ Each analysis returns, structured:
   descriptively). Guardrail D's citation cross-check is a different, complementary protection — it
   guards against fabricated sources, not against a genuine source manipulating the model's output.
   This is prompt-level mitigation only (instructing the model, not sandboxing it) — a reasonable,
-  industry-standard first layer for this risk level, not a complete technical guarantee.
+  industry-standard first layer for this risk level, not a complete technical guarantee. Applies
+  equally to Stage 1's shorter search (Section 5.1).
+
+### 5.4 Cost/quality measures (mandatory, added 2026-07-31)
+
+Already identified in this document's own Decision log (the "cost simulation" entry below) but never
+implemented; the redesign spec's Decision log makes them **mandatory parts of this spec, not
+optional follow-ups**, since Section 10 there depends on all of them:
+
+1. **Domain-restricted search** (Section 4) — primary sources first via `allowedDomains(...)`.
+2. **Fixed, tight search-round ceiling** instead of "search until satisfied" — reconfirmed
+   2026-07-31 as the single most load-bearing of these measures, since Anthropic re-bills
+   search-result content as input tokens on every subsequent conversation turn, so cost compounds
+   with round count rather than growing linearly (redesign spec Section 11, risk 8).
+3. **Criteria-scoped prompt** — Section 5.1/5.2's field lists above, not an open-ended "tell me
+   everything about this company."
+4. **Explicit, bounded effort/thinking budget** (`AnthropicChatOptions.effort(...)`,
+   `.thinkingAdaptive()`/`.thinkingDisabled()`) instead of the implicit high-effort default.
+5. **Stage 1's valuation figures passed into the Stage 2 prompt as context** (Section 3's
+   `stage1Snapshot` parameter) — the mechanism behind Guardrail A's and B's 2026-07-31 updates
+   above.
 
 ## 6. Integration & triggering
 
-- **Trigger: a manual "Request AI analysis" button** on every screening candidate and every
-  detected portfolio alert. Deliberately decouples the cost-incurring AI research from the free
-  daily metrics pipeline (the scheduler stays purely quantitative, see main spec Section 5) — cost
-  is incurred exactly when the button is actually clicked.
-- **Access control:** the button is only visible/functional for the logged-in operator, using the
-  same login as portfolio write access (main spec Section 9). Public visitors only see the result
-  (if one exists) or a neutral "no AI analysis yet" state — otherwise any anonymous visitor could
-  trigger arbitrary costs.
-- **`lastAnalyzedAt`:** a timestamp per `Suggestion`/`FundamentalAlert`, shown in the UI next to
-  the button.
-- **Hint for the likely next report month:** two-tiered — preferably via an earnings calendar
-  endpoint from the fundamentals data provider (to be checked against current docs/free-tier scope,
-  like Risk 1 in the main spec), otherwise a rough fallback estimate from historical filing dates
-  the agent has already found (last found report + ~3 months). For tickers with no reliable
-  schedule (see Section 4), show "unclear" rather than a guessed date.
-- **No lockout on re-analysis:** the button stays clickable at any time, even shortly after a
-  previous analysis — the hint is informational only, it does not enforce a waiting period. The
-  user keeps full control, e.g. for an earlier re-check with good reason.
-- **Result flows into existing entities:** `Suggestion` (moat assessment) and `FundamentalAlert`
-  (change explanation) are extended with the analysis result — no new core entity needed. Across
-  quarters this builds an evolving rather than one-off qualitative assessment, analogous to the
-  existing `FundamentalSnapshot` on the quantitative side.
+**Superseded 2026-07-31** by the redesign spec's own Sections 5, 7, and 8 (three-tier funnel,
+Selection Logic's four trigger modes, shared budget cap, full data-flow diagram) — those are now the
+authoritative source for trigger topology. This section is updated to match rather than duplicated in
+full; see the redesign spec for the complete picture.
+
+- **Trigger, widened 2026-07-31:** previously manual-only ("Request AI analysis" button); now four
+  paths all feed the same funnel (redesign spec Section 7 "Selection Logic"): (a) automatic daily
+  Scheduler draw, (b) operator-supplied sector/country filtered random draw, (c) operator-supplied
+  specific ticker, (d) operator-triggered Watchlist Re-check (Stage 1 only, never invokes
+  `research_company`). The manual button from the original design maps onto paths (b)/(c); path (a)
+  is new and is the redesign's core mechanism, not an edge case.
+- **Access control, unchanged in principle:** manual trigger paths ((b)/(c)/(d)) remain
+  operator-only, protected by the existing single-user login (main spec Section 9) — a public
+  visitor never triggers new research. The automatic path (a) runs server-side on a schedule, not
+  behind any user action, so this guardrail doesn't apply to it the same way; its cost exposure is
+  instead bounded by the shared daily/monthly Stage 2 cap (redesign spec Section 10).
+- **`lastAnalyzedAt` → per-criterion tier-of-origin + as-of date (widened 2026-07-31):** a single
+  record-level timestamp is no longer sufficient once a `ResearchRecord` can mix criteria confirmed
+  at different tiers and different times (redesign spec Section 9) — each criterion now carries its
+  own tier-of-origin and as-of date, shown on the dashboard drill-down (redesign spec Section 7).
+- **Hint for the likely next report month:** unchanged from the original design — a rough fallback
+  estimate from historical filing dates the agent has already found (last found report + ~3 months),
+  "unclear" shown rather than a guessed date when no reliable schedule exists (Section 4). Still
+  relevant for manual re-research of portfolio positions (redesign spec Section 8, "Portfolio
+  monitoring").
+- **No lockout on re-analysis, for manual paths:** manual triggers stay available at any time, not
+  gated by a waiting period. The automatic daily path is separately rate-limited by design (1–2
+  Stage 2 executions/day, redesign spec Section 10) — not a per-ticker lockout, a shared daily
+  budget.
+- **Result flows into `ResearchRecord` (updated 2026-07-31):** the original design's "extends
+  `Suggestion`/`FundamentalAlert` directly" is superseded by the redesign spec's data model
+  (Section 9 there) — every research outcome, pass or fail, at any tier, is appended to
+  `ResearchRecord`; `Suggestion` and `RejectedCandidate` are views over it, not separately written
+  entities. Portfolio-position re-research (this document's original intent) reuses the same
+  `ResearchRecord`/Stage 2 mechanism directly, without Stage 0/1 gating (redesign spec Section 8).
 
 ## 7. Operations & success factors
 
 - **Error/timeout behavior:** a third button state alongside "result available"/"not yet
   requested": "Research failed, please try again later" on timeout or when no usable sources were
   found. Prevents the app from looking broken on a first failure.
-- **Cost circuit breaker:** in addition to the per-ticker hint (`lastAnalyzedAt`), a simple global
-  daily limit or an AWS budget alert, as protection against bugs/double-clicks/unexpected behavior
-  — not just against deliberate overuse.
-- **Eval set:** a small set (5–10) of well-known tickers with a stable, known character (e.g., a
-  clear moat case, a clear value-trap case), used to periodically re-check analysis quality.
-  Protects against a prompt change or model update silently degrading quality — the TDD equivalent
-  for the non-deterministic part of the application, consistent with the main spec's existing TDD
-  commitment (Section 7.1).
+- **Cost circuit breaker, superseded 2026-07-31:** this document's original "simple global daily
+  limit" is now the redesign spec's authoritative **shared Stage 2 daily/monthly budget cap**
+  (Section 10 there), covering the automatic Scheduler run and both manual new-candidate trigger
+  paths combined — not a separate limit to maintain here. An AWS budget alert as a secondary
+  bugs/unexpected-behavior backstop is still worth keeping regardless of the app-level cap.
+- **Eval set, widened 2026-07-31:** a small set (5–10) of well-known tickers with a stable, known
+  character (e.g., a clear moat case, a clear value-trap case), used to periodically re-check
+  analysis quality — now needs to cover **both tools**: Stage 1's numeric-snapshot accuracy and
+  Stage 2's full criteria set, not just the original qualitative summary. Protects against a prompt
+  change or model update silently degrading quality — the TDD equivalent for the non-deterministic
+  part of the application, consistent with the main spec's existing TDD commitment (Section 7.1).
 - **Versioning:** every stored analysis is tagged with a prompt/schema version. Needed so the
   quarter-over-quarter comparison (Section 6) doesn't silently mix old analysis generations with
-  new ones once the analysis logic is later improved.
+  new ones once the analysis logic is later improved. **Needs a bump 2026-07-31** — the current
+  `CURRENT_PROMPT_VERSION = "research-v1"` reflects the narrow original scope; once
+  `ResearchPromptBuilder`/`CompanyResearchResult` are rewritten against Section 5 above
+  (reconciliation step 3), this must become `research-v2` (or similar) so any pre-rewrite records
+  are never mixed with post-rewrite ones — there are none in production yet, so this is a
+  forward-looking note, not a migration.
 - **Visibility in the repo:** the architectural decisions in this document (standalone MCP server,
   guardrails A–D, eval approach) should be documented in the project docs/README clearly enough to
   be recognizable without a live demo — matching the learning goal recorded in `PROJECT-STATUS.md`
@@ -187,22 +356,46 @@ Each analysis returns, structured:
 
 ## 8. Cost estimate (rough order of magnitude)
 
-- **Hosting:** near zero given the serverless deployment (Section 3) and this rare call pattern,
-  compared to an always-on server with ongoing baseline cost.
-- **Claude/search API cost:** architecture-independent, driven by call frequency. An agent loop
-  (search → read → summarize) uses more tokens than a single prompt; Anthropic's hosted web search
-  tool is additionally billed per search (rough order of magnitude: ~$10 per 1,000 searches). At
-  manual, quarterly-cadence triggering for a personal portfolio/candidate set, this lands in the
-  low single-digit euros per month, roughly estimated — notably cheaper than the (rejected)
-  blind-daily news search, which was estimated at €20–50/month.
+**Superseded 2026-07-31** by the redesign spec's Section 10 (authoritative cost control) and Section
+11 risk 8 (the target is still unvalidated by a real successful call). This section's original
+estimate assumed manual, quarterly-cadence triggering only — call frequency is now dominated by the
+automatic daily path instead, so the estimate below is kept only as historical context, not as the
+current target.
+
+- **Hosting:** near zero given the serverless deployment (Section 3), regardless of trigger
+  frequency, compared to an always-on server with ongoing baseline cost.
+- **Claude/search API cost, original (manual-only) estimate:** an agent loop (search → read →
+  summarize) uses more tokens than a single prompt; Anthropic's hosted web search tool is
+  additionally billed per search (~$0.01/search, confirmed 2026-07-31 — trivial on its own). At
+  manual, quarterly-cadence triggering for a personal portfolio/candidate set, this was estimated to
+  land in the low single-digit euros per month — notably cheaper than the (rejected) blind-daily
+  news search (€20–50/month estimate).
+- **Current target (redesign spec Section 10):** 1–2 Stage 2 executions/day (automatic + manual
+  combined, shared cap), still aiming for low single-digit euros/month overall. **Not yet
+  empirically confirmed** — the only real call to date landed at the worst-case end (~$1, and it
+  errored) of this document's own Decision log cost simulation. The real cost driver, confirmed
+  2026-07-31: search-result content is re-billed as input tokens on every subsequent conversation
+  turn, so cost compounds with search-round count rather than scaling linearly with it — making the
+  search-round ceiling (Section 5.4, measure 2) the most load-bearing lever. Reconciliation step 4
+  (redesign spec Decision log) is the actual empirical test of this target.
 
 ## 9. Open items to verify before implementation
 
-1. Availability of an earnings calendar endpoint at the chosen fundamentals data provider
-   (Section 6).
+1. ~~Availability of an earnings calendar endpoint at the chosen fundamentals data provider~~ —
+   **moot 2026-07-31**, the fundamentals data provider this referred to no longer exists (Section
+   1). The report-month hint (Section 6) falls back to the historical-filing-date estimate only.
 2. Terms of use of the relevant investor relations sites (Section 4).
 3. Concrete SEC EDGAR integration (which endpoints, rate limits) for US tickers.
-4. Exact Lambda timeout and the UX-side wait/polling behavior for the button during research.
+4. Exact Lambda timeout and the UX-side wait/polling behavior for the button during research (still
+   relevant for the manual trigger paths; the automatic Scheduler path has no UX wait to design for).
+5. **Added 2026-07-31:** whether interest coverage (Section 5.2) can actually be obtained within the
+   search-round ceiling without becoming a per-candidate cost outlier — must be confirmed empirically
+   during reconciliation step 3/4, not assumed (redesign spec Section 11, risk 7).
+6. **Added 2026-07-31:** the concrete `allowedDomains(...)` list for cost/quality measure 1
+   (Section 4) — which primary/reliable sources to allow, calibrated once real search volume exists.
+7. **Added 2026-07-31:** empirical confirmation of the Section 10/8 cost target via reconciliation
+   step 4's live call — the explicit ~$0.05–0.10/call checkpoint from the redesign spec's Decision
+   log.
 
 ## Decision log (context for follow-up sessions)
 
@@ -402,3 +595,39 @@ Each analysis returns, structured:
        re-derived by the model — so there is one source of truth for the number and one fewer search
        round per call. Not implemented; recorded here for whenever Phase 2's Data Provider Client
        lands.
+- **2026-07-31, reconciliation step 2 (screening-cost redesign):** with the Stage 1 mechanism decided
+  (redesign spec, 2026-07-31) and this document identified as the one piece of already-committed
+  design needing an actual rewrite (not just an extension) to match the redesign, updated this
+  document's scope, interface, output contract, triggering, and cost sections. Two genuine
+  contradictions were found and resolved while doing so, beyond the already-known criteria-catalogue
+  gap:
+  - **Automatic triggering.** This document's original Section 2 explicitly excluded scheduler-driven
+    automatic triggering ("stays deliberately manual/cost-incurring"), decided when the agent was a
+    rare, quarterly-cadence, button-only feature. The redesign spec makes automatic daily triggering
+    (1–2 Stage 2 executions/day) the *core* mechanism of the whole three-tier funnel. Resolved by
+    reversing the exclusion (Section 2) and rewriting Section 6 around the redesign's four trigger
+    modes, treating the redesign spec as authoritative for trigger topology.
+  - **Capital allocation.** This document's original Section 2 listed capital allocation as
+    "considered, not adopted for now." The redesign spec's 2026-07-31 product-strategy review
+    explicitly adopted management quality/capital allocation as a Stage 2 criterion, with
+    insider/founder ownership as its supporting Stage 1 signal. Resolved by reversing the exclusion
+    and adding both to Section 5.2/5.1.
+
+  Both were judged genuine oversights from the original 2026-07-24 design being decided a week before
+  the redesign, not deliberate re-litigations — recorded here (rather than silently overwritten) so a
+  future reader can see the exclusion existed and why it was reversed, consistent with how the
+  redesign spec's own Decision log treats reversed positions elsewhere.
+
+  **Guardrail B redefinition, confirmed with the user before writing:** rather than leaving Guardrail
+  B pointing at the now-nonexistent `FundamentalSnapshot`, or dropping it outright, the user chose
+  (of three options offered) to redefine it as a Stage-1-vs-Stage-2 consistency check — Stage 2 is
+  given Stage 1's snapshot values as prompt context (cost/quality measure 5), and if Stage 2's own
+  research diverges materially from what it was given, that divergence is flagged. Kept as a
+  rule-based main-application check, matching the original guardrail's own architecture principle
+  (Section 3: the MCP server doesn't own cross-checking logic).
+
+  **Not done in this pass** (reconciliation step 3, still pending): the actual code
+  (`ResearchPromptBuilder`, `CompanyResearchResult`, `CompanyResearchTool`) has not been touched —
+  this was a design-document update only. `promptVersion` still reads `"research-v1"` in code even
+  though this spec now describes a materially different output contract; see Section 7's Versioning
+  note above.
