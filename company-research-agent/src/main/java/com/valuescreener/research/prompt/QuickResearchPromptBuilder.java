@@ -24,15 +24,17 @@ public class QuickResearchPromptBuilder {
                 - currentPb: current price-to-book ratio.
                 - fiveYearAveragePe / fiveYearAveragePb: the company's own ~5-year average P/E and
                   P/B, only if the source publishes these directly — do not calculate them yourself.
-                - roe: current return on equity.
+                - roe: current return on equity, as a percentage (e.g. 18.5 for 18.5%%).
                 - debtToEquity: current debt-to-equity ratio.
                 - currentRatio: current assets divided by current liabilities, only if it's on the
                   same page.
-                - currentYearNetMargin: this year's net margin (single point, not a trend).
+                - currentYearNetMargin: this year's net margin (single point, not a trend), as a
+                  percentage (e.g. 12.1 for 12.1%%).
                 - currentYearFcfPositive: whether this year's free cash flow is positive (true/false).
                 - currentYearNetIncomeGrew: whether this year's net income is higher than last
                   year's (true/false).
-                - insiderOwnershipShare: insider/founder ownership share, if published.
+                - insiderOwnershipShare: insider/founder ownership share, if published, as a
+                  percentage (e.g. 6.2 for 6.2%%).
 
                 Do not quote source text verbatim; paraphrase in your own words. Any figure you
                 could not find should be omitted from the JSON entirely (its key left out) rather

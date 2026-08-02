@@ -80,7 +80,7 @@ public class CompanyResearchAgent {
                 ticker, promptBuilder.build(ticker, companyName, stage1Snapshot), webSearchMaxUses, STAGE2_EFFORT);
         logUsage(ticker, response);
 
-        RawResearchResponse raw = parse(response.getResult().getOutput().getText(), RawResearchResponse.class);
+        RawResearchResponse raw = parse(extractText(response), RawResearchResponse.class);
 
         if (raw.noReliableReportFound()) {
             return CompanyResearchResult.lowConfidence(ticker,
@@ -103,8 +103,13 @@ public class CompanyResearchAgent {
         if (marginTrend == null && freeCashFlowTrend == null && profitStability == null
                 && interestCoverage == null && currentRatio == null && moatAssessment == null
                 && managementQuality == null && valueTrapAssessment == null) {
-            return CompanyResearchResult.lowConfidence(ticker,
-                    "Model returned sources that could not be verified against actual search results.");
+            boolean rawHadNoCriteria = raw.marginTrend() == null && raw.freeCashFlowTrend() == null
+                    && raw.profitStability() == null && raw.interestCoverage() == null
+                    && raw.currentRatio() == null && raw.moatAssessment() == null
+                    && raw.managementQuality() == null && raw.valueTrapAssessment() == null;
+            return CompanyResearchResult.lowConfidence(ticker, rawHadNoCriteria
+                    ? "Model did not return any criteria for this ticker."
+                    : "Model returned sources that could not be verified against actual search results.");
         }
 
         return new CompanyResearchResult(
@@ -119,7 +124,7 @@ public class CompanyResearchAgent {
         logUsage(ticker, response);
 
         RawQuickResearchResponse raw =
-                parse(response.getResult().getOutput().getText(), RawQuickResearchResponse.class);
+                parse(extractText(response), RawQuickResearchResponse.class);
 
         if (raw.noReliableDataFound()) {
             return QuickResearchResult.noData(ticker,
@@ -146,8 +151,14 @@ public class CompanyResearchAgent {
                 && roe == null && debtToEquity == null && currentRatio == null && currentYearNetMargin == null
                 && currentYearFcfPositive == null && currentYearNetIncomeGrew == null
                 && insiderOwnershipShare == null) {
-            return QuickResearchResult.noData(ticker,
-                    "Model returned figures that could not be verified against actual search results.");
+            boolean rawHadNoFigures = raw.currentPe() == null && raw.currentPb() == null
+                    && raw.fiveYearAveragePe() == null && raw.fiveYearAveragePb() == null
+                    && raw.roe() == null && raw.debtToEquity() == null && raw.currentRatio() == null
+                    && raw.currentYearNetMargin() == null && raw.currentYearFcfPositive() == null
+                    && raw.currentYearNetIncomeGrew() == null && raw.insiderOwnershipShare() == null;
+            return QuickResearchResult.noData(ticker, rawHadNoFigures
+                    ? "Model did not return any figures for this ticker."
+                    : "Model returned figures that could not be verified against actual search results.");
         }
 
         return new QuickResearchResult(
@@ -209,6 +220,13 @@ public class CompanyResearchAgent {
                 usage.getCacheReadInputTokens(), usage.getCacheWriteInputTokens());
     }
 
+    private String extractText(ChatResponse response) {
+        if (response.getResult() == null || response.getResult().getOutput() == null) {
+            throw new ResearchResponseParseException("Model returned no answer content", null);
+        }
+        return response.getResult().getOutput().getText();
+    }
+
     private <T> T parse(String responseText, Class<T> type) {
         try {
             return objectMapper.readValue(responseText, type);
@@ -231,7 +249,8 @@ public class CompanyResearchAgent {
                 .collect(Collectors.toSet());
     }
 
-    private SourceReference verify(RawSourceReference raw, Set<String> citedUrls) {
+    private SourceReference
+    verify(RawSourceReference raw, Set<String> citedUrls) {
         if (raw == null || raw.url() == null || raw.claim() == null || raw.claim().isBlank()
                 || !citedUrls.contains(raw.url())) {
             return null;

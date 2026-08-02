@@ -36,7 +36,9 @@ public class CompanyResearchTool {
         try {
             CompanyResearchResult result = agent.research(ticker, companyName, stage1Snapshot);
             return CallToolResult.builder()
-                    .addTextContent(result.confidence().name())
+                    .addTextContent(result.lowConfidenceReason() == null
+                            ? result.confidence().name()
+                            : result.confidence().name() + ": " + result.lowConfidenceReason())
                     .structuredContent(result)
                     .build();
         } catch (ResearchTimeoutException | ResearchResponseParseException e) {

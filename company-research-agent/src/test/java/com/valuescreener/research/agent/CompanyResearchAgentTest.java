@@ -192,6 +192,21 @@ class CompanyResearchAgentTest {
     }
 
     @Test
+    void throwsParseExceptionInsteadOfNpeWhenChatResponseHasNoResult() {
+        ChatResponseMetadata metadata = mock(ChatResponseMetadata.class);
+        when(metadata.get("citations")).thenReturn(List.of());
+        when(metadata.getUsage()).thenReturn(null);
+
+        ChatResponse response = mock(ChatResponse.class);
+        when(response.getResult()).thenReturn(null);
+        when(response.getMetadata()).thenReturn(metadata);
+        when(chatModel.call(any(Prompt.class))).thenReturn(response);
+
+        assertThatThrownBy(() -> agent.research("EXMP", "Example Corp", null))
+                .isInstanceOf(ResearchResponseParseException.class);
+    }
+
+    @Test
     void throwsResearchTimeoutExceptionWhenChatModelCallExceedsTimeout() {
         ChatModel slowChatModel = mock(ChatModel.class);
         when(slowChatModel.call(any(Prompt.class))).thenAnswer(invocation -> {
