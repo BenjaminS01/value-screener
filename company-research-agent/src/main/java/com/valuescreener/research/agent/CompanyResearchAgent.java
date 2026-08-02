@@ -1,10 +1,16 @@
 package com.valuescreener.research.agent;
 
 import com.anthropic.models.messages.Model;
+import com.anthropic.models.messages.OutputConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.valuescreener.research.model.BooleanFinding;
 import com.valuescreener.research.model.CompanyResearchResult;
 import com.valuescreener.research.model.ConfidenceLevel;
+import com.valuescreener.research.model.NumericFinding;
+import com.valuescreener.research.model.QuickResearchResult;
 import com.valuescreener.research.model.SourceReference;
+import com.valuescreener.research.model.Stage1Snapshot;
+import com.valuescreener.research.prompt.QuickResearchPromptBuilder;
 import com.valuescreener.research.prompt.ResearchPromptBuilder;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.AnthropicWebSearchTool;
@@ -18,7 +24,6 @@ import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -34,69 +39,135 @@ public class CompanyResearchAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CompanyResearchAgent.class);
 
+    // Fixed per the agent spec's Section 3 (Stage 1 mechanism decision) rather than configurable
+    // like Stage 2's webSearchMaxUses -- one bounded search step is the whole point of Stage 1.
+    private static final long STAGE1_MAX_USES = 1L;
+    private static final OutputConfig.Effort STAGE1_EFFORT = OutputConfig.Effort.LOW;
+    private static final OutputConfig.Effort STAGE2_EFFORT = OutputConfig.Effort.MEDIUM;
+
     private final ChatModel chatModel;
     private final ResearchPromptBuilder promptBuilder;
+    private final QuickResearchPromptBuilder quickPromptBuilder;
     private final ObjectMapper objectMapper;
     private final long timeoutSeconds;
     private final String model;
     private final long webSearchMaxUses;
+    private final List<String> allowedDomains;
 
     public CompanyResearchAgent(ChatModel chatModel,
                                  ResearchPromptBuilder promptBuilder,
+                                 QuickResearchPromptBuilder quickPromptBuilder,
                                  ObjectMapper objectMapper,
                                  @Value("${research.agent.timeout-seconds:55}") long timeoutSeconds,
                                  @Value("${spring.ai.anthropic.chat.model:claude-sonnet-5}") String model,
-                                 @Value("${research.agent.web-search-max-uses:5}") long webSearchMaxUses) {
+                                 @Value("${research.agent.web-search-max-uses:5}") long webSearchMaxUses,
+                                 @Value("${research.agent.allowed-domains:sec.gov,www.sec.gov,stockanalysis.com,marketscreener.com,finance.yahoo.com,morningstar.com,reuters.com,wsj.com,macrotrends.net,boerse-frankfurt.de,finanzen.net,globenewswire.com,prnewswire.com,businesswire.com}")
+                                 String[] allowedDomains) {
         this.chatModel = chatModel;
         this.promptBuilder = promptBuilder;
+        this.quickPromptBuilder = quickPromptBuilder;
         this.objectMapper = objectMapper;
         this.timeoutSeconds = timeoutSeconds;
         this.model = model;
         this.webSearchMaxUses = webSearchMaxUses;
+        this.allowedDomains = List.of(allowedDomains);
     }
 
     private final Executor executor = Executors.newVirtualThreadPerTaskExecutor();
 
-    public CompanyResearchResult research(String ticker, String companyName) {
-        ChatResponse response = callWithTimeout(ticker, companyName);
+    public CompanyResearchResult research(String ticker, String companyName, Stage1Snapshot stage1Snapshot) {
+        ChatResponse response = callWithTimeout(
+                ticker, promptBuilder.build(ticker, companyName, stage1Snapshot), webSearchMaxUses, STAGE2_EFFORT);
         logUsage(ticker, response);
 
-        RawResearchResponse raw = parse(response.getResult().getOutput().getText());
+        RawResearchResponse raw = parse(response.getResult().getOutput().getText(), RawResearchResponse.class);
 
         if (raw.noReliableReportFound()) {
             return CompanyResearchResult.lowConfidence(ticker,
-                    raw.summary() == null || raw.summary().isBlank()
+                    raw.noReliableReportFoundReason() == null || raw.noReliableReportFoundReason().isBlank()
                             ? "No reliable current report found for this ticker."
-                            : raw.summary());
+                            : raw.noReliableReportFoundReason());
         }
 
         Set<String> citedUrls = extractCitedUrls(response);
-        List<SourceReference> verifiedSources = raw.sources().stream()
-                .filter(source -> citedUrls.contains(source.url()))
-                .filter(source -> source.claim() != null && !source.claim().isBlank())
-                .map(source -> new SourceReference(source.url(), source.claim()))
-                .toList();
 
-        if (verifiedSources.isEmpty()) {
+        SourceReference marginTrend = verify(raw.marginTrend(), citedUrls);
+        SourceReference freeCashFlowTrend = verify(raw.freeCashFlowTrend(), citedUrls);
+        SourceReference profitStability = verify(raw.profitStability(), citedUrls);
+        NumericFinding interestCoverage = verify(raw.interestCoverage(), citedUrls);
+        NumericFinding currentRatio = verify(raw.currentRatio(), citedUrls);
+        SourceReference moatAssessment = verify(raw.moatAssessment(), citedUrls);
+        SourceReference managementQuality = verify(raw.managementQuality(), citedUrls);
+        SourceReference valueTrapAssessment = verify(raw.valueTrapAssessment(), citedUrls);
+
+        if (marginTrend == null && freeCashFlowTrend == null && profitStability == null
+                && interestCoverage == null && currentRatio == null && moatAssessment == null
+                && managementQuality == null && valueTrapAssessment == null) {
             return CompanyResearchResult.lowConfidence(ticker,
                     "Model returned sources that could not be verified against actual search results.");
         }
 
         return new CompanyResearchResult(
-                ticker,
-                raw.summary(),
-                raw.valueTrapAssessment(),
-                verifiedSources,
-                ConfidenceLevel.HIGH,
+                ticker, marginTrend, freeCashFlowTrend, profitStability, interestCoverage, currentRatio,
+                moatAssessment, managementQuality, valueTrapAssessment, ConfidenceLevel.HIGH, null,
                 CompanyResearchResult.CURRENT_PROMPT_VERSION);
     }
 
-    private ChatResponse callWithTimeout(String ticker, String companyName) {
+    public QuickResearchResult quickResearch(String ticker, String companyName) {
+        ChatResponse response = callWithTimeout(
+                ticker, quickPromptBuilder.build(ticker, companyName), STAGE1_MAX_USES, STAGE1_EFFORT);
+        logUsage(ticker, response);
+
+        RawQuickResearchResponse raw =
+                parse(response.getResult().getOutput().getText(), RawQuickResearchResponse.class);
+
+        if (raw.noReliableDataFound()) {
+            return QuickResearchResult.noData(ticker,
+                    raw.noReliableDataFoundReason() == null || raw.noReliableDataFoundReason().isBlank()
+                            ? "No reliable current key-statistics page found for this ticker."
+                            : raw.noReliableDataFoundReason());
+        }
+
+        Set<String> citedUrls = extractCitedUrls(response);
+
+        NumericFinding currentPe = verify(raw.currentPe(), citedUrls);
+        NumericFinding currentPb = verify(raw.currentPb(), citedUrls);
+        NumericFinding fiveYearAveragePe = verify(raw.fiveYearAveragePe(), citedUrls);
+        NumericFinding fiveYearAveragePb = verify(raw.fiveYearAveragePb(), citedUrls);
+        NumericFinding roe = verify(raw.roe(), citedUrls);
+        NumericFinding debtToEquity = verify(raw.debtToEquity(), citedUrls);
+        NumericFinding currentRatio = verify(raw.currentRatio(), citedUrls);
+        NumericFinding currentYearNetMargin = verify(raw.currentYearNetMargin(), citedUrls);
+        BooleanFinding currentYearFcfPositive = verify(raw.currentYearFcfPositive(), citedUrls);
+        BooleanFinding currentYearNetIncomeGrew = verify(raw.currentYearNetIncomeGrew(), citedUrls);
+        NumericFinding insiderOwnershipShare = verify(raw.insiderOwnershipShare(), citedUrls);
+
+        if (currentPe == null && currentPb == null && fiveYearAveragePe == null && fiveYearAveragePb == null
+                && roe == null && debtToEquity == null && currentRatio == null && currentYearNetMargin == null
+                && currentYearFcfPositive == null && currentYearNetIncomeGrew == null
+                && insiderOwnershipShare == null) {
+            return QuickResearchResult.noData(ticker,
+                    "Model returned figures that could not be verified against actual search results.");
+        }
+
+        return new QuickResearchResult(
+                ticker, currentPe, currentPb, fiveYearAveragePe, fiveYearAveragePb, roe, debtToEquity,
+                currentRatio, currentYearNetMargin, currentYearFcfPositive, currentYearNetIncomeGrew,
+                insiderOwnershipShare, false, null, QuickResearchResult.CURRENT_PROMPT_VERSION);
+    }
+
+    private ChatResponse callWithTimeout(String ticker, String promptText, long maxUses,
+                                          OutputConfig.Effort effort) {
         Prompt prompt = new Prompt(
-                promptBuilder.build(ticker, companyName),
+                promptText,
                 AnthropicChatOptions.builder()
                         .model(Model.of(model))
-                        .webSearchTool(AnthropicWebSearchTool.builder().maxUses(webSearchMaxUses).build())
+                        .webSearchTool(AnthropicWebSearchTool.builder()
+                                .maxUses(maxUses)
+                                .allowedDomains(allowedDomains)
+                                .build())
+                        .effort(effort)
+                        .thinkingDisabled()
                         .build());
 
         CompletableFuture<ChatResponse> future =
@@ -138,9 +209,9 @@ public class CompanyResearchAgent {
                 usage.getCacheReadInputTokens(), usage.getCacheWriteInputTokens());
     }
 
-    private RawResearchResponse parse(String responseText) {
+    private <T> T parse(String responseText, Class<T> type) {
         try {
-            return objectMapper.readValue(responseText, RawResearchResponse.class);
+            return objectMapper.readValue(responseText, type);
         } catch (Exception e) {
             throw new ResearchResponseParseException(
                     "Could not parse research agent response as JSON", e);
@@ -158,5 +229,29 @@ public class CompanyResearchAgent {
                 .map(Citation::getUrl)
                 .filter(url -> url != null && !url.isBlank())
                 .collect(Collectors.toSet());
+    }
+
+    private SourceReference verify(RawSourceReference raw, Set<String> citedUrls) {
+        if (raw == null || raw.url() == null || raw.claim() == null || raw.claim().isBlank()
+                || !citedUrls.contains(raw.url())) {
+            return null;
+        }
+        return new SourceReference(raw.url(), raw.claim());
+    }
+
+    private NumericFinding verify(RawNumericFinding raw, Set<String> citedUrls) {
+        if (raw == null || raw.value() == null) {
+            return null;
+        }
+        SourceReference source = verify(new RawSourceReference(raw.url(), raw.claim()), citedUrls);
+        return source == null ? null : new NumericFinding(raw.value(), source);
+    }
+
+    private BooleanFinding verify(RawBooleanFinding raw, Set<String> citedUrls) {
+        if (raw == null || raw.value() == null) {
+            return null;
+        }
+        SourceReference source = verify(new RawSourceReference(raw.url(), raw.claim()), citedUrls);
+        return source == null ? null : new BooleanFinding(raw.value(), source);
     }
 }

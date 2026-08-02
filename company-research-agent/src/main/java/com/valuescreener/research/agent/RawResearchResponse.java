@@ -1,13 +1,14 @@
 package com.valuescreener.research.agent;
 
-import java.util.List;
-
 record RawResearchResponse(
-        String summary,
-        String valueTrapAssessment,
-        List<RawSourceReference> sources,
-        boolean noReliableReportFound) {
-
-    record RawSourceReference(String url, String claim) {
-    }
+        RawSourceReference marginTrend,
+        RawSourceReference freeCashFlowTrend,
+        RawSourceReference profitStability,
+        RawNumericFinding interestCoverage,
+        RawNumericFinding currentRatio,
+        RawSourceReference moatAssessment,
+        RawSourceReference managementQuality,
+        RawSourceReference valueTrapAssessment,
+        boolean noReliableReportFound,
+        String noReliableReportFoundReason) {
 }

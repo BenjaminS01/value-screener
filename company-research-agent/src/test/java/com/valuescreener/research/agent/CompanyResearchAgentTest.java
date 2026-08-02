@@ -4,10 +4,14 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.anthropic.models.messages.OutputConfig;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.valuescreener.research.model.CompanyResearchResult;
 import com.valuescreener.research.model.ConfidenceLevel;
+import com.valuescreener.research.model.QuickResearchResult;
+import com.valuescreener.research.model.Stage1Snapshot;
+import com.valuescreener.research.prompt.QuickResearchPromptBuilder;
 import com.valuescreener.research.prompt.ResearchPromptBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,9 +39,10 @@ import static org.mockito.Mockito.when;
 
 class CompanyResearchAgentTest {
 
+    private static final String[] TEST_ALLOWED_DOMAINS = {"sec.gov", "stockanalysis.com"};
+
     private final ChatModel chatModel = mock(ChatModel.class);
-    private final CompanyResearchAgent agent =
-            new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), new ObjectMapper(), 55, "claude-sonnet-5", 5);
+    private final CompanyResearchAgent agent = newAgent(chatModel, 55);
 
     private ListAppender<ILoggingEvent> logAppender;
 
@@ -57,13 +62,18 @@ class CompanyResearchAgentTest {
         return (Logger) LoggerFactory.getLogger(CompanyResearchAgent.class);
     }
 
+    private static CompanyResearchAgent newAgent(ChatModel chatModel, long timeoutSeconds) {
+        return new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), new QuickResearchPromptBuilder(),
+                new ObjectMapper(), timeoutSeconds, "claude-sonnet-5", 5, TEST_ALLOWED_DOMAINS);
+    }
+
+    // ---- Stage 2: research() ----
+
     @Test
-    void logsTokenUsageAfterASuccessfulCall() {
+    void logsTokenUsageAfterASuccessfulStage2Call() {
         String responseJson = """
                 {
-                  "summary": "Revenue grew 8% year over year.",
-                  "valueTrapAssessment": "No structural headwinds mentioned.",
-                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": "Revenue grew 8%"}],
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
                   "noReliableReportFound": false
                 }
                 """;
@@ -75,7 +85,7 @@ class CompanyResearchAgentTest {
         when(usage.getCacheWriteInputTokens()).thenReturn(0L);
         stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"), usage);
 
-        agent.research("EXMP", "Example Corp");
+        agent.research("EXMP", "Example Corp", null);
 
         assertThat(logAppender.list)
                 .anyMatch(event -> event.getLevel() == Level.INFO
@@ -87,15 +97,13 @@ class CompanyResearchAgentTest {
     void warnsInsteadOfFailingWhenUsageMetadataIsMissing() {
         String responseJson = """
                 {
-                  "summary": "Revenue grew 8% year over year.",
-                  "valueTrapAssessment": "No structural headwinds mentioned.",
-                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": "Revenue grew 8%"}],
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
                   "noReliableReportFound": false
                 }
                 """;
         stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"), null);
 
-        CompanyResearchResult result = agent.research("EXMP", "Example Corp");
+        CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
         assertThat(result.confidence()).isEqualTo(ConfidenceLevel.HIGH);
         assertThat(logAppender.list)
@@ -104,65 +112,82 @@ class CompanyResearchAgentTest {
     }
 
     @Test
-    void returnsHighConfidenceResultWithSourcesVerifiedAgainstCitations() {
+    void returnsHighConfidenceResultWithAllCriteriaVerifiedAgainstCitations() {
         String responseJson = """
                 {
-                  "summary": "Revenue grew 8% year over year.",
-                  "valueTrapAssessment": "Management commentary cites no structural headwinds.",
-                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": "Revenue grew 8%"}],
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
+                  "freeCashFlowTrend": {"url": "https://investor.example.com/q2-2026", "claim": "FCF grew 8% year over year"},
+                  "moatAssessment": {"url": "https://investor.example.com/q2-2026", "claim": "Brand strength supports pricing power"},
+                  "valueTrapAssessment": {"url": "https://investor.example.com/q2-2026", "claim": "No structural headwinds mentioned"},
                   "noReliableReportFound": false
                 }
                 """;
         stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
 
-        CompanyResearchResult result = agent.research("EXMP", "Example Corp");
+        CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
         assertThat(result.confidence()).isEqualTo(ConfidenceLevel.HIGH);
-        assertThat(result.sources()).hasSize(1);
-        assertThat(result.sources().get(0).url()).isEqualTo("https://investor.example.com/q2-2026");
+        assertThat(result.marginTrend().url()).isEqualTo("https://investor.example.com/q2-2026");
+        assertThat(result.freeCashFlowTrend()).isNotNull();
+        assertThat(result.moatAssessment()).isNotNull();
+        assertThat(result.valueTrapAssessment()).isNotNull();
     }
 
     @Test
-    void dropsSourcesNotBackedByActualCitationsAndFallsBackToLowConfidence() {
+    void onlyDropsTheUnverifiedCriterionWithoutFailingTheWholeResult() {
         String responseJson = """
                 {
-                  "summary": "Revenue grew 8% year over year.",
-                  "valueTrapAssessment": "No structural headwinds mentioned.",
-                  "sources": [{"url": "https://not-actually-searched.example.com", "claim": "Revenue grew 8%"}],
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
+                  "freeCashFlowTrend": {"url": "https://not-actually-searched.example.com", "claim": "FCF grew 8%"},
                   "noReliableReportFound": false
                 }
                 """;
         stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
 
-        CompanyResearchResult result = agent.research("EXMP", "Example Corp");
+        CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
+
+        assertThat(result.confidence()).isEqualTo(ConfidenceLevel.HIGH);
+        assertThat(result.marginTrend()).isNotNull();
+        assertThat(result.freeCashFlowTrend()).isNull();
+    }
+
+    @Test
+    void fallsBackToLowConfidenceWhenNoCriterionCanBeVerifiedAtAll() {
+        String responseJson = """
+                {
+                  "marginTrend": {"url": "https://not-actually-searched.example.com", "claim": "Margins held steady"},
+                  "noReliableReportFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+
+        CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
         assertThat(result.confidence()).isEqualTo(ConfidenceLevel.LOW);
-        assertThat(result.sources()).isEmpty();
+        assertThat(result.marginTrend()).isNull();
     }
 
     @Test
     void returnsLowConfidenceWhenModelReportsNoReliableReport() {
         String responseJson = """
                 {
-                  "summary": "No recent quarterly filing found for this ticker.",
-                  "valueTrapAssessment": "",
-                  "sources": [],
-                  "noReliableReportFound": true
+                  "noReliableReportFound": true,
+                  "noReliableReportFoundReason": "No recent quarterly filing found for this ticker."
                 }
                 """;
         stubChatModelResponse(responseJson, List.of());
 
-        CompanyResearchResult result = agent.research("EXMP", "Example Corp");
+        CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
         assertThat(result.confidence()).isEqualTo(ConfidenceLevel.LOW);
-        assertThat(result.summary()).isEqualTo("No recent quarterly filing found for this ticker.");
+        assertThat(result.lowConfidenceReason()).isEqualTo("No recent quarterly filing found for this ticker.");
     }
 
     @Test
     void throwsParseExceptionWhenFinalAnswerIsNotValidJson() {
         stubChatModelResponse("not json at all", List.of());
 
-        assertThatThrownBy(() -> agent.research("EXMP", "Example Corp"))
+        assertThatThrownBy(() -> agent.research("EXMP", "Example Corp", null))
                 .isInstanceOf(ResearchResponseParseException.class);
     }
 
@@ -173,10 +198,9 @@ class CompanyResearchAgentTest {
             Thread.sleep(500);
             throw new IllegalStateException("should have timed out before returning");
         });
-        CompanyResearchAgent agentWithShortTimeout =
-                new CompanyResearchAgent(slowChatModel, new ResearchPromptBuilder(), new ObjectMapper(), 0, "claude-sonnet-5", 5);
+        CompanyResearchAgent agentWithShortTimeout = newAgent(slowChatModel, 0);
 
-        assertThatThrownBy(() -> agentWithShortTimeout.research("EXMP", "Example Corp"))
+        assertThatThrownBy(() -> agentWithShortTimeout.research("EXMP", "Example Corp", null))
                 .isInstanceOf(ResearchTimeoutException.class);
     }
 
@@ -184,60 +208,188 @@ class CompanyResearchAgentTest {
     void ignoresUnknownJsonFieldsInModelResponse() {
         ObjectMapper lenientMapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        CompanyResearchAgent lenientAgent =
-                new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), lenientMapper, 55, "claude-sonnet-5", 5);
+        CompanyResearchAgent lenientAgent = new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(),
+                new QuickResearchPromptBuilder(), lenientMapper, 55, "claude-sonnet-5", 5, TEST_ALLOWED_DOMAINS);
         String responseJson = """
                 {
-                  "summary": "Revenue grew 8% year over year.",
-                  "valueTrapAssessment": "No structural headwinds mentioned.",
-                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": "Revenue grew 8%"}],
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
                   "noReliableReportFound": false,
                   "unexpectedNewField": "some future model output"
                 }
                 """;
         stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
 
-        CompanyResearchResult result = lenientAgent.research("EXMP", "Example Corp");
+        CompanyResearchResult result = lenientAgent.research("EXMP", "Example Corp", null);
 
         assertThat(result.confidence()).isEqualTo(ConfidenceLevel.HIGH);
     }
 
     @Test
-    void dropsSourcesWithBlankClaimAndFallsBackToLowConfidence() {
+    void treatsCriterionWithBlankClaimAsUnverified() {
         String responseJson = """
                 {
-                  "summary": "Revenue grew 8% year over year.",
-                  "valueTrapAssessment": "No structural headwinds mentioned.",
-                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": ""}],
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": ""},
                   "noReliableReportFound": false
                 }
                 """;
         stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
 
-        CompanyResearchResult result = agent.research("EXMP", "Example Corp");
+        CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
         assertThat(result.confidence()).isEqualTo(ConfidenceLevel.LOW);
-        assertThat(result.sources()).isEmpty();
+        assertThat(result.marginTrend()).isNull();
     }
 
     @Test
-    void capsWebSearchUsesToBoundCostAndLatencyPerRequest() {
+    void configuresStage2WebSearchWithBoundedUsesAndAllowedDomains() {
         String responseJson = """
                 {
-                  "summary": "Revenue grew 8% year over year.",
-                  "valueTrapAssessment": "No structural headwinds mentioned.",
-                  "sources": [{"url": "https://investor.example.com/q2-2026", "claim": "Revenue grew 8%"}],
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
                   "noReliableReportFound": false
                 }
                 """;
         stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
 
-        agent.research("EXMP", "Example Corp");
+        agent.research("EXMP", "Example Corp", null);
 
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
         verify(chatModel).call(promptCaptor.capture());
         AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
         assertThat(options.getWebSearchTool().getMaxUses()).isEqualTo(5L);
+        assertThat(options.getWebSearchTool().getAllowedDomains()).containsExactly("sec.gov", "stockanalysis.com");
+    }
+
+    @Test
+    void usesExplicitBoundedEffortAndDisablesThinkingForStage2() {
+        String responseJson = """
+                {
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
+                  "noReliableReportFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+
+        agent.research("EXMP", "Example Corp", null);
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
+        assertThat(options.getOutputConfig()).isNotNull();
+        assertThat(options.getOutputConfig().effort()).contains(OutputConfig.Effort.MEDIUM);
+        assertThat(options.getThinking().isDisabled()).isTrue();
+    }
+
+    @Test
+    void passesStage1SnapshotValuesIntoTheStage2Prompt() {
+        String responseJson = """
+                {
+                  "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
+                  "noReliableReportFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+
+        agent.research("EXMP", "Example Corp", new Stage1Snapshot(24.3, 3.1));
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        String promptText = promptCaptor.getValue().getInstructions().get(0).getText();
+        assertThat(promptText).contains("24.3").contains("3.1");
+    }
+
+    // ---- Stage 1: quickResearch() ----
+
+    @Test
+    void quickResearchReturnsVerifiedSnapshotOnSuccess() {
+        String responseJson = """
+                {
+                  "currentPe": {"value": 24.3, "url": "https://finance.example.com/EXMP", "claim": "P/E of 24.3 on the key-statistics page"},
+                  "currentYearFcfPositive": {"value": true, "url": "https://finance.example.com/EXMP", "claim": "FCF was positive this year"},
+                  "noReliableDataFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+
+        QuickResearchResult result = agent.quickResearch("EXMP", "Example Corp");
+
+        assertThat(result.noReliableDataFound()).isFalse();
+        assertThat(result.currentPe().value()).isEqualTo(24.3);
+        assertThat(result.currentYearFcfPositive().value()).isTrue();
+        assertThat(result.currentPb()).isNull();
+    }
+
+    @Test
+    void quickResearchReturnsNoDataFlagWhenModelReportsNoReliableSnapshot() {
+        String responseJson = """
+                {
+                  "noReliableDataFound": true,
+                  "noReliableDataFoundReason": "No current key-statistics page found for this ticker."
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of());
+
+        QuickResearchResult result = agent.quickResearch("EXMP", "Example Corp");
+
+        assertThat(result.noReliableDataFound()).isTrue();
+        assertThat(result.noReliableDataFoundReason())
+                .isEqualTo("No current key-statistics page found for this ticker.");
+    }
+
+    @Test
+    void quickResearchOnlyDropsTheUnverifiedFieldWithoutFailingTheWholeResult() {
+        String responseJson = """
+                {
+                  "currentPe": {"value": 24.3, "url": "https://finance.example.com/EXMP", "claim": "P/E of 24.3"},
+                  "roe": {"value": 18.5, "url": "https://not-actually-searched.example.com", "claim": "ROE of 18.5%"},
+                  "noReliableDataFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+
+        QuickResearchResult result = agent.quickResearch("EXMP", "Example Corp");
+
+        assertThat(result.noReliableDataFound()).isFalse();
+        assertThat(result.currentPe()).isNotNull();
+        assertThat(result.roe()).isNull();
+    }
+
+    @Test
+    void quickResearchCapsWebSearchToASingleBoundedUse() {
+        String responseJson = """
+                {
+                  "currentPe": {"value": 24.3, "url": "https://finance.example.com/EXMP", "claim": "P/E of 24.3"},
+                  "noReliableDataFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+
+        agent.quickResearch("EXMP", "Example Corp");
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
+        assertThat(options.getWebSearchTool().getMaxUses()).isEqualTo(1L);
+        assertThat(options.getWebSearchTool().getAllowedDomains()).containsExactly("sec.gov", "stockanalysis.com");
+    }
+
+    @Test
+    void usesExplicitBoundedEffortAndDisablesThinkingForStage1() {
+        String responseJson = """
+                {
+                  "currentPe": {"value": 24.3, "url": "https://finance.example.com/EXMP", "claim": "P/E of 24.3"},
+                  "noReliableDataFound": false
+                }
+                """;
+        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+
+        agent.quickResearch("EXMP", "Example Corp");
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
+        assertThat(options.getOutputConfig()).isNotNull();
+        assertThat(options.getOutputConfig().effort()).contains(OutputConfig.Effort.LOW);
+        assertThat(options.getThinking().isDisabled()).isTrue();
     }
 
     private void stubChatModelResponse(String responseText, List<String> citedUrls) {
