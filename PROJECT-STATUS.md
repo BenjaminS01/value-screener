@@ -1,6 +1,6 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-07-30
+Letztes Update: 2026-08-02
 Aktuelle Phase: **Phase 1 abgeschlossen**. Der Company-Research-Agent-Sub-Projekt-Branch ist
 gemerged, das Parallel-Worktree-Setup ist beendet (siehe unten).
 
@@ -80,6 +80,21 @@ einer Stage-1-vs-Stage-2-Konsistenzprüfung umdefiniert (die alte Referenz auf d
 Provider Client war sonst eine tote Abhängigkeit geblieben). **Noch nicht angefasst: der Code**
 (`ResearchPromptBuilder`/`CompanyResearchResult` implementieren noch den alten, schmalen Vertrag) —
 das ist Schritt 3, der nächste Schritt.
+
+**Company-Research-Agent-Code umgeschrieben (2026-08-02, Schritt 3 erledigt):** `ResearchPromptBuilder`,
+`CompanyResearchResult`, `CompanyResearchAgent` und `CompanyResearchTool` implementieren jetzt den
+vollen Section-5-Kriterienkatalog aus der umgeschriebenen Spec, verteilt auf die zwei MCP-Tools
+(`research_company`, `quick_research_company`). `CURRENT_PROMPT_VERSION` ist jetzt `research-v2`.
+Kernentscheidung dabei (Nutzer, 2026-08-01): Quellen-Verifikation läuft pro Kriterium statt
+alles-oder-nichts — ein einzelnes Kriterium mit nicht auffindbarer Quelle wird `null`, statt das
+gesamte Ergebnis auf `LOW`-Konfidenz herabzustufen. Alle 5 Kosten-/Qualitätsmaßnahmen aus der Spec sind
+verdrahtet, inklusive der finalen `allowedDomains`-Liste (14 Domains, siehe Design-Spec Decision-Log)
+jetzt auch in `application.yml` als überschreibbarer Default. Volle Regressionssuite grün (49/49),
+inklusive Spring-Context-Boot-Test für beide MCP-Tools. Umsetzung per Subagent-Driven Development;
+wegen modulweiter Maven-Kompilierung wurden Tasks 1–6 zu einem Review-/Commit-Checkpoint gebündelt
+(Details im SDD-Ledger, nicht dauerhaft archiviert). **Weiterhin offen:** der echte End-to-End-Live-Call
+gegen die Anthropic-API (Schritt 4) — siehe Abschnitt "Company Research Agent: Worktree-Phase beendet"
+oben und Decision-Log der Design-Spec.
 
 ## Implementierungsplan (Phase 1)
 

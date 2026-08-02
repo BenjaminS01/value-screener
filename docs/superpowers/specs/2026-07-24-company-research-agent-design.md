@@ -1,15 +1,17 @@
 # Company Research Agent — Design
 
-Last updated: 2026-07-31
+Last updated: 2026-08-02
 Status: Design approved by the user, implementation in progress (Guardrail E added mid-implementation,
 during Task 4 of the implementation plan; stack upgraded to Spring Boot 4 / Spring AI 2.0.0 GA during
 Task 4, see Decision log). **Extended 2026-07-31** (reconciliation step 2 of
 `2026-07-30-screening-cost-redesign-design.md`): scope, interface, output contract, triggering, and
 cost model updated for the full Section 6 criteria set from that spec and the new Stage 1 tool. Two
 prior scope exclusions in this document (automatic/scheduler triggering; capital allocation as a
-criterion) are reversed by this update — see Decision log. The actual code
-(`ResearchPromptBuilder`/`CompanyResearchResult`) has not yet been rewritten to match — that is
-reconciliation step 3, still pending.
+criterion) are reversed by this update — see Decision log. **Completed 2026-08-02** (reconciliation
+step 3): `ResearchPromptBuilder`, `CompanyResearchResult`, `CompanyResearchAgent`, and
+`CompanyResearchTool` now implement the full Section 5 contract described here, across the two-tool
+architecture (`research_company` / `quick_research_company`). `CURRENT_PROMPT_VERSION` is now
+`"research-v2"`. The live end-to-end cost check (reconciliation step 4) remains outstanding.
 
 **Language policy note:** Starting with this document, project docs are written in English (the
 user is a Java developer targeting international roles), with a German summary at the top. Earlier
@@ -391,8 +393,12 @@ current target.
 5. **Added 2026-07-31:** whether interest coverage (Section 5.2) can actually be obtained within the
    search-round ceiling without becoming a per-candidate cost outlier — must be confirmed empirically
    during reconciliation step 3/4, not assumed (redesign spec Section 11, risk 7).
-6. **Added 2026-07-31:** the concrete `allowedDomains(...)` list for cost/quality measure 1
-   (Section 4) — which primary/reliable sources to allow, calibrated once real search volume exists.
+6. ~~The concrete `allowedDomains(...)` list for cost/quality measure 1 (Section 4)~~ — **decided and
+   wired 2026-08-02** (reconciliation step 3): `sec.gov, www.sec.gov, stockanalysis.com,
+   marketscreener.com, finance.yahoo.com, morningstar.com, reuters.com, wsj.com, macrotrends.net,
+   boerse-frankfurt.de, finanzen.net, globenewswire.com, prnewswire.com, businesswire.com` (the last
+   three added during task review, for company IR/press-release content backing moat/management
+   quality/value-trap criteria). Still calibrated further once real search volume exists.
 7. **Added 2026-07-31:** empirical confirmation of the Section 10/8 cost target via reconciliation
    step 4's live call — the explicit ~$0.05–0.10/call checkpoint from the redesign spec's Decision
    log.
@@ -631,3 +637,30 @@ current target.
   this was a design-document update only. `promptVersion` still reads `"research-v1"` in code even
   though this spec now describes a materially different output contract; see Section 7's Versioning
   note above.
+
+- **2026-08-02, reconciliation step 3 (screening-cost redesign):** rewrote the actual module code to
+  match the design updated in step 2. `CompanyResearchResult` now carries the full Section 5 criterion
+  set (`marginTrend`, `freeCashFlowTrend`, `profitStability`, `interestCoverage`, `currentRatio`,
+  `moatAssessment`, `managementQuality`, `valueTrapAssessment`); `CURRENT_PROMPT_VERSION` bumped to
+  `"research-v2"`. Added the Stage 1 side of the two-tool architecture decided in the Stage 1
+  mechanism decision (2026-07-31): `QuickResearchPromptBuilder`, `QuickResearchResult`,
+  `Stage1Snapshot`, wired into a second MCP tool (`quick_research_company`) alongside the existing
+  `research_company`.
+  - **Per-criterion, not all-or-nothing, source verification** (user decision, 2026-08-01): if an
+    individual criterion's cited URL isn't found in the model's actual `Citation` list, that one
+    criterion becomes `null` rather than collapsing the whole result to `LOW` confidence — a single
+    unverifiable claim no longer discards seven verified ones.
+  - **Cost/quality measures 1–5** (Section 5.4/9) all wired: `allowedDomains` restricts search to a
+    14-domain allowlist (open item 6 above), `webSearchMaxUses` bounds search rounds per stage
+    (Stage 1: 1, Stage 2: default 5, both `@Value`-overridable except Stage 1's), explicit bounded
+    `effort` (Stage 1 `LOW`, Stage 2 `MEDIUM`) with `thinkingDisabled()` replaces unbounded reasoning
+    budget, and Stage 1's `Stage1Snapshot` is passed into the Stage 2 prompt as context (also the basis
+    for Guardrail B's redefinition from step 2).
+  - **Execution note:** Maven compiles the whole module for every `mvn test` run, so the plan's
+    original 7 fine-grained TDD tasks could not each reach an independent green build — Tasks 1–6 were
+    bundled into one review/commit checkpoint (Task 7 stayed separate) after this was discovered mid-
+    execution; approved by the user. Full detail in the SDD workspace ledger (not retained after the
+    branch merges).
+  - **Not done in this step:** the live end-to-end cost check (reconciliation step 4, open item 7
+    above) — `CURRENT_PROMPT_VERSION`/`allowedDomains` are now real, but the ~$0.05–0.10/call target is
+    still unconfirmed against an actual API call.
