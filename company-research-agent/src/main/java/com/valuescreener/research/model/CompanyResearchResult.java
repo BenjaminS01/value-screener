@@ -1,32 +1,28 @@
 package com.valuescreener.research.model;
 
-import java.util.List;
-
 public record CompanyResearchResult(
         String ticker,
-        String summary,
-        String valueTrapAssessment,
-        List<SourceReference> sources,
+        SourceReference marginTrend,
+        SourceReference freeCashFlowTrend,
+        SourceReference profitStability,
+        NumericFinding interestCoverage,
+        NumericFinding currentRatio,
+        SourceReference moatAssessment,
+        SourceReference managementQuality,
+        SourceReference valueTrapAssessment,
         ConfidenceLevel confidence,
+        String lowConfidenceReason,
         String promptVersion) {
 
     /**
      * Bumped whenever the research prompt or output contract changes, so that stored analyses
      * from different generations can be told apart when comparing across quarters.
      */
-    public static final String CURRENT_PROMPT_VERSION = "research-v1";
-
-    public CompanyResearchResult {
-        sources = List.copyOf(sources);
-    }
+    public static final String CURRENT_PROMPT_VERSION = "research-v2";
 
     public static CompanyResearchResult lowConfidence(String ticker, String reason) {
         return new CompanyResearchResult(
-                ticker,
-                reason,
-                "Insufficient sourced information to assess valuation drivers.",
-                List.of(),
-                ConfidenceLevel.LOW,
-                CURRENT_PROMPT_VERSION);
+                ticker, null, null, null, null, null, null, null, null,
+                ConfidenceLevel.LOW, reason, CURRENT_PROMPT_VERSION);
     }
 }
