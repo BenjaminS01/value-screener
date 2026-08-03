@@ -32,4 +32,7 @@ research:
     # Cost/quality measure 1 (agent spec Section 4/5.4): restricts search to primary filings and
     # established financial data sources instead of open web search. Starting list, calibrated
     # further once real search volume exists (agent spec Section 9, open item 6).
-    allowed-domains: sec.gov,www.sec.gov,stockanalysis.com,marketscreener.com,finance.yahoo.com,morningstar.com,reuters.com,wsj.com,macrotrends.net,boerse-frankfurt.de,finanzen.net,globenewswire.com,prnewswire.com,businesswire.com
+    # reuters.com and wsj.com removed 2026-08-02: Anthropic's web_search crawler cannot access them
+    # (confirmed via a real 400 invalid_request_error during the first live test call), and the API
+    # rejects the ENTIRE call if even one allowed-domains entry is inaccessible to its user agent.
+    allowed-domains: sec.gov,www.sec.gov,stockanalysis.com,marketscreener.com,finance.yahoo.com,morningstar.com,macrotrends.net,boerse-frankfurt.de,finanzen.net,globenewswire.com,prnewswire.com,businesswire.com

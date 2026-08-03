@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
-import org.springframework.ai.anthropic.Citation;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
@@ -27,8 +26,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,7 +36,8 @@ import static org.mockito.Mockito.when;
 
 class CompanyResearchAgentTest {
 
-    private static final String[] TEST_ALLOWED_DOMAINS = {"sec.gov", "stockanalysis.com"};
+    private static final String[] TEST_ALLOWED_DOMAINS =
+            {"sec.gov", "stockanalysis.com", "investor.example.com", "finance.example.com"};
 
     private final ChatModel chatModel = mock(ChatModel.class);
     private final CompanyResearchAgent agent = newAgent(chatModel, 55);
@@ -83,7 +81,7 @@ class CompanyResearchAgentTest {
         when(usage.getTotalTokens()).thenReturn(11000);
         when(usage.getCacheReadInputTokens()).thenReturn(0L);
         when(usage.getCacheWriteInputTokens()).thenReturn(0L);
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"), usage);
+        stubChatModelResponse(responseJson, usage);
 
         agent.research("EXMP", "Example Corp", null);
 
@@ -101,7 +99,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"), null);
+        stubChatModelResponse(responseJson, null);
 
         CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
@@ -112,7 +110,7 @@ class CompanyResearchAgentTest {
     }
 
     @Test
-    void returnsHighConfidenceResultWithAllCriteriaVerifiedAgainstCitations() {
+    void returnsHighConfidenceResultWithAllCriteriaVerifiedAgainstAllowedDomains() {
         String responseJson = """
                 {
                   "marginTrend": {"url": "https://investor.example.com/q2-2026", "claim": "Margins held steady around 20%"},
@@ -122,7 +120,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
@@ -142,7 +140,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
@@ -159,7 +157,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
@@ -175,7 +173,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFoundReason": "No recent quarterly filing found for this ticker."
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of());
+        stubChatModelResponse(responseJson);
 
         CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
@@ -185,7 +183,7 @@ class CompanyResearchAgentTest {
 
     @Test
     void throwsParseExceptionWhenFinalAnswerIsNotValidJson() {
-        stubChatModelResponse("not json at all", List.of());
+        stubChatModelResponse("not json at all");
 
         assertThatThrownBy(() -> agent.research("EXMP", "Example Corp", null))
                 .isInstanceOf(ResearchResponseParseException.class);
@@ -194,7 +192,6 @@ class CompanyResearchAgentTest {
     @Test
     void throwsParseExceptionInsteadOfNpeWhenChatResponseHasNoResult() {
         ChatResponseMetadata metadata = mock(ChatResponseMetadata.class);
-        when(metadata.get("citations")).thenReturn(List.of());
         when(metadata.getUsage()).thenReturn(null);
 
         ChatResponse response = mock(ChatResponse.class);
@@ -232,7 +229,7 @@ class CompanyResearchAgentTest {
                   "unexpectedNewField": "some future model output"
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         CompanyResearchResult result = lenientAgent.research("EXMP", "Example Corp", null);
 
@@ -247,7 +244,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         CompanyResearchResult result = agent.research("EXMP", "Example Corp", null);
 
@@ -263,7 +260,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         agent.research("EXMP", "Example Corp", null);
 
@@ -271,7 +268,8 @@ class CompanyResearchAgentTest {
         verify(chatModel).call(promptCaptor.capture());
         AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
         assertThat(options.getWebSearchTool().getMaxUses()).isEqualTo(5L);
-        assertThat(options.getWebSearchTool().getAllowedDomains()).containsExactly("sec.gov", "stockanalysis.com");
+        assertThat(options.getWebSearchTool().getAllowedDomains())
+                .containsExactly("sec.gov", "stockanalysis.com", "investor.example.com", "finance.example.com");
     }
 
     @Test
@@ -282,7 +280,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         agent.research("EXMP", "Example Corp", null);
 
@@ -302,7 +300,7 @@ class CompanyResearchAgentTest {
                   "noReliableReportFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://investor.example.com/q2-2026"));
+        stubChatModelResponse(responseJson);
 
         agent.research("EXMP", "Example Corp", new Stage1Snapshot(24.3, 3.1));
 
@@ -323,7 +321,7 @@ class CompanyResearchAgentTest {
                   "noReliableDataFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+        stubChatModelResponse(responseJson);
 
         QuickResearchResult result = agent.quickResearch("EXMP", "Example Corp");
 
@@ -341,7 +339,7 @@ class CompanyResearchAgentTest {
                   "noReliableDataFoundReason": "No current key-statistics page found for this ticker."
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of());
+        stubChatModelResponse(responseJson);
 
         QuickResearchResult result = agent.quickResearch("EXMP", "Example Corp");
 
@@ -359,7 +357,7 @@ class CompanyResearchAgentTest {
                   "noReliableDataFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+        stubChatModelResponse(responseJson);
 
         QuickResearchResult result = agent.quickResearch("EXMP", "Example Corp");
 
@@ -376,7 +374,7 @@ class CompanyResearchAgentTest {
                   "noReliableDataFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+        stubChatModelResponse(responseJson);
 
         agent.quickResearch("EXMP", "Example Corp");
 
@@ -384,7 +382,34 @@ class CompanyResearchAgentTest {
         verify(chatModel).call(promptCaptor.capture());
         AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
         assertThat(options.getWebSearchTool().getMaxUses()).isEqualTo(1L);
-        assertThat(options.getWebSearchTool().getAllowedDomains()).containsExactly("sec.gov", "stockanalysis.com");
+        assertThat(options.getWebSearchTool().getAllowedDomains())
+                .containsExactly("sec.gov", "stockanalysis.com", "investor.example.com", "finance.example.com");
+    }
+
+    @Test
+    void extractsTheFinalJsonBlockWhenModelReasonsInProseAndWrapsAnswerInMarkdownFences() {
+        String responseText = """
+                I'll use the primary statistics page. Let me draft a first pass.
+
+                ```json
+                {"roe": {"value": 999.0, "url": "https://finance.example.com/EXMP", "claim": "draft, ignore"}, "noReliableDataFound": false}
+                ```
+
+                Let me produce the final strict JSON per the requested schema, omitting unavailable fields.
+
+                ```json
+                {
+                  "roe": {"value": 18.5, "url": "https://finance.example.com/EXMP", "claim": "ROE of 18.5% per the statistics page"},
+                  "noReliableDataFound": false
+                }
+                ```
+                """;
+        stubChatModelResponse(responseText);
+
+        QuickResearchResult result = agent.quickResearch("EXMP", "Example Corp");
+
+        assertThat(result.noReliableDataFound()).isFalse();
+        assertThat(result.roe().value()).isEqualTo(18.5);
     }
 
     @Test
@@ -395,7 +420,7 @@ class CompanyResearchAgentTest {
                   "noReliableDataFound": false
                 }
                 """;
-        stubChatModelResponse(responseJson, List.of("https://finance.example.com/EXMP"));
+        stubChatModelResponse(responseJson);
 
         agent.quickResearch("EXMP", "Example Corp");
 
@@ -407,33 +432,29 @@ class CompanyResearchAgentTest {
         assertThat(options.getThinking().isDisabled()).isTrue();
     }
 
-    private void stubChatModelResponse(String responseText, List<String> citedUrls) {
+    private void stubChatModelResponse(String responseText) {
         Usage defaultUsage = mock(Usage.class);
         when(defaultUsage.getPromptTokens()).thenReturn(500);
         when(defaultUsage.getCompletionTokens()).thenReturn(500);
         when(defaultUsage.getTotalTokens()).thenReturn(1000);
         when(defaultUsage.getCacheReadInputTokens()).thenReturn(0L);
         when(defaultUsage.getCacheWriteInputTokens()).thenReturn(0L);
-        stubChatModelResponse(responseText, citedUrls, defaultUsage);
+        stubChatModelResponse(responseText, defaultUsage);
     }
 
-    private void stubChatModelResponse(String responseText, List<String> citedUrls, Usage usage) {
+    // Real Sonnet 5 calls that retrieve search results via code_execution-mediated web_search
+    // (Programmatic Tool Calling) come back with no citations metadata at all -- confirmed via a
+    // live call for AAPL. Deliberately not stubbing "citations" here reproduces that: verification
+    // must succeed purely from the claimed source's domain being on the allow-list, with no
+    // citation metadata present.
+    private void stubChatModelResponse(String responseText, Usage usage) {
         AssistantMessage output = mock(AssistantMessage.class);
         when(output.getText()).thenReturn(responseText);
 
         Generation generation = mock(Generation.class);
         when(generation.getOutput()).thenReturn(output);
 
-        List<Citation> citations = citedUrls.stream()
-                .map(url -> {
-                    Citation citation = mock(Citation.class);
-                    when(citation.getUrl()).thenReturn(url);
-                    return citation;
-                })
-                .toList();
-
         ChatResponseMetadata metadata = mock(ChatResponseMetadata.class);
-        when(metadata.get("citations")).thenReturn(citations);
         when(metadata.getUsage()).thenReturn(usage);
 
         ChatResponse response = mock(ChatResponse.class);

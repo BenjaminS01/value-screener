@@ -14,7 +14,6 @@ import com.valuescreener.research.prompt.QuickResearchPromptBuilder;
 import com.valuescreener.research.prompt.ResearchPromptBuilder;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.AnthropicWebSearchTool;
-import org.springframework.ai.anthropic.Citation;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -24,15 +23,17 @@ import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class CompanyResearchAgent {
@@ -61,7 +62,7 @@ public class CompanyResearchAgent {
                                  @Value("${research.agent.timeout-seconds:55}") long timeoutSeconds,
                                  @Value("${spring.ai.anthropic.chat.model:claude-sonnet-5}") String model,
                                  @Value("${research.agent.web-search-max-uses:5}") long webSearchMaxUses,
-                                 @Value("${research.agent.allowed-domains:sec.gov,www.sec.gov,stockanalysis.com,marketscreener.com,finance.yahoo.com,morningstar.com,reuters.com,wsj.com,macrotrends.net,boerse-frankfurt.de,finanzen.net,globenewswire.com,prnewswire.com,businesswire.com}")
+                                 @Value("${research.agent.allowed-domains:sec.gov,www.sec.gov,stockanalysis.com,marketscreener.com,finance.yahoo.com,morningstar.com,macrotrends.net,boerse-frankfurt.de,finanzen.net,globenewswire.com,prnewswire.com,businesswire.com}")
                                  String[] allowedDomains) {
         this.chatModel = chatModel;
         this.promptBuilder = promptBuilder;
@@ -89,16 +90,14 @@ public class CompanyResearchAgent {
                             : raw.noReliableReportFoundReason());
         }
 
-        Set<String> citedUrls = extractCitedUrls(response);
-
-        SourceReference marginTrend = verify(raw.marginTrend(), citedUrls);
-        SourceReference freeCashFlowTrend = verify(raw.freeCashFlowTrend(), citedUrls);
-        SourceReference profitStability = verify(raw.profitStability(), citedUrls);
-        NumericFinding interestCoverage = verify(raw.interestCoverage(), citedUrls);
-        NumericFinding currentRatio = verify(raw.currentRatio(), citedUrls);
-        SourceReference moatAssessment = verify(raw.moatAssessment(), citedUrls);
-        SourceReference managementQuality = verify(raw.managementQuality(), citedUrls);
-        SourceReference valueTrapAssessment = verify(raw.valueTrapAssessment(), citedUrls);
+        SourceReference marginTrend = verify(raw.marginTrend());
+        SourceReference freeCashFlowTrend = verify(raw.freeCashFlowTrend());
+        SourceReference profitStability = verify(raw.profitStability());
+        NumericFinding interestCoverage = verify(raw.interestCoverage());
+        NumericFinding currentRatio = verify(raw.currentRatio());
+        SourceReference moatAssessment = verify(raw.moatAssessment());
+        SourceReference managementQuality = verify(raw.managementQuality());
+        SourceReference valueTrapAssessment = verify(raw.valueTrapAssessment());
 
         if (marginTrend == null && freeCashFlowTrend == null && profitStability == null
                 && interestCoverage == null && currentRatio == null && moatAssessment == null
@@ -109,7 +108,7 @@ public class CompanyResearchAgent {
                     && raw.managementQuality() == null && raw.valueTrapAssessment() == null;
             return CompanyResearchResult.lowConfidence(ticker, rawHadNoCriteria
                     ? "Model did not return any criteria for this ticker."
-                    : "Model returned sources that could not be verified against actual search results.");
+                    : "Model returned sources whose domain is not on the trusted allow-list.");
         }
 
         return new CompanyResearchResult(
@@ -133,19 +132,17 @@ public class CompanyResearchAgent {
                             : raw.noReliableDataFoundReason());
         }
 
-        Set<String> citedUrls = extractCitedUrls(response);
-
-        NumericFinding currentPe = verify(raw.currentPe(), citedUrls);
-        NumericFinding currentPb = verify(raw.currentPb(), citedUrls);
-        NumericFinding fiveYearAveragePe = verify(raw.fiveYearAveragePe(), citedUrls);
-        NumericFinding fiveYearAveragePb = verify(raw.fiveYearAveragePb(), citedUrls);
-        NumericFinding roe = verify(raw.roe(), citedUrls);
-        NumericFinding debtToEquity = verify(raw.debtToEquity(), citedUrls);
-        NumericFinding currentRatio = verify(raw.currentRatio(), citedUrls);
-        NumericFinding currentYearNetMargin = verify(raw.currentYearNetMargin(), citedUrls);
-        BooleanFinding currentYearFcfPositive = verify(raw.currentYearFcfPositive(), citedUrls);
-        BooleanFinding currentYearNetIncomeGrew = verify(raw.currentYearNetIncomeGrew(), citedUrls);
-        NumericFinding insiderOwnershipShare = verify(raw.insiderOwnershipShare(), citedUrls);
+        NumericFinding currentPe = verify(raw.currentPe());
+        NumericFinding currentPb = verify(raw.currentPb());
+        NumericFinding fiveYearAveragePe = verify(raw.fiveYearAveragePe());
+        NumericFinding fiveYearAveragePb = verify(raw.fiveYearAveragePb());
+        NumericFinding roe = verify(raw.roe());
+        NumericFinding debtToEquity = verify(raw.debtToEquity());
+        NumericFinding currentRatio = verify(raw.currentRatio());
+        NumericFinding currentYearNetMargin = verify(raw.currentYearNetMargin());
+        BooleanFinding currentYearFcfPositive = verify(raw.currentYearFcfPositive());
+        BooleanFinding currentYearNetIncomeGrew = verify(raw.currentYearNetIncomeGrew());
+        NumericFinding insiderOwnershipShare = verify(raw.insiderOwnershipShare());
 
         if (currentPe == null && currentPb == null && fiveYearAveragePe == null && fiveYearAveragePb == null
                 && roe == null && debtToEquity == null && currentRatio == null && currentYearNetMargin == null
@@ -158,7 +155,7 @@ public class CompanyResearchAgent {
                     && raw.currentYearNetIncomeGrew() == null && raw.insiderOwnershipShare() == null;
             return QuickResearchResult.noData(ticker, rawHadNoFigures
                     ? "Model did not return any figures for this ticker."
-                    : "Model returned figures that could not be verified against actual search results.");
+                    : "Model returned figures whose domain is not on the trusted allow-list.");
         }
 
         return new QuickResearchResult(
@@ -227,50 +224,87 @@ public class CompanyResearchAgent {
         return response.getResult().getOutput().getText();
     }
 
+    // Confirmed via a real live call: despite being told to answer with ONLY JSON, the model
+    // sometimes reasons in prose first (especially when it uses code_execution along the way)
+    // and/or wraps its answer -- including an earlier, discarded draft -- in markdown code
+    // fences. Prompt wording alone did not prevent this, so parsing has to tolerate it: take the
+    // LAST fenced JSON block (the model's own "final answer", per its own wording), falling back
+    // to the first-to-last brace span for the plain, unfenced case.
+    // Non-greedy on the fence content itself (not on brace-matching): a greedy \{.*} spans
+    // past a block's own closing ``` and merges with a LATER block, since Jackson's readValue
+    // silently ignores trailing tokens after the first complete JSON value by default -- that
+    // combined match would then silently parse as the FIRST (draft) block instead of the last.
+    private static final Pattern JSON_FENCE_PATTERN =
+            Pattern.compile("```(?:json)?\\s*(.*?)\\s*```", Pattern.DOTALL);
+
+    private String extractJson(String responseText) {
+        Matcher matcher = JSON_FENCE_PATTERN.matcher(responseText);
+        String lastFencedBlock = null;
+        while (matcher.find()) {
+            lastFencedBlock = matcher.group(1);
+        }
+        if (lastFencedBlock != null) {
+            return lastFencedBlock;
+        }
+        int start = responseText.indexOf('{');
+        int end = responseText.lastIndexOf('}');
+        return start >= 0 && end > start ? responseText.substring(start, end + 1) : responseText;
+    }
+
     private <T> T parse(String responseText, Class<T> type) {
+        String jsonText = extractJson(responseText);
         try {
-            return objectMapper.readValue(responseText, type);
+            return objectMapper.readValue(jsonText, type);
         } catch (Exception e) {
+            log.error("Could not parse research agent response as JSON. Cause: {}. Raw response text:\n{}",
+                    e.getMessage(), responseText);
             throw new ResearchResponseParseException(
                     "Could not parse research agent response as JSON", e);
         }
     }
 
-    private Set<String> extractCitedUrls(ChatResponse response) {
-        Object citations = response.getMetadata().get("citations");
-        if (!(citations instanceof List<?> citationList)) {
-            return Set.of();
+    // Anthropic's citation metadata does not get attached when the model retrieves web content
+    // via code_execution-mediated web_search calls (Programmatic Tool Calling) rather than a
+    // direct, visible web_search tool call -- confirmed live for Sonnet 5, which uses PTC by
+    // default. So citations can't be used as the verification signal. Falling back to checking
+    // the claimed source's domain against the same allowed-domains list the web_search tool
+    // itself is restricted to: weaker than confirming the exact URL was actually retrieved, but
+    // the API already guarantees any search it performed was scoped to these domains.
+    private boolean isAllowedDomain(String url) {
+        String host;
+        try {
+            host = URI.create(url).getHost();
+        } catch (IllegalArgumentException e) {
+            return false;
         }
-        return citationList.stream()
-                .filter(Citation.class::isInstance)
-                .map(Citation.class::cast)
-                .map(Citation::getUrl)
-                .filter(url -> url != null && !url.isBlank())
-                .collect(Collectors.toSet());
+        if (host == null) {
+            return false;
+        }
+        String lowerHost = host.toLowerCase(Locale.ROOT);
+        return allowedDomains.stream().anyMatch(domain -> domain.equalsIgnoreCase(lowerHost));
     }
 
-    private SourceReference
-    verify(RawSourceReference raw, Set<String> citedUrls) {
+    private SourceReference verify(RawSourceReference raw) {
         if (raw == null || raw.url() == null || raw.claim() == null || raw.claim().isBlank()
-                || !citedUrls.contains(raw.url())) {
+                || !isAllowedDomain(raw.url())) {
             return null;
         }
         return new SourceReference(raw.url(), raw.claim());
     }
 
-    private NumericFinding verify(RawNumericFinding raw, Set<String> citedUrls) {
+    private NumericFinding verify(RawNumericFinding raw) {
         if (raw == null || raw.value() == null) {
             return null;
         }
-        SourceReference source = verify(new RawSourceReference(raw.url(), raw.claim()), citedUrls);
+        SourceReference source = verify(new RawSourceReference(raw.url(), raw.claim()));
         return source == null ? null : new NumericFinding(raw.value(), source);
     }
 
-    private BooleanFinding verify(RawBooleanFinding raw, Set<String> citedUrls) {
+    private BooleanFinding verify(RawBooleanFinding raw) {
         if (raw == null || raw.value() == null) {
             return null;
         }
-        SourceReference source = verify(new RawSourceReference(raw.url(), raw.claim()), citedUrls);
+        SourceReference source = verify(new RawSourceReference(raw.url(), raw.claim()));
         return source == null ? null : new BooleanFinding(raw.value(), source);
     }
 }
