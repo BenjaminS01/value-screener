@@ -244,6 +244,19 @@ den Broker aktuell noch nicht), nicht der Nutzen für value-screener isoliert be
 Bewusste Entscheidung: wie beim MCP-Thema erst bei Wiederaufnahme von Phase 2 (AI Assessor) aktiv
 wieder ansprechen und dann entscheiden, nicht in Phase 1 hineinziehen.
 
+## Nebenthema: Quartalsbericht-Upload für Tiefenrecherche — gebrainstormt, zurückgestellt
+
+Neue Idee (2026-08-02, Brainstorming-Session), Design fertig abgestimmt und geschrieben:
+[`docs/superpowers/specs/2026-08-02-quarterly-report-upload-design.md`](docs/superpowers/specs/2026-08-02-quarterly-report-upload-design.md).
+Kurzfassung: Operator kann zu einem Kandidaten Quartalsberichte (PDF) hochladen, PDF-Volltext wird
+direkt als Prompt-Kontext an den Company Research Agent gegeben (keine Vector-DB in Version 1 — bewusst
+zurückgestellter Ausbauschritt, siehe Spec).
+
+**Bewusst zurückgestellt, nicht in aktueller Umsetzung enthalten:** baut auf dem Company Research
+Agent auf, dessen echter Live-Call (Schritt 4 der Redesign-Reconciliation, siehe oben) noch nicht
+erfolgreich bestätigt wurde. Erst nach erfolgreichem Schritt 4 weiterverfolgen. Keine Datei aus diesem
+Nebenthema überschneidet sich mit der aktuell laufenden Live-Call-Testarbeit.
+
 ## Hinweis: öffentliches Repo
 
 Dieses Repo wird öffentlich auf GitHub gehostet (Vorzeigeprojekt). Daher: keine private
