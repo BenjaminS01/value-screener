@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.PostLoad;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
@@ -74,6 +75,14 @@ public class CompanySnapshot {
 
     protected CompanySnapshot() {
         // JPA
+    }
+
+    // Hibernate loads a null @Embedded field (not an empty embeddable) when every backing column is NULL; restore the "never null" invariant here.
+    @PostLoad
+    private void ensureFinancialStatsIsNotNull() {
+        if (this.financialStats == null) {
+            this.financialStats = FinancialStats.empty();
+        }
     }
 
     public CompanySnapshot(String ticker, String isin, String companyName, String sector, String country,
