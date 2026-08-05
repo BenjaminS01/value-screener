@@ -20,6 +20,28 @@ entfernten Worktree) wurde vor dessen Entfernung in die öffentlichen Learning-W
 **Offen:** noch nie ein erfolgreicher End-to-End-Research-Call gegen die echte Anthropic-API — siehe
 Decision-Log in der Design-Spec, bevor an diesem Sub-Projekt weitergearbeitet wird.
 
+## Session Research Collection: Backend-Grundlage umgesetzt (2026-08-05)
+
+Neues Modul `com.valuescreener.research` in `backend/` umgesetzt: `CompanySnapshot`-Aggregat
+(Identität + `FinancialStats`-Value-Object für die 8 optionalen Kennzahlen + `moatNote`/
+`opportunitiesAndRisksNote` als freie Notizfelder, Merge-Semantik — ein
+späterer Recherche-Pass überschreibt nur Felder, die er tatsächlich liefert, verliert also nie zuvor
+gefundene Daten), Repository, Service (Upsert nach ISIN), REST-Controller unter
+`/api/research/snapshots` (POST/GET/GET-by-ISIN), abgesichert durch die bestehende
+Single-User-Auth (kein `SecurityConfig`-Änderung nötig, `.anyRequest().authenticated()` deckt es
+bereits ab, per eigenem Test verifiziert). Design:
+[`docs/superpowers/specs/2026-08-03-session-research-collection-design.md`](docs/superpowers/specs/2026-08-03-session-research-collection-design.md).
+Plan: [`docs/superpowers/plans/2026-08-03-session-research-collection.md`](docs/superpowers/plans/2026-08-03-session-research-collection.md).
+
+**Bewusste Entscheidung (siehe Design-Doku):** Schritt 4 (Live-Call-Test des Company Research Agent)
+wird zugunsten dieses Themas pausiert — dieser Baustein braucht keine bezahlte KI-Nutzung zum Testen
+(reines JUnit/Testcontainers), im Gegensatz zum bisherigen Redesign-Pfad.
+
+**Noch offen:** Deep-Research-Kontext-Injection (`ResearchPromptBuilder` in `company-research-agent/`
+mit `CompanySnapshot`-Daten füttern), Dashboard/Frontend, Abgleich mit
+`2026-07-30-screening-cost-redesign-design.md` — alles bewusst außerhalb dieses Plans (siehe
+Design-Doku Abschnitt 7).
+
 ## Idee
 
 Persönliches Tool für Value-Investing nach Buffett-Prinzipien:
