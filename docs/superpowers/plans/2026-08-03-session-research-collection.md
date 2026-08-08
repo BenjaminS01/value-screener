@@ -269,8 +269,11 @@ git commit -m "feat(research): add FinancialStats value object with merge semant
 same shape as `PortfolioPosition`: a private no-arg constructor for JPA, a validating public
 constructor, and a domain method (`applyUpdate`, mirroring `recordPurchase`/`recordSale`) that encodes
 the business rule from the design spec — a later research pass **overwrites** identity/description
-fields with fresher values, but only overwrites the optional `FinancialStats` fields and `moatNote`
-**when the new pass actually found them**, otherwise keeps what's already known. It also computes
+fields with fresher values, but only overwrites the optional `FinancialStats` fields, `moatNote`, and
+`opportunitiesAndRisksNote` **when the new pass actually found them**, otherwise keeps what's already
+known. `opportunitiesAndRisksNote` is a free-text note (like `moatNote`) for a short summary of the
+company's main opportunities and risks — added mid-plan at the user's request, same shape and treatment
+as `moatNote` throughout. It also computes
 `updatedFields` on every write — the set of optional fields *this particular pass* provided — which is
 exactly the "which data was updated" freshness signal from the design spec's UI requirement.
 
@@ -280,7 +283,7 @@ exactly the "which data was updated" freshness signal from the design spec's UI 
 
 **Interfaces:**
 - Consumes: `FinancialStats` (Task 1) — `FinancialStats.empty()`, `mergedWith`, `presentFieldNames()`.
-- Produces: `CompanySnapshot(String ticker, String isin, String companyName, String sector, String country, String businessDescription, String moatNote, FinancialStats financialStats, LocalDate asOfDate, Set<String> sources)` constructor; `void applyUpdate(String companyName, String sector, String country, String businessDescription, String moatNote, FinancialStats financialStats, LocalDate asOfDate, Set<String> sources)`; getters `getId/getTicker/getIsin/getCompanyName/getSector/getCountry/getBusinessDescription/getMoatNote/getFinancialStats/getAsOfDate/getSources/getUpdatedFields`. Consumed by `CompanySnapshotRepository` (Task 3) and `CompanySnapshotService` (Task 4).
+- Produces: `CompanySnapshot(String ticker, String isin, String companyName, String sector, String country, String businessDescription, String moatNote, String opportunitiesAndRisksNote, FinancialStats financialStats, LocalDate asOfDate, Set<String> sources)` constructor; `void applyUpdate(String companyName, String sector, String country, String businessDescription, String moatNote, String opportunitiesAndRisksNote, FinancialStats financialStats, LocalDate asOfDate, Set<String> sources)`; getters `getId/getTicker/getIsin/getCompanyName/getSector/getCountry/getBusinessDescription/getMoatNote/getOpportunitiesAndRisksNote/getFinancialStats/getAsOfDate/getSources/getUpdatedFields`. `opportunitiesAndRisksNote` follows the exact same optional/overwrite-if-provided treatment as `moatNote`. Consumed by `CompanySnapshotRepository` (Task 3) and `CompanySnapshotService` (Task 4).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -301,7 +304,7 @@ class CompanySnapshotTest {
     private static CompanySnapshot minimalSnapshot() {
         return new CompanySnapshot(
                 "aapl", "us0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null,
+                "Designs and sells consumer electronics.", null, null, null,
                 LocalDate.of(2026, 8, 1), Set.of("https://example.com/aapl-key-stats"));
     }
 
@@ -318,7 +321,7 @@ class CompanySnapshotTest {
     void rejectsBlankTicker() {
         assertThatThrownBy(() -> new CompanySnapshot(
                 "  ", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null, LocalDate.of(2026, 8, 1), Set.of()))
+                "Designs and sells consumer electronics.", null, null, null, LocalDate.of(2026, 8, 1), Set.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ticker");
     }
@@ -327,7 +330,7 @@ class CompanySnapshotTest {
     void rejectsMalformedIsin() {
         assertThatThrownBy(() -> new CompanySnapshot(
                 "AAPL", "NOT-AN-ISIN", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null, LocalDate.of(2026, 8, 1), Set.of()))
+                "Designs and sells consumer electronics.", null, null, null, LocalDate.of(2026, 8, 1), Set.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("isin");
     }
@@ -336,7 +339,7 @@ class CompanySnapshotTest {
     void rejectsBlankBusinessDescription() {
         assertThatThrownBy(() -> new CompanySnapshot(
                 "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "  ", null, null, LocalDate.of(2026, 8, 1), Set.of()))
+                "  ", null, null, null, LocalDate.of(2026, 8, 1), Set.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("businessDescription");
     }
@@ -346,10 +349,12 @@ class CompanySnapshotTest {
         FinancialStats stats = new FinancialStats(new BigDecimal("28.0"), null, null, null, null, null, null, null);
         CompanySnapshot snapshot = new CompanySnapshot(
                 "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", "Strong brand moat.", stats,
+                "Designs and sells consumer electronics.", "Strong brand moat.",
+                "Regulatory risk in the EU; expansion opportunity in services.", stats,
                 LocalDate.of(2026, 8, 1), Set.of());
 
-        assertThat(snapshot.getUpdatedFields()).containsExactlyInAnyOrder("peRatio", "moatNote");
+        assertThat(snapshot.getUpdatedFields()).containsExactlyInAnyOrder(
+                "peRatio", "moatNote", "opportunitiesAndRisksNote");
     }
 
     @Test
@@ -357,17 +362,19 @@ class CompanySnapshotTest {
         FinancialStats initialStats = new FinancialStats(new BigDecimal("28.0"), new BigDecimal("40.0"), null, null, null, null, null, null);
         CompanySnapshot snapshot = new CompanySnapshot(
                 "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", "Strong brand moat.", initialStats,
+                "Designs and sells consumer electronics.", "Strong brand moat.",
+                "Regulatory risk in the EU.", initialStats,
                 LocalDate.of(2026, 8, 1), Set.of("https://example.com/first-source"));
 
         FinancialStats freshPeOnly = new FinancialStats(new BigDecimal("29.5"), null, null, null, null, null, null, null);
         snapshot.applyUpdate("Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics and services.", null, freshPeOnly,
+                "Designs and sells consumer electronics and services.", null, null, freshPeOnly,
                 LocalDate.of(2026, 8, 5), Set.of("https://example.com/second-source"));
 
         assertThat(snapshot.getFinancialStats().getPeRatio()).isEqualByComparingTo("29.5");
         assertThat(snapshot.getFinancialStats().getPbRatio()).isEqualByComparingTo("40.0");
         assertThat(snapshot.getMoatNote()).isEqualTo("Strong brand moat.");
+        assertThat(snapshot.getOpportunitiesAndRisksNote()).isEqualTo("Regulatory risk in the EU.");
         assertThat(snapshot.getAsOfDate()).isEqualTo(LocalDate.of(2026, 8, 5));
         assertThat(snapshot.getSources()).containsExactlyInAnyOrder(
                 "https://example.com/first-source", "https://example.com/second-source");
@@ -379,9 +386,23 @@ class CompanySnapshotTest {
 
         FinancialStats freshRoeOnly = new FinancialStats(null, null, new BigDecimal("35.0"), null, null, null, null, null);
         snapshot.applyUpdate("Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, freshRoeOnly, LocalDate.of(2026, 8, 5), Set.of());
+                "Designs and sells consumer electronics.", null, null, freshRoeOnly, LocalDate.of(2026, 8, 5), Set.of());
 
         assertThat(snapshot.getUpdatedFields()).containsExactly("roePercent");
+    }
+
+    @Test
+    void applyUpdateOverwritesOpportunitiesAndRisksNoteWhenProvided() {
+        CompanySnapshot snapshot = minimalSnapshot();
+
+        snapshot.applyUpdate("Apple Inc.", "Information Technology", "USA",
+                "Designs and sells consumer electronics.", null,
+                "New risk: supply chain concentration in one country.", null,
+                LocalDate.of(2026, 8, 5), Set.of());
+
+        assertThat(snapshot.getOpportunitiesAndRisksNote())
+                .isEqualTo("New risk: supply chain concentration in one country.");
+        assertThat(snapshot.getUpdatedFields()).containsExactly("opportunitiesAndRisksNote");
     }
 }
 ```
@@ -445,6 +466,9 @@ public class CompanySnapshot {
     @Column(name = "moat_note", columnDefinition = "TEXT")
     private String moatNote;
 
+    @Column(name = "opportunities_and_risks_note", columnDefinition = "TEXT")
+    private String opportunitiesAndRisksNote;
+
     @Embedded
     private FinancialStats financialStats;
 
@@ -470,8 +494,8 @@ public class CompanySnapshot {
     }
 
     public CompanySnapshot(String ticker, String isin, String companyName, String sector, String country,
-                            String businessDescription, String moatNote, FinancialStats financialStats,
-                            LocalDate asOfDate, Set<String> sources) {
+                            String businessDescription, String moatNote, String opportunitiesAndRisksNote,
+                            FinancialStats financialStats, LocalDate asOfDate, Set<String> sources) {
         this.ticker = requireValidTicker(ticker);
         this.isin = requireValidIsin(isin);
         this.companyName = requireNonBlank(companyName, "companyName");
@@ -479,30 +503,36 @@ public class CompanySnapshot {
         this.country = requireNonBlank(country, "country");
         this.businessDescription = requireNonBlank(businessDescription, "businessDescription");
         this.moatNote = moatNote;
+        this.opportunitiesAndRisksNote = opportunitiesAndRisksNote;
         this.financialStats = financialStats != null ? financialStats : FinancialStats.empty();
         this.asOfDate = Objects.requireNonNull(asOfDate, "asOfDate must not be null");
         this.sources = new LinkedHashSet<>(sources != null ? sources : Set.of());
-        this.updatedFields = computeUpdatedFields(this.moatNote, this.financialStats);
+        this.updatedFields = computeUpdatedFields(this.moatNote, this.opportunitiesAndRisksNote, this.financialStats);
     }
 
     public void applyUpdate(String companyName, String sector, String country, String businessDescription,
-                             String moatNote, FinancialStats financialStats, LocalDate asOfDate, Set<String> sources) {
+                             String moatNote, String opportunitiesAndRisksNote, FinancialStats financialStats,
+                             LocalDate asOfDate, Set<String> sources) {
         this.companyName = requireNonBlank(companyName, "companyName");
         this.sector = requireNonBlank(sector, "sector");
         this.country = requireNonBlank(country, "country");
         this.businessDescription = requireNonBlank(businessDescription, "businessDescription");
         FinancialStats providedStats = financialStats != null ? financialStats : FinancialStats.empty();
-        this.updatedFields = computeUpdatedFields(moatNote, providedStats);
+        this.updatedFields = computeUpdatedFields(moatNote, opportunitiesAndRisksNote, providedStats);
         this.moatNote = moatNote != null ? moatNote : this.moatNote;
+        this.opportunitiesAndRisksNote = opportunitiesAndRisksNote != null ? opportunitiesAndRisksNote : this.opportunitiesAndRisksNote;
         this.financialStats = this.financialStats.mergedWith(providedStats);
         this.asOfDate = Objects.requireNonNull(asOfDate, "asOfDate must not be null");
         this.sources.addAll(sources != null ? sources : Set.of());
     }
 
-    private static Set<String> computeUpdatedFields(String moatNote, FinancialStats financialStats) {
+    private static Set<String> computeUpdatedFields(String moatNote, String opportunitiesAndRisksNote, FinancialStats financialStats) {
         Set<String> fields = new LinkedHashSet<>(financialStats.presentFieldNames());
         if (moatNote != null) {
             fields.add("moatNote");
+        }
+        if (opportunitiesAndRisksNote != null) {
+            fields.add("opportunitiesAndRisksNote");
         }
         return fields;
     }
@@ -544,6 +574,7 @@ public class CompanySnapshot {
     public String getCountry() { return country; }
     public String getBusinessDescription() { return businessDescription; }
     public String getMoatNote() { return moatNote; }
+    public String getOpportunitiesAndRisksNote() { return opportunitiesAndRisksNote; }
     public FinancialStats getFinancialStats() { return financialStats; }
     public LocalDate getAsOfDate() { return asOfDate; }
     public Set<String> getSources() { return Set.copyOf(sources); }
@@ -554,7 +585,7 @@ public class CompanySnapshot {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd backend && mvn -q -Dtest=CompanySnapshotTest test`
-Expected: PASS (6/6).
+Expected: PASS (8/8).
 
 - [ ] **Step 5: Report completion — do not commit**
 
@@ -624,7 +655,7 @@ class CompanySnapshotRepositoryTest {
     private static CompanySnapshot newSnapshot() {
         return new CompanySnapshot(
                 "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null,
+                "Designs and sells consumer electronics.", null, null, null,
                 LocalDate.of(2026, 8, 1), Set.of("https://example.com/aapl-key-stats"));
     }
 
@@ -650,11 +681,11 @@ class CompanySnapshotRepositoryTest {
 
         CompanySnapshot freshCopy = repository.findById(id).orElseThrow();
         freshCopy.applyUpdate("Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null, LocalDate.of(2026, 8, 5), Set.of());
+                "Designs and sells consumer electronics.", null, null, null, LocalDate.of(2026, 8, 5), Set.of());
         repository.saveAndFlush(freshCopy);
 
         staleCopy.applyUpdate("Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null, LocalDate.of(2026, 8, 6), Set.of());
+                "Designs and sells consumer electronics.", null, null, null, LocalDate.of(2026, 8, 6), Set.of());
         assertThatThrownBy(() -> repository.saveAndFlush(staleCopy))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     }
@@ -679,6 +710,7 @@ CREATE TABLE company_snapshot (
     country VARCHAR(100) NOT NULL,
     business_description TEXT NOT NULL,
     moat_note TEXT,
+    opportunities_and_risks_note TEXT,
     pe_ratio NUMERIC(12, 4),
     pb_ratio NUMERIC(12, 4),
     roe_percent NUMERIC(12, 4),
@@ -797,6 +829,7 @@ class CompanySnapshotServiceTest {
         UpsertCompanySnapshotRequest request = new UpsertCompanySnapshotRequest(
                 "aapl", "US0378331005", "Apple Inc.", "Information Technology", "USA",
                 "Designs and sells consumer electronics.", "Strong brand moat.",
+                "Regulatory risk in the EU; expansion opportunity in services.",
                 new BigDecimal("28.0"), null, null, null, null, null, null, null,
                 LocalDate.of(2026, 8, 1), Set.of("https://example.com/aapl-key-stats"));
 
@@ -804,7 +837,8 @@ class CompanySnapshotServiceTest {
 
         assertThat(result.ticker()).isEqualTo("AAPL");
         assertThat(result.peRatio()).isEqualByComparingTo("28.0");
-        assertThat(result.updatedFields()).containsExactlyInAnyOrder("peRatio", "moatNote");
+        assertThat(result.updatedFields()).containsExactlyInAnyOrder(
+                "peRatio", "moatNote", "opportunitiesAndRisksNote");
     }
 
     @Test
@@ -813,13 +847,14 @@ class CompanySnapshotServiceTest {
         FinancialStats existingStats = new FinancialStats(new BigDecimal("28.0"), new BigDecimal("40.0"), null, null, null, null, null, null);
         CompanySnapshot existing = new CompanySnapshot(
                 "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", "Strong brand moat.", existingStats,
+                "Designs and sells consumer electronics.", "Strong brand moat.",
+                "Regulatory risk in the EU.", existingStats,
                 LocalDate.of(2026, 8, 1), Set.of("https://example.com/first-source"));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         UpsertCompanySnapshotRequest request = new UpsertCompanySnapshotRequest(
                 "aapl", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics and services.", null,
+                "Designs and sells consumer electronics and services.", null, null,
                 new BigDecimal("29.5"), null, null, null, null, null, null, null,
                 LocalDate.of(2026, 8, 5), Set.of("https://example.com/second-source"));
 
@@ -827,6 +862,7 @@ class CompanySnapshotServiceTest {
 
         assertThat(result.peRatio()).isEqualByComparingTo("29.5");
         assertThat(result.pbRatio()).isEqualByComparingTo("40.0");
+        assertThat(result.opportunitiesAndRisksNote()).isEqualTo("Regulatory risk in the EU.");
         assertThat(result.sources()).containsExactlyInAnyOrder(
                 "https://example.com/first-source", "https://example.com/second-source");
 
@@ -840,7 +876,7 @@ class CompanySnapshotServiceTest {
         CompanySnapshotService service = new CompanySnapshotService(repository);
         CompanySnapshot snapshot = new CompanySnapshot(
                 "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null,
+                "Designs and sells consumer electronics.", null, null, null,
                 LocalDate.of(2026, 8, 1), Set.of());
         when(repository.findAll()).thenReturn(List.of(snapshot));
 
@@ -855,7 +891,7 @@ class CompanySnapshotServiceTest {
         CompanySnapshotService service = new CompanySnapshotService(repository);
         CompanySnapshot snapshot = new CompanySnapshot(
                 "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", null, null,
+                "Designs and sells consumer electronics.", null, null, null,
                 LocalDate.of(2026, 8, 1), Set.of());
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(snapshot));
 
@@ -899,6 +935,7 @@ public record UpsertCompanySnapshotRequest(
         @NotBlank String country,
         @NotBlank String businessDescription,
         String moatNote,
+        String opportunitiesAndRisksNote,
         BigDecimal peRatio,
         BigDecimal pbRatio,
         BigDecimal roePercent,
@@ -929,6 +966,7 @@ public record CompanySnapshotView(
         String country,
         String businessDescription,
         String moatNote,
+        String opportunitiesAndRisksNote,
         BigDecimal peRatio,
         BigDecimal pbRatio,
         BigDecimal roePercent,
@@ -946,6 +984,7 @@ public record CompanySnapshotView(
         return new CompanySnapshotView(
                 snapshot.getId(), snapshot.getTicker(), snapshot.getIsin(), snapshot.getCompanyName(),
                 snapshot.getSector(), snapshot.getCountry(), snapshot.getBusinessDescription(), snapshot.getMoatNote(),
+                snapshot.getOpportunitiesAndRisksNote(),
                 stats.getPeRatio(), stats.getPbRatio(), stats.getRoePercent(), stats.getDebtToEquity(),
                 stats.getCurrentYearNetMarginPercent(), stats.getCurrentYearFcfPositive(),
                 stats.getCurrentYearNetIncomeIncreasedYoy(), stats.getInsiderOwnershipPercent(),
@@ -995,10 +1034,11 @@ public class CompanySnapshotService {
         if (snapshot == null) {
             snapshot = new CompanySnapshot(request.ticker(), request.isin(), request.companyName(),
                     request.sector(), request.country(), request.businessDescription(), request.moatNote(),
-                    stats, request.asOfDate(), sources);
+                    request.opportunitiesAndRisksNote(), stats, request.asOfDate(), sources);
         } else {
             snapshot.applyUpdate(request.companyName(), request.sector(), request.country(),
-                    request.businessDescription(), request.moatNote(), stats, request.asOfDate(), sources);
+                    request.businessDescription(), request.moatNote(), request.opportunitiesAndRisksNote(),
+                    stats, request.asOfDate(), sources);
         }
         return CompanySnapshotView.from(repository.save(snapshot));
     }
@@ -1087,8 +1127,10 @@ class CompanySnapshotControllerTest {
         return new CompanySnapshotView(
                 1L, "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
                 "Designs and sells consumer electronics.", "Strong brand moat.",
+                "Regulatory risk in the EU; expansion opportunity in services.",
                 new BigDecimal("28.0"), null, null, null, null, null, null, null,
-                LocalDate.of(2026, 8, 1), Set.of("https://example.com/aapl-key-stats"), Set.of("peRatio", "moatNote"));
+                LocalDate.of(2026, 8, 1), Set.of("https://example.com/aapl-key-stats"),
+                Set.of("peRatio", "moatNote", "opportunitiesAndRisksNote"));
     }
 
     @Test
@@ -1362,7 +1404,8 @@ beendet" section), written in German to match the rest of the document:
 ## Session Research Collection: Backend-Grundlage umgesetzt (2026-08-0X)
 
 Neues Modul `com.valuescreener.research` in `backend/` umgesetzt: `CompanySnapshot`-Aggregat
-(Identität + `FinancialStats`-Value-Object für die 8 optionalen Kennzahlen, Merge-Semantik — ein
+(Identität + `FinancialStats`-Value-Object für die 8 optionalen Kennzahlen + `moatNote`/
+`opportunitiesAndRisksNote` als freie Notizfelder, Merge-Semantik — ein
 späterer Recherche-Pass überschreibt nur Felder, die er tatsächlich liefert, verliert also nie zuvor
 gefundene Daten), Repository, Service (Upsert nach ISIN), REST-Controller unter
 `/api/research/snapshots` (POST/GET/GET-by-ISIN), abgesichert durch die bestehende
@@ -1405,3 +1448,11 @@ git commit -m "docs: record session research collection backend milestone"
   `currentYearNetIncomeIncreasedYoy`, `insiderOwnershipPercent`) are identical across Tasks 1, 2, 4, 5.
   `CompanySnapshot.applyUpdate`'s parameter order matches its constructor's tail (minus ticker/isin,
   which never change) across Tasks 2–4.
+- **Amendment (added after Tasks 1–2 were already implemented and reviewed):** `opportunitiesAndRisksNote`
+  (`String`, nullable, TEXT column) added to `CompanySnapshot`/`FinancialStats`'s sibling field set —
+  same optional/overwrite-if-provided treatment as `moatNote` throughout: entity field (after `moatNote`),
+  constructor param, `applyUpdate` param, `computeUpdatedFields` tracking, getter (Task 2); migration
+  column (Task 3); `UpsertCompanySnapshotRequest`/`CompanySnapshotView` field + service pass-through
+  (Task 4); test helper updates (Task 5). Placed immediately after `moatNote` in every signature/record
+  for consistency. All positional constructor/`applyUpdate`/DTO call sites across Tasks 2–5 were updated
+  to match — verified via `grep` for the old shorter argument lists after editing.
