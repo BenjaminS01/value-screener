@@ -1,22 +1,19 @@
 package com.valuescreener.research;
 
-import jakarta.persistence.CollectionTable;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.PostLoad;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.LinkedHashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 @Entity
@@ -47,27 +44,8 @@ public class CompanySnapshot {
     @Column(name = "business_description", nullable = false, columnDefinition = "TEXT")
     private String businessDescription;
 
-    @Column(name = "moat_note", columnDefinition = "TEXT")
-    private String moatNote;
-
-    @Column(name = "opportunities_and_risks_note", columnDefinition = "TEXT")
-    private String opportunitiesAndRisksNote;
-
-    @Embedded
-    private FinancialStats financialStats;
-
-    @Column(name = "as_of_date", nullable = false)
-    private LocalDate asOfDate;
-
-    @ElementCollection
-    @CollectionTable(name = "company_snapshot_source", joinColumns = @JoinColumn(name = "company_snapshot_id"))
-    @Column(name = "source", nullable = false, length = 500)
-    private Set<String> sources = new LinkedHashSet<>();
-
-    @ElementCollection
-    @CollectionTable(name = "company_snapshot_updated_field", joinColumns = @JoinColumn(name = "company_snapshot_id"))
-    @Column(name = "field_name", nullable = false, length = 100)
-    private Set<String> updatedFields = new LinkedHashSet<>();
+    @OneToMany(mappedBy = "companySnapshot", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ResearchFinding> findings = new ArrayList<>();
 
     @Version
     @Column(nullable = false)
@@ -77,56 +55,35 @@ public class CompanySnapshot {
         // JPA
     }
 
-    // Hibernate loads a null @Embedded field (not an empty embeddable) when every backing column is NULL; restore the "never null" invariant here.
-    @PostLoad
-    private void ensureFinancialStatsIsNotNull() {
-        if (this.financialStats == null) {
-            this.financialStats = FinancialStats.empty();
-        }
-    }
-
     public CompanySnapshot(String ticker, String isin, String companyName, String sector, String country,
-                            String businessDescription, String moatNote, String opportunitiesAndRisksNote,
-                            FinancialStats financialStats, LocalDate asOfDate, Set<String> sources) {
+                            String businessDescription) {
         this.ticker = requireValidTicker(ticker);
         this.isin = requireValidIsin(isin);
         this.companyName = requireNonBlank(companyName, "companyName");
         this.sector = requireNonBlank(sector, "sector");
         this.country = requireNonBlank(country, "country");
         this.businessDescription = requireNonBlank(businessDescription, "businessDescription");
-        this.moatNote = moatNote;
-        this.opportunitiesAndRisksNote = opportunitiesAndRisksNote;
-        this.financialStats = financialStats != null ? financialStats : FinancialStats.empty();
-        this.asOfDate = Objects.requireNonNull(asOfDate, "asOfDate must not be null");
-        this.sources = new LinkedHashSet<>(sources != null ? sources : Set.of());
-        this.updatedFields = computeUpdatedFields(this.moatNote, this.opportunitiesAndRisksNote, this.financialStats);
     }
 
-    public void applyUpdate(String companyName, String sector, String country, String businessDescription,
-                             String moatNote, String opportunitiesAndRisksNote, FinancialStats financialStats,
-                             LocalDate asOfDate, Set<String> sources) {
+    public void applyUpdate(String companyName, String sector, String country, String businessDescription) {
         this.companyName = requireNonBlank(companyName, "companyName");
         this.sector = requireNonBlank(sector, "sector");
         this.country = requireNonBlank(country, "country");
         this.businessDescription = requireNonBlank(businessDescription, "businessDescription");
-        FinancialStats providedStats = financialStats != null ? financialStats : FinancialStats.empty();
-        this.updatedFields = computeUpdatedFields(moatNote, opportunitiesAndRisksNote, providedStats);
-        this.moatNote = moatNote != null ? moatNote : this.moatNote;
-        this.opportunitiesAndRisksNote = opportunitiesAndRisksNote != null ? opportunitiesAndRisksNote : this.opportunitiesAndRisksNote;
-        this.financialStats = this.financialStats.mergedWith(providedStats);
-        this.asOfDate = Objects.requireNonNull(asOfDate, "asOfDate must not be null");
-        this.sources.addAll(sources != null ? sources : Set.of());
     }
 
-    private static Set<String> computeUpdatedFields(String moatNote, String opportunitiesAndRisksNote, FinancialStats financialStats) {
-        Set<String> fields = new LinkedHashSet<>(financialStats.presentFieldNames());
-        if (moatNote != null) {
-            fields.add("moatNote");
+    public void upsertFinding(ResearchCriterion criterionKey, BigDecimal numericValue, Boolean booleanValue,
+                               String claim, String sourceUrl, LocalDate asOfDate) {
+        for (ResearchFinding finding : findings) {
+            if (finding.getCriterionKey() == criterionKey) {
+                finding.applyUpdate(numericValue, booleanValue, claim, sourceUrl, asOfDate);
+                return;
+            }
         }
-        if (opportunitiesAndRisksNote != null) {
-            fields.add("opportunitiesAndRisksNote");
-        }
-        return fields;
+        ResearchFinding finding = new ResearchFinding(criterionKey, numericValue, booleanValue, claim,
+                sourceUrl, asOfDate);
+        finding.setCompanySnapshot(this);
+        findings.add(finding);
     }
 
     private static String requireValidTicker(String ticker) {
@@ -165,10 +122,5 @@ public class CompanySnapshot {
     public String getSector() { return sector; }
     public String getCountry() { return country; }
     public String getBusinessDescription() { return businessDescription; }
-    public String getMoatNote() { return moatNote; }
-    public String getOpportunitiesAndRisksNote() { return opportunitiesAndRisksNote; }
-    public FinancialStats getFinancialStats() { return financialStats; }
-    public LocalDate getAsOfDate() { return asOfDate; }
-    public Set<String> getSources() { return Set.copyOf(sources); }
-    public Set<String> getUpdatedFields() { return Set.copyOf(updatedFields); }
+    public List<ResearchFinding> getFindings() { return List.copyOf(findings); }
 }
