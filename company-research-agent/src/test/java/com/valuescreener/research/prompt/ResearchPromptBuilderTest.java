@@ -68,6 +68,16 @@ class ResearchPromptBuilderTest {
     }
 
     @Test
+    void instructsOneFocusedSearchPerCriterionWithOmitOnMiss() {
+        String prompt = builder.build("AAPL", "Apple Inc.", null);
+
+        assertThat(prompt)
+                .contains("working under a limited search budget")
+                .contains("at most one focused search")
+                .doesNotContain("than the other criteria combined");
+    }
+
+    @Test
     void includesStage1SnapshotValuesWhenProvided() {
         String prompt = builder.build("AAPL", "Apple Inc.", new Stage1Snapshot(24.3, 3.1));
 

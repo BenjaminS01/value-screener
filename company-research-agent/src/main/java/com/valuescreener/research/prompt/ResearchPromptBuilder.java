@@ -31,6 +31,11 @@ public class ResearchPromptBuilder {
                 Do not quote source text verbatim. Paraphrase every claim in your own words and
                 attach a link to the specific source it came from.
                 %s
+                You are working under a limited search budget. For each criterion below, do at most one focused search.
+                If you don't find a reliable, directly relevant source quickly, leave that criterion out of your JSON
+                answer entirely rather than searching further or guessing — a partial result with fewer criteria is
+                preferred over an exhaustive search.
+
                 Research and report on exactly these criteria, each with its own source link and
                 paraphrased claim:
                 - marginTrend: operating/net margin over the last 5-10 years — stable, growing, or
@@ -40,9 +45,7 @@ public class ResearchPromptBuilder {
                 - profitStability: whether profit has avoided a strong decline over the last 5-10
                   years (the most demanding criterion here — only report it if you found genuine
                   multi-year figures, not a single good or bad year).
-                - interestCoverage: EBIT divided by interest expense, if you can find both figures
-                  without spending disproportionate extra searches on it. If it would take more
-                  searching than the other criteria combined, leave it out rather than guessing.
+                - interestCoverage: EBIT divided by interest expense, from the most recent filings.
                 - currentRatio: current assets divided by current liabilities, from the most recent
                   balance sheet.
                 - moatAssessment: a qualitative read on the company's competitive moat and business
