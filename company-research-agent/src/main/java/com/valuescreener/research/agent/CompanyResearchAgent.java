@@ -44,7 +44,7 @@ public class CompanyResearchAgent {
     // like Stage 2's webSearchMaxUses -- one bounded search step is the whole point of Stage 1.
     private static final long STAGE1_MAX_USES = 1L;
     private static final OutputConfig.Effort STAGE1_EFFORT = OutputConfig.Effort.LOW;
-    private static final OutputConfig.Effort STAGE2_EFFORT = OutputConfig.Effort.MEDIUM;
+    private static final OutputConfig.Effort STAGE2_EFFORT = OutputConfig.Effort.LOW;
 
     private final ChatModel chatModel;
     private final ResearchPromptBuilder promptBuilder;

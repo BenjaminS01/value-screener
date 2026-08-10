@@ -288,7 +288,7 @@ class CompanyResearchAgentTest {
         verify(chatModel).call(promptCaptor.capture());
         AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
         assertThat(options.getOutputConfig()).isNotNull();
-        assertThat(options.getOutputConfig().effort()).contains(OutputConfig.Effort.MEDIUM);
+        assertThat(options.getOutputConfig().effort()).contains(OutputConfig.Effort.LOW);
         assertThat(options.getThinking().isDisabled()).isTrue();
     }
 
