@@ -6,28 +6,18 @@ CREATE TABLE company_snapshot (
     sector VARCHAR(100) NOT NULL,
     country VARCHAR(100) NOT NULL,
     business_description TEXT NOT NULL,
-    moat_note TEXT,
-    opportunities_and_risks_note TEXT,
-    pe_ratio NUMERIC(12, 4),
-    pb_ratio NUMERIC(12, 4),
-    roe_percent NUMERIC(12, 4),
-    debt_to_equity NUMERIC(12, 4),
-    current_year_net_margin_percent NUMERIC(12, 4),
-    current_year_fcf_positive BOOLEAN,
-    current_year_net_income_increased_yoy BOOLEAN,
-    insider_ownership_percent NUMERIC(12, 4),
-    as_of_date DATE NOT NULL,
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE company_snapshot_source (
+CREATE TABLE research_finding (
+    id BIGSERIAL PRIMARY KEY,
     company_snapshot_id BIGINT NOT NULL REFERENCES company_snapshot(id) ON DELETE CASCADE,
-    source VARCHAR(500) NOT NULL,
-    PRIMARY KEY (company_snapshot_id, source)
-);
-
-CREATE TABLE company_snapshot_updated_field (
-    company_snapshot_id BIGINT NOT NULL REFERENCES company_snapshot(id) ON DELETE CASCADE,
-    field_name VARCHAR(100) NOT NULL,
-    PRIMARY KEY (company_snapshot_id, field_name)
+    criterion_key VARCHAR(40) NOT NULL,
+    numeric_value NUMERIC(12, 4),
+    boolean_value BOOLEAN,
+    claim TEXT NOT NULL,
+    source_url VARCHAR(1000),
+    as_of_date DATE NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_research_finding_snapshot_criterion UNIQUE (company_snapshot_id, criterion_key)
 );

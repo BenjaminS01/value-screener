@@ -25,7 +25,13 @@
 - Create: `backend/src/main/java/com/valuescreener/research/ResearchCriterion.java`
 - Create: `backend/src/main/java/com/valuescreener/research/ResearchFinding.java`
 - Create: `backend/src/test/java/com/valuescreener/research/ResearchFindingTest.java`
-- Create: `backend/src/main/resources/db/migration/V4__replace_financial_stats_with_research_finding.sql`
+- Modify: `backend/src/main/resources/db/migration/V3__create_company_snapshot.sql`
+
+**Amended 2026-08-10, before Task 1 was committed:** originally this task added a new `V4` migration
+that `ALTER`s away the `FinancialStats`-era columns/tables. Since no real environment has ever had this
+schema applied (no live deployment yet — see the design spec), the user asked to edit `V3` directly
+instead, so the migration history reflects the final shape from the start rather than carrying a
+create-then-immediately-alter pair that only existed on paper. `V4` is not created at all.
 
 **Interfaces:**
 - Produces: `ResearchCriterion` (enum, 18 values per Global Constraints). `ResearchFinding` public constructor
@@ -245,24 +251,21 @@ public class ResearchFinding {
 }
 ```
 
-- [ ] **Step 5: Write the migration**
+- [ ] **Step 5: Edit `V3__create_company_snapshot.sql` directly**
+
+Replace the full file contents of `backend/src/main/resources/db/migration/V3__create_company_snapshot.sql`:
 
 ```sql
-ALTER TABLE company_snapshot
-    DROP COLUMN moat_note,
-    DROP COLUMN opportunities_and_risks_note,
-    DROP COLUMN pe_ratio,
-    DROP COLUMN pb_ratio,
-    DROP COLUMN roe_percent,
-    DROP COLUMN debt_to_equity,
-    DROP COLUMN current_year_net_margin_percent,
-    DROP COLUMN current_year_fcf_positive,
-    DROP COLUMN current_year_net_income_increased_yoy,
-    DROP COLUMN insider_ownership_percent,
-    DROP COLUMN as_of_date;
-
-DROP TABLE company_snapshot_source;
-DROP TABLE company_snapshot_updated_field;
+CREATE TABLE company_snapshot (
+    id BIGSERIAL PRIMARY KEY,
+    ticker VARCHAR(10) NOT NULL,
+    isin VARCHAR(12) NOT NULL UNIQUE,
+    company_name VARCHAR(200) NOT NULL,
+    sector VARCHAR(100) NOT NULL,
+    country VARCHAR(100) NOT NULL,
+    business_description TEXT NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0
+);
 
 CREATE TABLE research_finding (
     id BIGSERIAL PRIMARY KEY,
@@ -278,8 +281,10 @@ CREATE TABLE research_finding (
 );
 ```
 
-Save as `backend/src/main/resources/db/migration/V4__replace_financial_stats_with_research_finding.sql`
-(matches the existing `V1`/`V2`/`V3` naming convention in that directory).
+No `V4` file is created — this is a direct edit of `V3`, safe only because no real/persistent environment
+has ever applied the old `V3` (no live deployment yet). If a local dev/test Postgres volume already has
+the old `V3` applied, it must be recreated (e.g. `docker compose down -v` for the dev DB; Testcontainers
+already starts fresh containers per test run, so nothing to do there).
 
 - [ ] **Step 6: Run test to verify it passes**
 
@@ -290,7 +295,7 @@ Expected: PASS, 5/5.
 
 Tell the user to run:
 ```bash
-git add backend/src/main/java/com/valuescreener/research/ResearchCriterion.java backend/src/main/java/com/valuescreener/research/ResearchFinding.java backend/src/test/java/com/valuescreener/research/ResearchFindingTest.java backend/src/main/resources/db/migration/V4__replace_financial_stats_with_research_finding.sql
+git add backend/src/main/java/com/valuescreener/research/ResearchCriterion.java backend/src/main/java/com/valuescreener/research/ResearchFinding.java backend/src/test/java/com/valuescreener/research/ResearchFindingTest.java backend/src/main/resources/db/migration/V3__create_company_snapshot.sql
 git commit -m "feat(research): add ResearchCriterion and ResearchFinding"
 ```
 
