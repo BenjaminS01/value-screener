@@ -62,7 +62,7 @@ class CompanyResearchAgentTest {
 
     private static CompanyResearchAgent newAgent(ChatModel chatModel, long timeoutSeconds) {
         return new CompanyResearchAgent(chatModel, new ResearchPromptBuilder(), new QuickResearchPromptBuilder(),
-                new ObjectMapper(), timeoutSeconds, "claude-sonnet-5", 5, TEST_ALLOWED_DOMAINS);
+                new ObjectMapper(), timeoutSeconds, "claude-sonnet-5", 3, TEST_ALLOWED_DOMAINS);
     }
 
     // ---- Stage 2: research() ----
@@ -267,7 +267,7 @@ class CompanyResearchAgentTest {
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
         verify(chatModel).call(promptCaptor.capture());
         AnthropicChatOptions options = (AnthropicChatOptions) promptCaptor.getValue().getOptions();
-        assertThat(options.getWebSearchTool().getMaxUses()).isEqualTo(5L);
+        assertThat(options.getWebSearchTool().getMaxUses()).isEqualTo(3L);
         assertThat(options.getWebSearchTool().getAllowedDomains())
                 .containsExactly("sec.gov", "stockanalysis.com", "investor.example.com", "finance.example.com");
     }

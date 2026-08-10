@@ -33,7 +33,12 @@ research:
     # Bounds worst-case cost/latency per research call: without this, the model can
     # issue an unlimited number of web_search calls. A local timeout does NOT stop
     # the underlying (billed) Anthropic request either -- see the Decision log.
-    web-search-max-uses: 5
+    # Lowered 5 -> 3 (2026-08-10): a live Stage 2 call at 5 timed out twice (120s, then
+    # 240s) with no recoverable result -- see the Decision log entry "Stage 2 prompt/cost
+    # simplification" in the design spec. Accepted tradeoff: less recall on multi-round
+    # disambiguation cases (one earlier simulation needed 7 rounds for AAPL's fiscal-quarter
+    # labeling) in favor of calls that actually complete.
+    web-search-max-uses: 3
     # Cost/quality measure 1 (agent spec Section 4/5.4): restricts search to primary filings and
     # established financial data sources instead of open web search. Starting list, calibrated
     # further once real search volume exists (agent spec Section 9, open item 6).

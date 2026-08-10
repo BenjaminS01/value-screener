@@ -61,7 +61,7 @@ public class CompanyResearchAgent {
                                  ObjectMapper objectMapper,
                                  @Value("${research.agent.timeout-seconds:55}") long timeoutSeconds,
                                  @Value("${spring.ai.anthropic.chat.model:claude-sonnet-5}") String model,
-                                 @Value("${research.agent.web-search-max-uses:5}") long webSearchMaxUses,
+                                 @Value("${research.agent.web-search-max-uses:3}") long webSearchMaxUses,
                                  @Value("${research.agent.allowed-domains:sec.gov,www.sec.gov,stockanalysis.com,marketscreener.com,finance.yahoo.com,morningstar.com,macrotrends.net,boerse-frankfurt.de,finanzen.net,globenewswire.com,prnewswire.com,businesswire.com}")
                                  String[] allowedDomains) {
         this.chatModel = chatModel;
