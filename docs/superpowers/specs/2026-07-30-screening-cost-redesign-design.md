@@ -1,10 +1,13 @@
 # Screening & Research Cost Redesign — Design
 
-Last updated: 2026-07-31
-Status: Design approved by the user. Implementation not started; reconciliation steps 1 (Stage 1
-mechanism) and 2 (Company Research Agent design spec) of the agreed sequence are done — see the last
-Decision log entry. Step 3 (rewrite `ResearchPromptBuilder`/`CompanyResearchResult` against the
-updated agent spec) is next.
+Last updated: 2026-08-10
+Status: Design approved by the user. Reconciliation steps 1-4 of the original agreed sequence are done
+(Stage 1 mechanism, Company Research Agent spec rewrite, code rewrite, first successful live calls for
+both Stage 1 and Stage 2 — see [[project_company_research_agent_status]] and
+[[project_screening_cost_redesign]] memory for the live-call detail, not duplicated here). Before
+starting step 5 (the greenfield implementation plan), a goal-prioritization session narrowed this
+design's v1 scope — see the last Decision log entry ("goal-prioritization session") — the **Scheduler
+(automatic daily triggering) is deferred to a later phase; v1 ships manual-trigger-only.**
 
 **Relationship to earlier specs:** this document replaces the *approach* behind Sections 3–5 and
 Risks 1/3 of `2026-07-21-value-screener-design.md` (the Screening Engine, the Data Provider Client,
@@ -115,6 +118,22 @@ Komponenten durch **einen einzigen, KI-getriebenen Mechanismus ohne externen Fun
   und -Code (Prompt/Modell) auf den vollen Kriterienkatalog umschreiben, dann erster echter Live-Call
   gegen die neue Version, erst danach der breite Implementierungsplan für die restlichen, komplett
   neuen Komponenten.
+- **Ergänzung (2026-08-10, Zielklärung, vor dem Implementierungsplan für die neuen Komponenten):**
+  Reconciliation-Schritte 3-4 sind inzwischen erledigt (Code umgeschrieben, erste erfolgreiche
+  Live-Calls für Stufe 1 und Stufe 2 gegen die echte Anthropic-API). Vor Schritt 5 (Implementierungsplan)
+  wurde das eigentliche Projektziel neu geschärft: primärer Zweck ist inzwischen explizit ein
+  Bewerbungs-/Freelance-Vorzeigeprojekt (Java-Stelle bei mittlerer/großer Firma, plus Freelancing),
+  begleitet von der laufenden AWS-Developer-Zertifizierung, bei möglichst geringen laufenden Kosten,
+  mit persönlichem Nutzen als Nebeneffekt (eine Liste mit Aktien-Ideen inkl. Fundamentaldaten + KI-
+  Tiefenrecherche auf Abruf). Daraus folgt eine bewusste Verkleinerung des v1-Umfangs: der
+  **automatische tägliche Scheduler wird auf eine spätere Phase verschoben** — v1 nutzt ausschließlich
+  die ohnehin schon vorgesehenen manuellen Auslösewege (gezielter Ticker, gefilterte Zufallswahl,
+  Selection-Logic-Modi 2/3). Begründung: ein dauerhaft laufender Scheduler auf App Runner verursacht
+  laufende Kosten schon während der Bewerbungsphase und ist der aufwändigste Teil bis zur ersten
+  vorführbaren Version — beides steht im Widerspruch zu "möglichst wenig Geld zahlen" und "schnell
+  etwas Vorzeigbares haben". Alle übrigen Komponenten (Universe Provider, Selection Logic, Knowledge
+  Base, Sector Benchmark Cache, Dashboard) bleiben inhaltlich unverändert — nur der automatische
+  Auslöseweg (a) ist betroffen, siehe Section 7 (Scheduler-Bullet) und Section 8 (Datenfluss-Diagramm).
 - **Ergänzung (2026-07-31, Machbarkeitsprüfung):** Plan als grundsätzlich umsetzbar bewertet, mit einer
   offenen zentralen Wette: das Kostenziel (niedrige einstellige Euro/Monat bei 1–2 Stage-2-Läufen/Tag)
   ist bisher nur geschätzt, nie an einem echten erfolgreichen Call bestätigt — der einzige reale Call
@@ -396,7 +415,11 @@ historical average, and isn't materially above its sector's cached benchmark.
   trigger paths at genuinely under-covered areas instead of guessing, and shows concretely how the
   accepted "coverage speed sacrificed for budget discipline" trade-off (Section 11, risk 1) is playing
   out over time. No new research or cost — pure read of existing data.
-- **Scheduler** — triggers one automatic daily batch via the Selection Logic. Per the user's explicit
+- **Scheduler (deferred to a later phase, 2026-08-10 — see Decision log "goal-prioritization
+  session")** — not part of v1. v1 ships with Selection Logic modes 2/3 only (operator-triggered filtered
+  draw and specific-ticker), both already manual and already required regardless of this deferral.
+  Description below is the target design for whenever automatic triggering is picked back up. Triggers
+  one automatic daily batch via the Selection Logic. Per the user's explicit
   budget/coverage-speed trade-off (Section 11), the daily figure is deliberately small — on the order
   of 1–2 Stage-2 executions per day — favoring cost discipline over how fast the universe gets
   covered. **Invocation topology gap (found 2026-07-31, feasibility review):** the Company Research
@@ -470,6 +493,7 @@ historical average, and isn't materially above its sector's cached benchmark.
 ```
 Trigger (any of a-c enters the funnel below; d is separate, see note):
   (a) Scheduler (daily, automatic, weighted-random: recency + sector-balance)
+      — DEFERRED to a later phase (2026-08-10); not in v1, see Section 7
   (b) Operator: filtered random draw (sector/country)
   (c) Operator: specific Gettex ticker
   (d) Operator: Watchlist Re-check — bypasses the funnel below entirely, re-runs Stage 1 only on
@@ -862,3 +886,45 @@ per position) since the position count is small enough not to be a cost concern.
   `ResearchPromptBuilder`/`CompanyResearchResult`, plus a new Stage 1 prompt builder/output record, in
   actual code) — the agent spec now describes a materially different contract than the currently
   committed code implements; `CURRENT_PROMPT_VERSION` still reads `"research-v1"`. Step 3 is next.
+- **2026-08-02/2026-08-10, reconciliation steps 3-4 done (recorded here as a pointer; full detail in
+  [[project_screening_cost_redesign]] and [[project_company_research_agent_status]] memory and in
+  `2026-07-24-company-research-agent-design.md`'s own Decision log, not duplicated in this file):**
+  `ResearchPromptBuilder`/`CompanyResearchResult`/`CompanyResearchAgent`/`CompanyResearchTool` rewritten
+  against the full Section 6 criteria set across both MCP tools (2026-08-02). First real live calls
+  against the Anthropic API succeeded for both `quick_research_company` (2026-08-03, AAPL) and
+  `research_company` (2026-08-10, AAPL, after a follow-up prompt/cost simplification pass — see that
+  spec's own Decision log) — closing the "no successful end-to-end call yet" blocker that had gated
+  starting step 5 (the greenfield implementation plan) since this design was first approved.
+- **2026-08-10, goal-prioritization session (before starting reconciliation step 5):** with step 4
+  closed, the user paused before writing the greenfield implementation plan to re-examine the project's
+  actual goal. Clarified: the primary purpose is now explicitly a job-search/freelance portfolio piece
+  (Java developer role at a mid-to-large company, plus freelance clients), paired with demonstrating the
+  AWS Developer certification currently in progress, under a hard constraint of minimizing real running
+  cost, with personal utility as a secondary but real benefit — a list of stock ideas with fundamentals
+  and on-demand AI deep-research findings (moat, etc.).
+
+  Reviewed this design's existing architecture against that clarified goal. Most of it holds up well
+  unchanged: the whole point of this redesign (no paid fundamentals API, hard cost caps on the AI
+  funnel) already directly serves the "minimize spend" constraint, and the Company Research Agent +
+  MCP work is a strong, current portfolio signal for a Java/AI role. One real tension found: the
+  originally-designed **automatic daily Scheduler** (Section 7) running continuously on App Runner (a)
+  incurs real ongoing cost during the job-search window itself, and (b) is the single largest remaining
+  chunk of work before anything is demoable — both directly work against the now-clarified priorities.
+  The user's actual stated end goal ("a list of stock ideas, with data, when I ask for it") does not
+  require automatic unattended operation; it only requires that a trigger exist.
+
+  **Decision:** defer the Scheduler (automatic daily triggering) to a later phase. v1 ships with
+  Selection Logic's manual trigger modes only — filtered draw (sector/country) and specific-ticker
+  (modes 2/3 in Section 7's Selection Logic bullet) — both of which were already part of the design
+  regardless of this deferral, so nothing here is new scope, only a re-ordering of what v1 must include.
+  Universe Provider, Selection Logic (minus the automatic-draw weighting logic, which only matters for
+  mode 1), Knowledge Base, Sector Benchmark Cache, and Dashboard are all unaffected — they're exactly as
+  useful for a manually-triggered v1 as for the originally-envisioned automatic one, since Selection
+  Logic modes 1-3 all feed the same three-tier funnel (Section 8) and write to the same Knowledge Base.
+  Written into Section 7 (Scheduler bullet), Section 8 (data-flow diagram), the top status line, and the
+  German summary above. **Next up:** resume reconciliation step 5 — write the implementation plan for
+  the now-narrower v1 slice (Universe Provider, Selection Logic modes 2/3 only, Knowledge Base, Sector
+  Benchmark Cache, Dashboard, and the still-undesigned backend↔Company-Research-Agent MCP client this
+  spec's Scheduler bullet already flagged as an open gap) — likely starting with the single smallest
+  useful slice: connecting a manual research trigger through to a persisted, listable result, per the
+  session that prompted this goal-prioritization pause.
