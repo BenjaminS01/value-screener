@@ -117,11 +117,12 @@ included in a given research pass are left untouched. This preserves the existin
 now applied per-criterion instead of per-field — researching only the moat again doesn't touch a
 previously-found P/E value.
 
-The snapshot-level identity fields (`companyName`, `sector`, `country`, `businessDescription`) keep their
-existing merge behavior, unchanged from `2026-08-03-session-research-collection-design.md`: a field is
-only overwritten when the request supplies a non-null value, so a pass that doesn't research the sector
-again doesn't blank it out. This existing rule now applies to a narrower set of fields, since the
-numeric/qualitative ones moved to the per-criterion rule above.
+**Correction found during planning:** the snapshot-level identity fields (`companyName`, `sector`,
+`country`, `businessDescription`) were never subject to a "keep if not provided" merge in the original
+implementation — they are `@NotBlank` and always required on every request, always overwritten
+unconditionally. That merge-if-null behavior only ever applied to `moatNote`/`opportunitiesAndRisksNote`/
+`FinancialStats`, which this design replaces with the per-criterion rule above. This design keeps the
+identity fields' existing always-required, always-overwritten behavior unchanged.
 
 `asOfDate` moves from the snapshot level to the finding level — each criterion shows its own currency,
 matching `2026-07-30-screening-cost-redesign-design.md` Section 9's target `ResearchRecord` shape
