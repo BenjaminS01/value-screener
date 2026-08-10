@@ -68,12 +68,12 @@ class ResearchPromptBuilderTest {
     }
 
     @Test
-    void instructsOneFocusedSearchPerCriterionWithOmitOnMiss() {
+    void instructsTotalSearchBudgetWithOmitOnMiss() {
         String prompt = builder.build("AAPL", "Apple Inc.", null);
 
         assertThat(prompt)
-                .contains("working under a limited search budget")
-                .contains("at most one focused search")
+                .contains("at most 3 web searches in total")
+                .contains("broad queries that can answer several criteria at once")
                 .doesNotContain("than the other criteria combined");
     }
 

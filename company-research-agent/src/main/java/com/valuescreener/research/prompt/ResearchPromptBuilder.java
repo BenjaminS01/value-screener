@@ -31,10 +31,13 @@ public class ResearchPromptBuilder {
                 Do not quote source text verbatim. Paraphrase every claim in your own words and
                 attach a link to the specific source it came from.
                 %s
-                You are working under a limited search budget. For each criterion below, do at most one focused search.
-                If you don't find a reliable, directly relevant source quickly, leave that criterion out of your JSON
-                answer entirely rather than searching further or guessing — a partial result with fewer criteria is
-                preferred over an exhaustive search.
+                You have at most 3 web searches in total for all criteria below combined. Prefer
+                broad queries that can answer several criteria at once (for example, a filings
+                page or a key-statistics page often covers multiple criteria in one search). If
+                you don't find a reliable, directly relevant source for a criterion within your
+                search budget, leave that criterion out of your JSON answer entirely rather than
+                guessing — a partial result with fewer criteria is preferred over an exhaustive
+                search.
 
                 Research and report on exactly these criteria, each with its own source link and
                 paraphrased claim:
