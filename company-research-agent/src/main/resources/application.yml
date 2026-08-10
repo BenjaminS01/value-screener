@@ -24,7 +24,12 @@ research:
     # 55s (the original guess) was too tight: a real Sonnet 5 call with web_search
     # issues multiple search queries before synthesizing the answer, confirmed
     # during Task 7's manual wire-level check to routinely exceed it for AAPL.
-    timeout-seconds: 120
+    # 120s was still too tight for Stage 2 specifically: a live research_company(AAPL) call
+    # (up to 5 web searches at MEDIUM effort, synthesizing 8 criteria) hit this timeout with
+    # no result on 2026-08-08. Once this fires, the underlying Anthropic request is NOT
+    # actually cancelled (see callWithTimeout's comment) -- it keeps running and billing, but
+    # the result is unrecoverable, so this must be generous enough to avoid that outcome.
+    timeout-seconds: 240
     # Bounds worst-case cost/latency per research call: without this, the model can
     # issue an unlimited number of web_search calls. A local timeout does NOT stop
     # the underlying (billed) Anthropic request either -- see the Decision log.
