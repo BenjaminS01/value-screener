@@ -664,3 +664,46 @@ current target.
   - **Not done in this step:** the live end-to-end cost check (reconciliation step 4, open item 7
     above) — `CURRENT_PROMPT_VERSION`/`allowedDomains` are now real, but the ~$0.05–0.10/call target is
     still unconfirmed against an actual API call.
+
+- **2026-08-10, reconciliation step 4 (screening-cost redesign) — Stage 2 prompt/cost simplification,
+  approved design, not yet implemented.** Two live `research_company(AAPL)` attempts (2026-08-08,
+  2026-08-10) both timed out with no usable result — the first at the then-current 120s local timeout,
+  the second still at a since-raised 240s. Root cause confirmed by reading `callWithTimeout`: on a
+  local timeout, `future.cancel(true)` only stops *this process* from waiting — the underlying OkHttp
+  call blocks on a plain socket read that ignores `Thread.interrupt()`, so the Anthropic request keeps
+  running and billing regardless, and `logUsage(...)` (which runs only after a successful return) is
+  never reached — no usage figures are recoverable from a timed-out attempt. Raising the local timeout
+  further doesn't address why the call takes so long in the first place: Stage 2 asks for all 8
+  Section 5 criteria in one call, at `webSearchMaxUses=5`/`effort=MEDIUM`, calibrated only off Stage 1's
+  much lighter 1-search/`LOW` profile.
+
+  Rather than keep raising the timeout (each failed attempt is a real, unrecoverable cost with zero
+  result), decided to make Stage 2 itself cheaper and faster, at an accepted quality cost:
+  1. **Prompt (`ResearchPromptBuilder`):** generalize the existing `interestCoverage`-only escape hatch
+     ("if it would take more searching than the other criteria combined, leave it out") into one
+     upfront budget instruction covering all 8 criteria — at most one focused search per criterion,
+     omit (`null`) rather than chase it further. The old `interestCoverage`-specific wording is removed
+     as redundant; `profitStability`'s "only report with genuine multi-year figures" wording is
+     unrelated (a quality bar, not a search-budget instruction) and stays.
+  2. **Hard caps, not just prompt wording:** the `interestCoverage` escape hatch already existed and the
+     call still timed out, so an advisory-only fix was judged insufficient — `webSearchMaxUses`
+     (`application.yml`, plus its `@Value` fallback default) drops from 5 to 3, and `STAGE2_EFFORT`
+     (`CompanyResearchAgent`) drops from `MEDIUM` to `LOW`, matching Stage 1. Stage 1 itself
+     (`STAGE1_MAX_USES`, its own `LOW` effort) is untouched.
+  3. **Accepted, deliberately unaddressed consequence:** more `research_company` results will have
+     several of the 8 criteria come back `null`. `ConfidenceLevel` (currently only `HIGH`/`LOW`, `HIGH`
+     awarded as soon as ≥1 of 8 criteria resolves) is left exactly as-is — confirmed via grep that it
+     has no consumer yet outside this module, so any "is 2-of-8 actually good enough" threshold would
+     be a guess at a not-yet-designed Selection Logic component's needs. Each criterion field on
+     `CompanyResearchResult` already exposes its own presence/absence, so no information is lost for
+     whenever that consumer is designed — same deferred-until-the-real-consumer-exists pattern already
+     used for `valueTrapAssessment`'s missing valuation figure above.
+
+  Lower `webSearchMaxUses` reduces recall on multi-round disambiguation cases (the earlier AAPL manual
+  simulation needed 7 rounds for fiscal-quarter labeling, decision log entry above) — accepted
+  intentionally here in favor of a call that actually completes.
+
+  Not implemented yet. Recorded via `docs/superpowers/specs/2026-07-24-company-research-agent-design.md`
+  rather than a new dated spec file, matching this document's existing convention of recording
+  incremental refinements to this same component as Decision log entries instead of one spec file per
+  change.
