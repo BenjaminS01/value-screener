@@ -4,7 +4,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Set;
 
 @Service
 public class CompanySnapshotService {
@@ -17,25 +16,19 @@ public class CompanySnapshotService {
 
     @Transactional
     public CompanySnapshotView upsert(UpsertCompanySnapshotRequest request) {
-        FinancialStats stats = new FinancialStats(
-                request.peRatio(), request.pbRatio(), request.roePercent(), request.debtToEquity(),
-                request.currentYearNetMarginPercent(), request.currentYearFcfPositive(),
-                request.currentYearNetIncomeIncreasedYoy(), request.insiderOwnershipPercent());
-        Set<String> sources = request.sources() != null ? request.sources() : Set.of();
-        String moatNote = request.moatNote() != null && request.moatNote().isBlank() ? null : request.moatNote();
-        String opportunitiesAndRisksNote = request.opportunitiesAndRisksNote() != null
-                && request.opportunitiesAndRisksNote().isBlank() ? null : request.opportunitiesAndRisksNote();
-
         String normalizedIsin = request.isin().trim().toUpperCase();
         CompanySnapshot snapshot = repository.findByIsin(normalizedIsin).orElse(null);
         if (snapshot == null) {
             snapshot = new CompanySnapshot(request.ticker(), request.isin(), request.companyName(),
-                    request.sector(), request.country(), request.businessDescription(), moatNote,
-                    opportunitiesAndRisksNote, stats, request.asOfDate(), sources);
+                    request.sector(), request.country(), request.businessDescription());
         } else {
             snapshot.applyUpdate(request.companyName(), request.sector(), request.country(),
-                    request.businessDescription(), moatNote, opportunitiesAndRisksNote,
-                    stats, request.asOfDate(), sources);
+                    request.businessDescription());
+        }
+        List<FindingRequest> findings = request.findings() != null ? request.findings() : List.of();
+        for (FindingRequest finding : findings) {
+            snapshot.upsertFinding(finding.criterionKey(), finding.numericValue(), finding.booleanValue(),
+                    finding.claim(), finding.sourceUrl(), finding.asOfDate());
         }
         return CompanySnapshotView.from(repository.save(snapshot));
     }
