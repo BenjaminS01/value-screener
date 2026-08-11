@@ -1011,8 +1011,22 @@ git commit -m "feat(research): rewrite snapshot DTOs and service for per-criteri
 
 ### Task 4: Update `CompanySnapshotController` and its tests, add validation-rejection tests
 
+**Amended 2026-08-10, discovered while running the full suite for the first time in this task:** the
+original plan only searched `com.valuescreener.research` for consumers of the old `CompanySnapshot` API
+and missed `backend/src/test/java/com/valuescreener/security/ResearchSnapshotSecurityTest.java` — a
+full-stack Testcontainers+MockMvc security test that also posts to `/api/research/snapshots` and still
+uses the old `moatNote`/`peRatio` request shape. Also discovered: `CompanySnapshotRepositoryTest`'s
+`rejectsSaveOfAStaleCopyAfterAConcurrentUpdate` (rewritten in Task 2) calls the new 4-arg `applyUpdate`
+twice with **identical** arguments — Hibernate's dirty-checking sees no actual change, issues no UPDATE,
+and the expected `ObjectOptimisticLockingFailureException` never fires. The old version of this test
+avoided this by varying `asOfDate`, a parameter `applyUpdate` no longer has. Both are real regressions
+introduced earlier in this plan, not implementer errors — fixed as part of this task, added to its Files
+list below.
+
 **Files:**
 - Modify: `backend/src/test/java/com/valuescreener/research/CompanySnapshotControllerTest.java`
+- Modify: `backend/src/test/java/com/valuescreener/research/CompanySnapshotRepositoryTest.java`
+- Modify: `backend/src/test/java/com/valuescreener/security/ResearchSnapshotSecurityTest.java`
 
 **Interfaces:**
 - Consumes: `CompanySnapshotView`/`FindingView`/`UpsertCompanySnapshotRequest`/`FindingRequest` (Task 3).

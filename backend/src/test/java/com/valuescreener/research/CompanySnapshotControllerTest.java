@@ -10,7 +10,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -31,13 +30,11 @@ class CompanySnapshotControllerTest {
     private CompanySnapshotService service;
 
     private static CompanySnapshotView sampleView() {
+        FindingView peRatio = new FindingView(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
+                "Trailing P/E of 28.0.", "https://example.com/aapl-key-stats", LocalDate.of(2026, 8, 1));
         return new CompanySnapshotView(
                 1L, "AAPL", "US0378331005", "Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.", "Strong brand moat.",
-                "Regulatory risk in the EU; expansion opportunity in services.",
-                new BigDecimal("28.0"), null, null, null, null, null, null, null,
-                LocalDate.of(2026, 8, 1), Set.of("https://example.com/aapl-key-stats"),
-                Set.of("peRatio", "moatNote", "opportunitiesAndRisksNote"));
+                "Designs and sells consumer electronics.", List.of(peRatio));
     }
 
     @Test
@@ -50,7 +47,7 @@ class CompanySnapshotControllerTest {
                                 {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
                                  "sector":"Information Technology","country":"USA",
                                  "businessDescription":"Designs and sells consumer electronics.",
-                                 "asOfDate":"2026-08-01"}
+                                 "findings":[]}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ticker").value("AAPL"));
@@ -63,8 +60,56 @@ class CompanySnapshotControllerTest {
                         .content("""
                                 {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
                                  "sector":"Information Technology","country":"USA",
-                                 "businessDescription":"","asOfDate":"2026-08-01"}
+                                 "businessDescription":"","findings":[]}
                                 """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsFindingWithMalformedSourceUrl() throws Exception {
+        mockMvc.perform(post("/api/research/snapshots")
+                        .contentType("application/json")
+                        .content("""
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
+                                 "sector":"Information Technology","country":"USA",
+                                 "businessDescription":"Designs and sells consumer electronics.",
+                                 "findings":[{"criterionKey":"PE_RATIO","numericValue":28.0,
+                                 "claim":"Trailing P/E of 28.0.","sourceUrl":"not-a-url",
+                                 "asOfDate":"2026-08-01"}]}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsFindingWithClaimOverTwoThousandCharacters() throws Exception {
+        String tooLongClaim = "a".repeat(2001);
+        mockMvc.perform(post("/api/research/snapshots")
+                        .contentType("application/json")
+                        .content("""
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
+                                 "sector":"Information Technology","country":"USA",
+                                 "businessDescription":"Designs and sells consumer electronics.",
+                                 "findings":[{"criterionKey":"PE_RATIO","numericValue":28.0,
+                                 "claim":"%s","asOfDate":"2026-08-01"}]}
+                                """.formatted(tooLongClaim)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsRequestWithMoreThanFiftyFindings() throws Exception {
+        String findingsJson = java.util.stream.IntStream.range(0, 51)
+                .mapToObj(i -> """
+                        {"criterionKey":"PE_RATIO","numericValue":28.0,"claim":"Finding %d.",
+                         "asOfDate":"2026-08-01"}""".formatted(i))
+                .reduce((a, b) -> a + "," + b).orElseThrow();
+        mockMvc.perform(post("/api/research/snapshots")
+                        .contentType("application/json")
+                        .content("""
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
+                                 "sector":"Information Technology","country":"USA",
+                                 "businessDescription":"Designs and sells consumer electronics.",
+                                 "findings":[%s]}
+                                """.formatted(findingsJson)))
                 .andExpect(status().isBadRequest());
     }
 

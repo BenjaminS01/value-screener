@@ -57,11 +57,11 @@ class CompanySnapshotRepositoryTest {
 
         CompanySnapshot freshCopy = repository.findById(id).orElseThrow();
         freshCopy.applyUpdate("Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.");
+                "Designs and sells consumer electronics and wearables.");
         repository.saveAndFlush(freshCopy);
 
         staleCopy.applyUpdate("Apple Inc.", "Information Technology", "USA",
-                "Designs and sells consumer electronics.");
+                "Designs and sells consumer electronics and services.");
         assertThatThrownBy(() -> repository.saveAndFlush(staleCopy))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     }

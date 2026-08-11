@@ -51,7 +51,7 @@ class ResearchSnapshotSecurityTest {
                                 {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
                                  "sector":"Information Technology","country":"USA",
                                  "businessDescription":"Designs and sells consumer electronics.",
-                                 "asOfDate":"2026-08-01"}
+                                 "findings":[]}
                                 """))
                 .andExpect(status().isUnauthorized());
     }
@@ -65,7 +65,7 @@ class ResearchSnapshotSecurityTest {
                                 {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
                                  "sector":"Information Technology","country":"USA",
                                  "businessDescription":"Designs and sells consumer electronics.",
-                                 "asOfDate":"2026-08-01"}
+                                 "findings":[]}
                                 """))
                 .andExpect(status().isOk());
     }
@@ -79,8 +79,9 @@ class ResearchSnapshotSecurityTest {
                                 {"ticker":"MSFT","isin":"US5949181045","companyName":"Microsoft Corporation",
                                  "sector":"Information Technology","country":"USA",
                                  "businessDescription":"Develops and licenses software and cloud services.",
-                                 "moatNote":"Durable enterprise switching costs.",
-                                 "asOfDate":"2026-08-01"}
+                                 "findings":[{"criterionKey":"MOAT_ASSESSMENT",
+                                 "claim":"Durable enterprise switching costs.",
+                                 "asOfDate":"2026-08-01"}]}
                                 """))
                 .andExpect(status().isOk());
 
@@ -91,15 +92,15 @@ class ResearchSnapshotSecurityTest {
                                 {"ticker":"MSFT","isin":"US5949181045","companyName":"Microsoft Corporation",
                                  "sector":"Information Technology","country":"USA",
                                  "businessDescription":"Develops and licenses software and cloud services.",
-                                 "peRatio":35.2,
-                                 "asOfDate":"2026-08-02"}
+                                 "findings":[{"criterionKey":"PE_RATIO","numericValue":35.2,
+                                 "claim":"Trailing P/E of 35.2.","asOfDate":"2026-08-02"}]}
                                 """))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/research/snapshots/US5949181045")
                         .with(SecurityMockMvcRequestPostProcessors.httpBasic("admin", "test-password")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moatNote").value("Durable enterprise switching costs."))
-                .andExpect(jsonPath("$.peRatio").value(35.2));
+                .andExpect(jsonPath("$.findings[0].claim").value("Durable enterprise switching costs."))
+                .andExpect(jsonPath("$.findings[1].numericValue").value(35.2));
     }
 }
