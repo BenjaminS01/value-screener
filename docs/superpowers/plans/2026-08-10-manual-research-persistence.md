@@ -1226,6 +1226,14 @@ git commit -m "test(research): cover new snapshot request shape and validation r
 
 ### Task 5: The `research-company` Claude Code skill
 
+**Amended 2026-08-10, caught before dispatch:** the plan text below invented `VALUE_SCREENER_ADMIN_USERNAME`
+/`VALUE_SCREENER_ADMIN_PASSWORD` env var names without checking them against the real backend config.
+`SecurityConfig.java`/`application.yml`/`README.md` establish `ADMIN_USERNAME` (server-side, matches
+client-side 1:1) and `ADMIN_PASSWORD_HASH` (server-side bcrypt hash — never a usable client credential).
+Since the server never stores a plaintext password, the skill's curl call needs its own plaintext env var,
+distinct from the hash. Fixed to `$ADMIN_USERNAME`/`$ADMIN_PASSWORD` (the latter is a new, separate env var
+the user exports themselves, holding the plaintext that was hashed into `ADMIN_PASSWORD_HASH`).
+
 **Files:**
 - Create: `.claude/skills/research-company/SKILL.md`
 
