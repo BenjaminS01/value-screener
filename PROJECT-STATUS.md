@@ -333,3 +333,22 @@ erneut verifiziert (33/33 Backend-Tests grün).
 - Vor Phase 4 (AWS-Deployment): CORS-Policy fehlt noch (Dev funktioniert nur über den
   Vite-`/api`-Proxy), HTTP Basic Auth erfordert zwingend HTTPS in Produktion — beides für den
   Phase-4-Plan vormerken.
+- Vor Phase 4: Auth-Modell für den `research-company`-Skill gegen die Live-API nochmal genauer
+  anschauen (2026-08-12 besprochen, zurückgestellt bis Phase 4). Hintergrund: `SecurityConfig`
+  schützt aktuell alles hinter `.anyRequest().authenticated()` mit einem einzigen geteilten
+  Admin-Credential — Research-Snapshot-Schreibzugriff und z. B. Portfolio-Käufe/-Verkäufe teilen
+  sich dasselbe Passwort. Für den lokalen Sandbox-Workflow (`docker/claude-sandbox/`) ist das
+  Restrisiko klein (lokales, nicht wiederverwendetes Credential), gegen die künftige Live-API wird
+  der Blast Radius bei einem Leak aber deutlich größer.
+  Geplanter Live-Workflow (vom Nutzer bestätigt, 2026-08-12): Claude Code recherchiert lokal im
+  Sandbox-Container (`docker/claude-sandbox/`, offenes Internet, aber ohne Live-Credential) und
+  gibt die fertigen Findings aus; der Nutzer prüft das Ergebnis und lädt es **selbst manuell** hoch
+  (z. B. eigener curl-Aufruf oder Admin-Formular) — kein automatisiertes Upload-Script. Damit taucht
+  das Live-Credential an keiner Stelle in irgendeinem Claude-Code-Prozess auf (weder im Sandbox- noch
+  im normalen), sondern ausschließlich in der eigenen Shell/dem Browser des Nutzers — schließt den
+  Prompt-Injection-Exfiltrationsweg vollständig statt nur strukturell, und der manuelle Schritt
+  dient nebenbei als menschlicher Review vor der Veröffentlichung (relevant für die
+  BaFin/Art.-20-MAR-Überlegungen aus dem Design, siehe oben "Öffentlich, aber vorerst nur
+  Eigenbedarf"). Ergänzend zu prüfen: eigenes, schmaleres Credential nur für
+  `/api/research/snapshots` statt des geteilten Admin-Users, kurzlebige Tokens statt Dauerpasswort,
+  Audit-Log auf dem Schreib-Endpoint.

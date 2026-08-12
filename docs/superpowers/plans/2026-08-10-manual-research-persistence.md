@@ -1234,8 +1234,21 @@ Since the server never stores a plaintext password, the skill's curl call needs 
 distinct from the hash. Fixed to `$ADMIN_USERNAME`/`$ADMIN_PASSWORD` (the latter is a new, separate env var
 the user exports themselves, holding the plaintext that was hashed into `ADMIN_PASSWORD_HASH`).
 
+**Amended 2026-08-12, after the skill was already implemented and reviewed:** this is new scope, not a bug
+fix — the user requested a sandboxed way to run this skill, since it's the first thing in the project that
+does broad, untrusted web research (`WebSearch`/`WebFetch` + `Bash`) from their personal laptop rather than
+inside a scoped dev environment. Indirect prompt injection from fetched pages is a real, if mitigated, risk
+(see the skill's own "Security" section) — a container limits the blast radius if that mitigation ever
+fails, by only mounting this repo (not the host home directory) and requiring no other host access besides
+reaching the locally running backend. Added as a new **Step 2** below, inserted before (and blocking) the
+existing manual verification step, since that verification is exactly the first real invocation of this
+skill's web research. Old Step 2 ("Verify") is renumbered Step 3, old Step 3 ("Commit") is renumbered Step 4.
+
 **Files:**
 - Create: `.claude/skills/research-company/SKILL.md`
+- Create: `docker/claude-sandbox/Dockerfile`
+- Create: `docker/claude-sandbox/run.sh`
+- Modify: `README.md` (document the sandbox for the showcase reader)
 
 **Interfaces:**
 - Consumes: `POST /api/research/snapshots` (Tasks 3-4's final shape) — the skill's only write action.
@@ -1379,18 +1392,38 @@ Report back to the user: which criteria were found and persisted, which were ski
 reliable source, and the response status from the API call.
 ```
 
-- [ ] **Step 2: Verify (manual, not automated)**
+- [x] **Step 2: Sandbox the skill's runtime (Docker)**
+
+Already built and smoke-tested: `docker/claude-sandbox/Dockerfile` (Node 20 + `@anthropic-ai/claude-code`)
+and `docker/claude-sandbox/run.sh` (builds the image, then runs it with `-v "$REPO_ROOT:/workspace"` — this
+repo only, not `$HOME` — plus `--add-host=host.docker.internal:host-gateway` so the container can still
+reach the backend running on the host at `localhost:8080`, and passthrough of `$ADMIN_USERNAME`/
+`$ADMIN_PASSWORD`). `docker build` and `claude --version` both verified working inside the image.
+
+**Amended 2026-08-12, closed a real gap found while discussing residual risk:** the sandbox originally
+bind-mounted the host's real `~/.claude/.credentials.json` read-only, to skip a fresh login. `:ro` only
+blocks writes, not reads — a compromised session (e.g. via a successful prompt injection during research)
+could still read and exfiltrate that file over the network the sandbox needs for research, handing an
+attacker the user's real Claude Code session. Fixed: the sandbox now logs in on its own, first run only,
+into a named Docker volume (`value-screener-claude-sandbox-home`) instead — a login fully separate from
+the host's real one. If it's ever compromised, revoking it (`docker volume rm value-screener-claude-sandbox-home`)
+doesn't touch the real login at all.
+
+- [ ] **Step 3: Verify (manual, not automated)**
 
 Per the design spec's Section 5 "Verification" note, this is not something to unit test. Run
-`cd backend && mvn spring-boot:run` in one terminal, then in a Claude Code session invoke this skill
-against a real ticker (e.g. AAPL) and confirm: the skill researches without calling
-`company-research-agent`, builds a findings list, successfully POSTs, and `GET /api/research/snapshots/US0378331005`
-returns the persisted result with its findings.
+`cd backend && mvn spring-boot:run` in one terminal, then **inside the sandbox**
+(`./docker/claude-sandbox/run.sh`, from a shell with `ADMIN_USERNAME`/`ADMIN_PASSWORD` already exported)
+invoke this skill against a real ticker (e.g. AAPL) and confirm: the skill researches without calling
+`company-research-agent`, builds a findings list, successfully POSTs (the sandbox sets `$BACKEND_URL` to
+`http://host.docker.internal:8080` automatically, so the skill's request reaches the host-run backend
+from inside the container), and `GET /api/research/snapshots/US0378331005` returns the persisted result
+with its findings.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 Tell the user to run:
 ```bash
-git add .claude/skills/research-company/SKILL.md
-git commit -m "feat(skills): add research-company skill for cost-free manual research"
+git add .claude/skills/research-company/SKILL.md docker/claude-sandbox/ README.md
+git commit -m "feat(skills): add research-company skill and sandboxed runtime for cost-free manual research"
 ```

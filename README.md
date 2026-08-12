@@ -19,6 +19,26 @@ Design: [`docs/superpowers/specs/2026-07-24-company-research-agent-design.md`](d
 Umsetzung läuft aktuell in einem separaten Git-Worktree auf Branch `feature/company-research-agent`
 (siehe `PROJECT-STATUS.md` für den genauen Stand).
 
+## Sandbox für Web-Recherche-Skills
+
+Der `.claude/skills/research-company/`-Skill lässt Claude Code selbst mit `WebSearch`/`WebFetch` im
+offenen Internet recherchieren und die Ergebnisse per `Bash`/`curl` persistieren. Diese Kombination aus
+ungeprüften Web-Inhalten und echter Tool-Ausführung ist ein klassisches Einfallstor für indirekte
+Prompt-Injection (eine Webseite enthält Text, der wie eine Anweisung an das Modell aussieht). Der Skill
+selbst begrenzt das bereits auf Prompt-Ebene (siehe dessen "Security"-Abschnitt), zusätzlich läuft er
+**verpflichtend, nicht optional** in einem Docker-Container, der nur dieses Repository mountet — nicht
+das restliche Home-Verzeichnis (der Skill weist in seinem Security-Abschnitt selbst darauf hin und bricht
+ab, falls er außerhalb der Sandbox gestartet wird):
+
+```bash
+export ADMIN_USERNAME=admin
+export ADMIN_PASSWORD=<dein-klartext-passwort>
+./docker/claude-sandbox/run.sh
+```
+
+Selbst falls die Prompt-Injection-Mitigation versagt, bleibt ein potenzieller Schaden auf das gemountete
+Repo beschränkt statt auf den restlichen Rechner überzugreifen.
+
 ## Phase 1: Projekt-Grundgerüst + Portfolio-Grundfunktion
 
 ### Voraussetzungen
