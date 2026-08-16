@@ -39,6 +39,41 @@ export ADMIN_PASSWORD=<dein-klartext-passwort>
 Selbst falls die Prompt-Injection-Mitigation versagt, bleibt ein potenzieller Schaden auf das gemountete
 Repo beschränkt statt auf den restlichen Rechner überzugreifen.
 
+### Manueller Testablauf für den `research-company`-Skill
+
+Es gibt ein Passwort, das an zwei Stellen in zwei Formen gebraucht wird: das Backend speichert nur den
+bcrypt-**Hash** (`ADMIN_PASSWORD_HASH`), der Skill braucht für HTTP Basic Auth das **Klartext-Passwort**
+(`ADMIN_PASSWORD`). Beide müssen zum selben Passwort gehören.
+
+1. **Hash erzeugen** (einmalig, z. B. per `AdminPasswordHashGenerator`, siehe oben "Admin-Passwort-Hash
+   erzeugen", oder extern per beliebigem bcrypt-Tool).
+2. **Backend starten** (Terminal 1):
+   ```bash
+   cd backend
+   export ADMIN_USERNAME=admin
+   export ADMIN_PASSWORD_HASH='<Hash aus Schritt 1>'
+   mvn spring-boot:run
+   ```
+   Falls Verbindungsfehler zu Postgres: `docker compose up -d` (siehe oben) zuerst ausführen.
+3. **Sandbox starten** (Terminal 2, im Projekt-Root):
+   ```bash
+   export ADMIN_USERNAME=admin
+   export ADMIN_PASSWORD='<Klartext-Passwort aus Schritt 1>'
+   ./docker/claude-sandbox/run.sh
+   ```
+   Beim allerersten Start fragt Claude Code im Container einmalig nach Login — separat vom Host-Login,
+   bleibt danach im benannten Docker-Volume erhalten.
+4. **Recherche anstoßen** (im Sandbox-Prompt): z. B. `research AAPL`. Der Skill sollte automatisch
+   greifen, mit `WebSearch`/`WebFetch` recherchieren (nie `company-research-agent` aufrufen) und am Ende
+   selbst per `curl -X POST` an `http://host.docker.internal:8080/api/research/snapshots` persistieren.
+5. **Von außen verifizieren** (Terminal 1 oder ein drittes, **nicht** in der Sandbox —
+   `ADMIN_USERNAME`/`ADMIN_PASSWORD` müssen dort erneut exportiert sein):
+   ```bash
+   curl -i -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" http://localhost:8080/api/research/snapshots/<ISIN>
+   ```
+   Erwartet: `HTTP/1.1 200` und die recherchierten Findings als JSON, jedes mit eigener Quelle
+   (`sourceUrl`), Datum (`asOfDate`) und deskriptiv formuliertem `claim`.
+
 ## Phase 1: Projekt-Grundgerüst + Portfolio-Grundfunktion
 
 ### Voraussetzungen

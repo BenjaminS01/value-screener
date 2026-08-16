@@ -1409,7 +1409,7 @@ into a named Docker volume (`value-screener-claude-sandbox-home`) instead — a 
 the host's real one. If it's ever compromised, revoking it (`docker volume rm value-screener-claude-sandbox-home`)
 doesn't touch the real login at all.
 
-- [ ] **Step 3: Verify (manual, not automated)**
+- [x] **Step 3: Verify (manual, not automated)**
 
 Per the design spec's Section 5 "Verification" note, this is not something to unit test. Run
 `cd backend && mvn spring-boot:run` in one terminal, then **inside the sandbox**
@@ -1419,6 +1419,13 @@ invoke this skill against a real ticker (e.g. AAPL) and confirm: the skill resea
 `http://host.docker.internal:8080` automatically, so the skill's request reaches the host-run backend
 from inside the container), and `GET /api/research/snapshots/US0378331005` returns the persisted result
 with its findings.
+
+**Verified 2026-08-16:** ran two live researches inside the sandbox — AAPL (`US0378331005`) and Marsh &
+McLennan (ticker now `MRSH` post-rebrand, ISIN `US5717481023`). Both confirmed from the host via
+`curl -i -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" http://localhost:8080/api/research/snapshots/<isin>`:
+HTTP 200, full JSON with all found findings, each carrying its own `claim`/`sourceUrl`/`asOfDate`,
+descriptive (not recommendation-phrased) wording throughout. No `company-research-agent` call was made.
+Live test passed.
 
 - [ ] **Step 4: Commit**
 
