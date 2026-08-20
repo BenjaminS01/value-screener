@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/portfolio/public").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/research/snapshots/**").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(basic -> {
                 });

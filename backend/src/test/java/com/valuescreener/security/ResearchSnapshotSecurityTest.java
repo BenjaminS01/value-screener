@@ -38,9 +38,9 @@ class ResearchSnapshotSecurityTest {
     private MockMvc mockMvc;
 
     @Test
-    void rejectsUnauthenticatedRead() throws Exception {
+    void acceptsUnauthenticatedRead() throws Exception {
         mockMvc.perform(get("/api/research/snapshots"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 
     @Test
