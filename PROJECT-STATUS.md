@@ -35,6 +35,19 @@ sieht öffentlich nur Ticker + Branche vor. Für den Portfolio↔Recherche-Abgle
 trotzdem öffentlich exponiert — bewusste, geprüfte Abweichung, keine Stückzahl/kein Einstiegspreis
 sind betroffen, diese bleiben wie vorgesehen verborgen.
 
+**Task-Reihenfolge (2026-08-20, festgelegt auf Nutzerwunsch, kein separates Plan-File):**
+1. Backend: `GET /api/research/snapshots/**` öffentlich freigeben (`SecurityConfig`).
+2. Backend: `isin` in `PublicPortfolioPositionView`/`PortfolioService` exponieren.
+3. Frontend: `researchApi.ts` (neu) + `isin`-Feld in `portfolioApi.ts`.
+4. Frontend: `PositionResearch.tsx` (neu) — Kontext-Header + Findings, englische Kriterien-Labels.
+5. Frontend: `DeepResearchPlaceholder.tsx` (neu) — Button + Erklärtext inkl. LLM-/Trading-API-Ausblick.
+6. Frontend: `PortfolioPage.tsx` verdrahten + `PortfolioPage`/`LoginForm`/`AddPositionForm` auf Englisch.
+7. Frontend: `ResearchLibraryPage.tsx` (neu) — inkl. Interessenkonflikt-Hinweis gegen Portfolio.
+8. Frontend: `LandingPage.tsx` (neu, wird Startansicht) + `App.tsx`-Navigation.
+
+Jeder Task: TDD, eigene Prüfung/eigener Commit durch den Nutzer, kurze Konzept-Erklärung unmittelbar vor
+Start des jeweiligen Tasks (SDD-Konvention).
+
 **Nächster Schritt:** Umsetzung startet erst nach explizitem Go des Nutzers — Design selbst ist final.
 
 ## Company Research Agent: Worktree-Phase beendet
