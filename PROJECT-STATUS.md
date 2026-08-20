@@ -1,10 +1,41 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-08-02
+Letztes Update: 2026-08-20
 Aktuelle Phase: **Phase 1 abgeschlossen**. Der Company-Research-Agent-Sub-Projekt-Branch ist
 gemerged, das Parallel-Worktree-Setup ist beendet (siehe unten).
 
 Dieses Dokument fasst den Stand zusammen, damit eine neue Session ohne erneute Erklärung anschließen kann.
+
+## Portfolio Research UI: Design genehmigt, Umsetzung noch nicht gestartet (2026-08-20)
+
+Aufbauend auf der abgeschlossenen Recherche-Persistenz (siehe unten "Session Research Collection"
+sowie den `research-company`-Skill, live-verifiziert 2026-08-16 mit AAPL und Marsh & McLennan/MRSH):
+fünf zusammenhängende, als "bounded" eingestufte UI-Punkte wurden im Chat besprochen und genehmigt,
+aber **noch nicht umgesetzt** (kein Code geschrieben, kein Commit). Laut Bounded-Pfad-Konvention gibt
+es kein separates Spec-File dafür — die Chat-Genehmigung reicht; dieser Abschnitt ist die
+Repo-sichtbare Zusammenfassung.
+
+1. **Recherche-Anzeige auf Portfolio-Positionen** — aufklappbar pro Position, Findings inkl. Quelle/
+   Datum, oder "Not yet researched." wenn kein Snapshot existiert.
+2. **Recherche-Bibliothek-Seite** — alle recherchierten Titel, unabhängig vom eigenen Portfolio. Zeigt
+   pro Titel den bestehenden Interessenkonflikt-Hinweis ("Betreiber hält diese Position", siehe
+   Design-Spec Abschnitt 9) per Ticker-Abgleich gegen die eigene Portfolio-Liste — Übertragung des
+   dort für Screening-Kandidaten vorgesehenen Mechanismus auf diese neue Seite, ergänzt 2026-08-20.
+3. **Tiefenrecherche-Platzhalter-Button** — kein echter Trigger, zeigt bei Klick nur Erklärtext
+   (erwähnt künftige LLM-API-/Trading-API-Anbindung als Ausblick).
+4. **Englische App-Sprache** — UI-Texte auf Englisch, kein i18n-Framework; Impressum/Datenschutz/
+   Disclaimer bleiben Deutsch (§ 5 DDG).
+5. **Neue Startseite** — erklärt Idee + Architektur (inkl. geplantem, noch nicht live AWS-Deployment)
+   als neue Default-Ansicht der App.
+
+Backend-seitig nötig: `GET /api/research/snapshots/**` öffentlich freigeben, `isin` in
+`PublicPortfolioPositionView`/`PortfolioService` ergänzen. **Bewusste Ausnahme (2026-08-20):** ISIN
+war laut Task-2-Notiz unten explizit als "Backend-/Admin-only" designed; die Design-Spec (Abschnitt 9)
+sieht öffentlich nur Ticker + Branche vor. Für den Portfolio↔Recherche-Abgleich wird ISIN jetzt
+trotzdem öffentlich exponiert — bewusste, geprüfte Abweichung, keine Stückzahl/kein Einstiegspreis
+sind betroffen, diese bleiben wie vorgesehen verborgen.
+
+**Nächster Schritt:** Umsetzung startet erst nach explizitem Go des Nutzers — Design selbst ist final.
 
 ## Company Research Agent: Worktree-Phase beendet
 
