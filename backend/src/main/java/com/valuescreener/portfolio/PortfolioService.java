@@ -45,7 +45,7 @@ public class PortfolioService {
 
     public List<PublicPortfolioPositionView> listPublicPositions() {
         return repository.findAll().stream()
-                .map(position -> new PublicPortfolioPositionView(position.getTicker(), position.getCompanyName()))
+                .map(position -> new PublicPortfolioPositionView(position.getTicker(), position.getCompanyName(), position.getIsin()))
                 .toList();
     }
 }

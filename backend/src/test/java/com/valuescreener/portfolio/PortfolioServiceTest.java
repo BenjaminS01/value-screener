@@ -93,7 +93,7 @@ class PortfolioServiceTest {
     }
 
     @Test
-    void listPublicPositionsExposesTickerAndCompanyName() {
+    void listPublicPositionsExposesTickerCompanyNameAndIsin() {
         PortfolioService service = new PortfolioService(repository);
         PortfolioPosition position = new PortfolioPosition(
                 "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
@@ -101,6 +101,6 @@ class PortfolioServiceTest {
 
         List<PublicPortfolioPositionView> result = service.listPublicPositions();
 
-        assertThat(result).containsExactly(new PublicPortfolioPositionView("MSFT", "Microsoft Corp."));
+        assertThat(result).containsExactly(new PublicPortfolioPositionView("MSFT", "Microsoft Corp.", "US5949181045"));
     }
 }

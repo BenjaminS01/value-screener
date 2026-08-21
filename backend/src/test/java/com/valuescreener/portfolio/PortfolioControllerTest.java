@@ -31,11 +31,11 @@ class PortfolioControllerTest {
     @Test
     void returnsPublicPositionsAsJson() throws Exception {
         when(portfolioService.listPublicPositions())
-                .thenReturn(List.of(new PublicPortfolioPositionView("AAPL", "Apple Inc.")));
+                .thenReturn(List.of(new PublicPortfolioPositionView("AAPL", "Apple Inc.", "US0378331005")));
 
         mockMvc.perform(get("/api/portfolio/public"))
                 .andExpect(status().isOk())
-                .andExpect(content().json("[{\"ticker\":\"AAPL\",\"companyName\":\"Apple Inc.\"}]"));
+                .andExpect(content().json("[{\"ticker\":\"AAPL\",\"companyName\":\"Apple Inc.\",\"isin\":\"US0378331005\"}]"));
     }
 
     @Test
@@ -95,15 +95,15 @@ class PortfolioControllerTest {
     }
 
     @Test
-    void neverExposesQuantityEntryPriceOrIsinInPublicResponse() throws Exception {
+    void neverExposesQuantityOrEntryPriceInPublicResponse() throws Exception {
         when(portfolioService.listPublicPositions())
-                .thenReturn(List.of(new PublicPortfolioPositionView("AAPL", "Apple Inc.")));
+                .thenReturn(List.of(new PublicPortfolioPositionView("AAPL", "Apple Inc.", "US0378331005")));
 
         mockMvc.perform(get("/api/portfolio/public"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].quantity").doesNotExist())
                 .andExpect(jsonPath("$[0].entryPrice").doesNotExist())
-                .andExpect(jsonPath("$[0].isin").doesNotExist());
+                .andExpect(jsonPath("$[0].isin").value("US0378331005"));
     }
 
     @Test
