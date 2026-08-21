@@ -1,6 +1,7 @@
 export interface PublicPosition {
   ticker: string
   companyName: string
+  isin: string
 }
 
 export async function fetchPublicPositions(): Promise<PublicPosition[]> {
