@@ -13,7 +13,7 @@ describe('App', () => {
   it('renders the app title and portfolio view by default', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: 'Value Screener' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Mein Portfolio' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'My Portfolio' })).toBeInTheDocument()
   })
 
   it('switches to the Impressum view', async () => {

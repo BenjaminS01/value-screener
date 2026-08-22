@@ -15,16 +15,16 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Anmelden">
+    <form onSubmit={handleSubmit} aria-label="Login">
       <label>
-        Benutzername
+        Username
         <input value={username} onChange={(e) => setUsername(e.target.value)} />
       </label>
       <label>
-        Passwort
+        Password
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </label>
-      <button type="submit">Anmelden</button>
+      <button type="submit">Login</button>
     </form>
   )
 }

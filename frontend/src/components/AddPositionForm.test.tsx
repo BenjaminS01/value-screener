@@ -17,11 +17,11 @@ describe('AddPositionForm', () => {
 
     fireEvent.change(screen.getByLabelText('Ticker'), { target: { value: 'aapl' } })
     fireEvent.change(screen.getByLabelText('ISIN'), { target: { value: 'US0378331005' } })
-    fireEvent.change(screen.getByLabelText('Unternehmensname'), { target: { value: 'Apple Inc.' } })
-    fireEvent.change(screen.getByLabelText('Stückzahl'), { target: { value: '10' } })
-    fireEvent.change(screen.getByLabelText('Einstiegspreis'), { target: { value: '150' } })
-    fireEvent.change(screen.getByLabelText('Kaufdatum'), { target: { value: '2026-01-15' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }))
+    fireEvent.change(screen.getByLabelText('Company name'), { target: { value: 'Apple Inc.' } })
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Entry price'), { target: { value: '150' } })
+    fireEvent.change(screen.getByLabelText('Purchase date'), { target: { value: '2026-01-15' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     await waitFor(() => expect(onAdded).toHaveBeenCalled())
 

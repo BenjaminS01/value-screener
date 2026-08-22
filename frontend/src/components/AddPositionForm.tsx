@@ -40,7 +40,7 @@ export function AddPositionForm({ credentials, onAdded }: AddPositionFormProps) 
   }
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Position hinzufügen">
+    <form onSubmit={handleSubmit} aria-label="Add position">
       <label>
         Ticker
         <input value={ticker} onChange={(e) => setTicker(e.target.value)} />
@@ -50,22 +50,22 @@ export function AddPositionForm({ credentials, onAdded }: AddPositionFormProps) 
         <input value={isin} onChange={(e) => setIsin(e.target.value)} />
       </label>
       <label>
-        Unternehmensname
+        Company name
         <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
       </label>
       <label>
-        Stückzahl
+        Quantity
         <input value={quantity} onChange={(e) => setQuantity(e.target.value)} />
       </label>
       <label>
-        Einstiegspreis
+        Entry price
         <input value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} />
       </label>
       <label>
-        Kaufdatum
+        Purchase date
         <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
       </label>
-      <button type="submit">Hinzufügen</button>
+      <button type="submit">Add</button>
       {error && <p role="alert">{error}</p>}
     </form>
   )
