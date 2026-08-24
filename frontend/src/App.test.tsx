@@ -10,10 +10,26 @@ describe('App', () => {
     )
   })
 
-  it('renders the app title and portfolio view by default', () => {
+  it('renders the app title and landing page view by default', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: 'Value Screener' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'My Portfolio' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'How it works' })).toBeInTheDocument()
+  })
+
+  it('switches to the Portfolio view', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Portfolio' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'My Portfolio' })).toBeInTheDocument()
+    })
+  })
+
+  it('switches to the Research view', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Research' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument()
+    })
   })
 
   it('switches to the Impressum view', async () => {
