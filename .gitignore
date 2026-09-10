@@ -4,3 +4,5 @@
 .superpowers/
 .claude/worktrees/
 .idea/
+.env
+logs/
