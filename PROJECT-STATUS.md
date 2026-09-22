@@ -1,10 +1,54 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-08-20
-Aktuelle Phase: **Phase 1 abgeschlossen**. Der Company-Research-Agent-Sub-Projekt-Branch ist
-gemerged, das Parallel-Worktree-Setup ist beendet (siehe unten).
+Letztes Update: 2026-09-22
+Aktuelle Phase: **Phase 4 (AWS-Deployment) läuft**, parallel zur AWS-Developer-Zertifizierungsvorbereitung
+des Nutzers. Phase 1 weiterhin abgeschlossen, siehe unten.
 
 Dieses Dokument fasst den Stand zusammen, damit eine neue Session ohne erneute Erklärung anschließen kann.
+
+## Phase 4 — AWS-Deployment: läuft, Thema für Thema als begleitete Schulung (2026-09-20)
+
+Vollständige Architektur-Doku: [`docs/superpowers/specs/2026-09-20-aws-deployment-design.md`](docs/superpowers/specs/2026-09-20-aws-deployment-design.md).
+Fortschritt/verbleibende Themen: [`docs/superpowers/plans/2026-09-20-aws-deployment-plan.md`](docs/superpowers/plans/2026-09-20-aws-deployment-plan.md).
+
+**Rahmen:** Sicherheit zuerst, ~20 €/Monat Kostendeckel, möglichst breite AWS-Funktionsabdeckung fürs
+Lernen, Region `eu-central-1`. Umsetzung erfolgt live in der AWS-Konsole, jedes Thema wird vom Controller
+erklärt, bevor der Nutzer es selbst umsetzt — kein klassischer SDD-Task-Plan.
+
+**Erledigt:** Account-Setup (Root+MFA, IAM-Alltags-User ohne Access Key, per `AssumeRole` erreichbare
+`Admin`-Rolle mit Frisch-MFA-Bedingung — bewusst **kein** IAM Identity Center, da das auf dem gewählten
+Free-Plan-Account sofort einen Pay-as-you-go-Zwangs-Upgrade auslösen und das Startguthaben verfallen
+lassen würde), AWS Budgets mit automatischer Kosten-Notbremse, eigene VPC (`value-screener-vpc`, rein
+privat, kein Internet-/NAT-Gateway) mit zwei Subnetzen/Security-Groups, RDS-PostgreSQL-Instanz
+(`value-screener-postgres`, nicht öffentlich, Zugangsdaten von RDS selbst in Secrets Manager verwaltet).
+Ein reiner EC2/Auto-Scaling/Load-Balancer-Exkurs (Lernübung, nicht Teil der Zielarchitektur) wurde
+vollständig gebaut und wieder abgebaut.
+
+**Kurskorrektur (2026-09-22):** App Runner nimmt seit 30.04.2026 keine Neukunden mehr an (unser Account ist
+neuer, kein Free-Plan-Problem) — als Ersatz **ECS Fargate, klassisch selbst gebaut** (nicht Express Mode,
+das einen eigenen, unnötig teuren Load Balancer erzwingen würde). Reines EC2 wäre günstiger (~6 statt
+~10–11 $/Monat) und wurde ernsthaft erwogen, aber bewusst zugunsten des höheren Lernwerts von ECS vertagt
+— mit der Absicht, bei echtem Kostendruck später zu wechseln (VPC/RDS/ECR/CI-Pipeline sind davon
+unberührt). Öffentlicher Zugang künftig über **API Gateway + VPC Link** statt Load Balancer (günstiger bei
+geringem Traffic, kein neues öffentliches Subnetz nötig). Außerdem beim vollständigen Doku-Check entdeckt:
+Thema 5 (Lambda) braucht **keinen** automatischen EventBridge-Scheduler — dieser wurde laut
+Screening-Cost-Redesign-Spec bereits am 2026-08-10 bewusst auf später verschoben, v1 kommt mit manuellem
+Trigger für den Company-Research-Agent aus. Thema 5 bekommt zusätzlich eine öffentliche, kostensichere
+Showcase-Demo (ratenbegrenzter "Tiefenrecherche"-Button + täglicher EventBridge-Check-in, sichtbar auf der
+Landingpage, komplett getrennt vom echten, teuren Agenten) — Details in der Plan-Datei.
+
+**In Arbeit (Thema 4, Backend-Compute):** `backend/Dockerfile` angelegt (Container-Image-Weg über ECR).
+Offen: ECR-Repository, GitHub-OIDC-IAM-Rolle (kein Access Key), GitHub-Actions-Workflow (Trigger:
+Git-Tags `v*`, nicht jeder Push — bewusste Release-Disziplin), danach ECS Cluster/Task Definition/Service
+sowie die dafür nötigen VPC-Endpoints (Secrets Manager, ggf. Lambda) — **kein NAT Gateway nötig**, da das
+Backend laut Code-Prüfung nie direkt externe APIs wie Anthropic aufruft (das liegt komplett im separaten
+Company-Research-Agent-Lambda).
+
+**Noch offen:** Lambda/EventBridge (Company Research Agent), Frontend (S3/CloudFront/ACM/Route 53),
+Secrets Manager/KMS (Grundlage schon über RDS vorhanden), Cognito (Ablösung des geteilten
+Admin-Basic-Auth-Credentials), CloudTrail, SQS/SNS, X-Ray, CodePipeline (Sinnhaftigkeit gegenüber dem
+bereits vorgezogenen GitHub-Actions-Weg noch zu bewerten), AWS CDK, sowie ein kurzer, bewusst befristeter
+WAF/GuardDuty/Config-Überblick (dauerhafter Betrieb würde das Budget sprengen).
 
 ## Portfolio Research UI: Design genehmigt, Umsetzung noch nicht gestartet (2026-08-20)
 
