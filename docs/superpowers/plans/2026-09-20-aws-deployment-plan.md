@@ -18,7 +18,7 @@ standing git convention.
 | 1 | IAM | ✅ done (covered live during account setup) |
 | 2 | VPC & Security Groups | ✅ done — `value-screener-vpc`, 2 private subnets, 2 security groups |
 | 3 | RDS | ✅ done — `value-screener-postgres` created |
-| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | 🔄 in progress — `Dockerfile` added; next: ECR repo, GitHub OIDC role + workflow, ECS Cluster/Task Definition/Service, API Gateway + VPC Link |
+| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | 🔄 in progress — Dockerfile, ECR, GitHub OIDC role, CI/CD workflow all done and **verified end-to-end** (2026-10-03); next: ECS Cluster/Task Definition/Service, VPC Endpoints, API Gateway + VPC Link |
 | 5 | Lambda (Company Research Agent, **manual trigger only**, no EventBridge for the real agent) **+ public showcase demo** (DynamoDB, rate-limited Lambda button, EventBridge heartbeat shown in UI — added 2026-09-22) **+ SQS DLQ on every Lambda** (pulled forward from Topic 10, added 2026-09-22) | ⏳ not started |
 | 6 | S3, CloudFront, ACM, Route 53 (frontend) | ⏳ not started |
 | 7 | Secrets Manager & KMS | ⏳ not started (RDS's Secrets-Manager-managed credential already exists as a head start) |
@@ -50,12 +50,20 @@ Two things changed the plan, both explained in full in the design spec's Decisio
 ## Topic 4 (backend compute) — remaining steps
 
 1. ~~Write `backend/Dockerfile`~~ — done.
-2. Create an ECR repository (`value-screener-backend`).
-3. Register GitHub as an OIDC identity provider in IAM (one-time, account-wide).
-4. Create an IAM role trusting that OIDC provider, scoped to this repo (and ideally to the `v*` tag ref
-   pattern), with permission to push to the ECR repository.
-5. Add a GitHub Actions workflow (`.github/workflows/...`) triggered on `v*` tag push: checkout → build
-   the Docker image → assume the OIDC role → `docker push` to ECR.
+2. ~~Create an ECR repository (`value-screener-backend`)~~ — done, scan-on-push enabled.
+3. ~~Register GitHub as an OIDC identity provider in IAM~~ — done.
+4. ~~Create an IAM role trusting that OIDC provider~~ — done (`GitHubActionsECRPushRole`). **Gotcha hit
+   and fixed (2026-10-03):** GitHub changed its OIDC `sub` claim format on 2026-07-15 to include the
+   org/repo numeric IDs (`repo:ORG@ORG_ID/REPO@REPO_ID:ref:...` instead of the old
+   `repo:ORG/REPO:ref:...`), breaking the trust policy's `StringLike` condition, which was still in the
+   legacy format — surfaced as `Not authorized to perform sts:AssumeRoleWithWebIdentity`. Fixed by making
+   the condition a list containing **both** the legacy and the new immutable (ID-based) subject format,
+   for forward/backward safety. Worth remembering if this resurfaces on any other GitHub OIDC role.
+5. ~~Add the GitHub Actions workflow~~ — done (`.github/workflows/build-and-push-backend.yml`), with a
+   `test` job (mirrors `ci.yml`'s backend test step — a deliberate, acceptable bit of redundancy at
+   release time, not an oversight; `ci.yml` doesn't trigger on tag pushes at all) gating the build/push
+   job. **First successful end-to-end run confirmed 2026-10-03** (tag `v0.0.1-test`): tests pass, OIDC
+   auth succeeds, image builds and lands in ECR.
 6. Create the ECS Cluster (lightweight — just a logical grouping for Fargate).
 7. Create the Task Definition: ECR image, CPU/memory (smallest — 0.25 vCPU/0.5 GB), port mapping, two IAM
    roles (Task Execution Role — pull from ECR, write logs; Task Role — used by the running app, e.g. to

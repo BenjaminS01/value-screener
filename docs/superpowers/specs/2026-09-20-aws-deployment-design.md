@@ -304,6 +304,18 @@ the real agent or its cost profile:
   ingress with API Gateway (HTTP API) + VPC Link for the same reason (ALB's fixed cost vs. API Gateway's
   near-zero cost at this traffic volume) — this also avoids needing a new public subnet, since the VPC
   Link places ENIs in the existing private subnets exactly like the App Runner connector would have.
+- 2026-10-03: Built ECR repository, registered GitHub as an IAM OIDC provider, created
+  `GitHubActionsECRPushRole`, and added `.github/workflows/build-and-push-backend.yml` (tag-triggered,
+  with a `test` job gating build/push — deliberately duplicates `ci.yml`'s backend test step since
+  `ci.yml` only triggers on push/PR to `main`, never on tag pushes; a reusable-workflow refactor to
+  de-duplicate is noted as optional future cleanup, not done now). First run failed:
+  `Not authorized to perform sts:AssumeRoleWithWebIdentity`. Root cause found via research, not guessing:
+  GitHub changed its OIDC `sub` claim format on 2026-07-15 to an immutable, ID-based form
+  (`repo:ORG@ORG_ID/REPO@REPO_ID:ref:...`) alongside the legacy name-based form
+  (`repo:ORG/REPO:ref:...`); the trust policy's `StringLike` condition only had the legacy form. Fixed by
+  making that condition a list containing both forms. Second run succeeded end-to-end (tests pass, OIDC
+  auth, Docker build, ECR push) on tag `v0.0.1-test` — the full build/publish half of the CI/CD pipeline
+  is now verified working, before any ECS resources exist to deploy to.
 
 ---
 

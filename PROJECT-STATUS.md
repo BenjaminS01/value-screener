@@ -37,9 +37,11 @@ Trigger für den Company-Research-Agent aus. Thema 5 bekommt zusätzlich eine ö
 Showcase-Demo (ratenbegrenzter "Tiefenrecherche"-Button + täglicher EventBridge-Check-in, sichtbar auf der
 Landingpage, komplett getrennt vom echten, teuren Agenten) — Details in der Plan-Datei.
 
-**In Arbeit (Thema 4, Backend-Compute):** `backend/Dockerfile` angelegt (Container-Image-Weg über ECR).
-Offen: ECR-Repository, GitHub-OIDC-IAM-Rolle (kein Access Key), GitHub-Actions-Workflow (Trigger:
-Git-Tags `v*`, nicht jeder Push — bewusste Release-Disziplin), danach ECS Cluster/Task Definition/Service
+**In Arbeit (Thema 4, Backend-Compute):** Dockerfile, ECR-Repository, GitHub-OIDC-IAM-Rolle (kein Access
+Key) und der GitHub-Actions-Workflow (Trigger: Git-Tags `v*`, mit Test-Gate vor dem Push) stehen und sind
+**End-to-End verifiziert** (2026-10-03, Tag `v0.0.1-test`) — Build/Push-Hälfte der Pipeline läuft. Dabei
+ein GitHub-OIDC-Format-Fehler gefunden und gefixt (seit 15.07.2026 neues `sub`-Claim-Format mit
+Org-/Repo-IDs; Trust Policy akzeptiert jetzt beide Formate). Offen: ECS Cluster/Task Definition/Service
 sowie die dafür nötigen VPC-Endpoints (Secrets Manager, ggf. Lambda) — **kein NAT Gateway nötig**, da das
 Backend laut Code-Prüfung nie direkt externe APIs wie Anthropic aufruft (das liegt komplett im separaten
 Company-Research-Agent-Lambda).
