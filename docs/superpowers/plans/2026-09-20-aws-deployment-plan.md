@@ -18,7 +18,7 @@ standing git convention.
 | 1 | IAM | ✅ done (covered live during account setup) |
 | 2 | VPC & Security Groups | ✅ done — `value-screener-vpc`, 2 private subnets, 2 security groups |
 | 3 | RDS | ✅ done — `value-screener-postgres` created |
-| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | 🔄 in progress — Dockerfile, ECR, GitHub OIDC role, CI/CD workflow all done and **verified end-to-end** (2026-10-03); next: ECS Cluster/Task Definition/Service, VPC Endpoints, API Gateway + VPC Link |
+| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | 🔄 in progress — Dockerfile, ECR, GitHub OIDC role, CI/CD workflow, ECS Cluster/Task Definition/Service, and VPC Endpoints all done; **task confirmed Running/Healthy end-to-end** (2026-10-10); next: API Gateway + VPC Link for public access |
 | 5 | Lambda (Company Research Agent, **manual trigger only**, no EventBridge for the real agent) **+ public showcase demo** (DynamoDB, rate-limited Lambda button, EventBridge heartbeat shown in UI — added 2026-09-22) **+ SQS DLQ on every Lambda** (pulled forward from Topic 10, added 2026-09-22) | ⏳ not started |
 | 6 | S3, CloudFront, ACM, Route 53 (frontend) | ⏳ not started |
 | 7 | Secrets Manager & KMS | ⏳ not started (RDS's Secrets-Manager-managed credential already exists as a head start) |
@@ -64,17 +64,41 @@ Two things changed the plan, both explained in full in the design spec's Decisio
    release time, not an oversight; `ci.yml` doesn't trigger on tag pushes at all) gating the build/push
    job. **First successful end-to-end run confirmed 2026-10-03** (tag `v0.0.1-test`): tests pass, OIDC
    auth succeeds, image builds and lands in ECR.
-6. Create the ECS Cluster (lightweight — just a logical grouping for Fargate).
-7. Create the Task Definition: ECR image, CPU/memory (smallest — 0.25 vCPU/0.5 GB), port mapping, two IAM
-   roles (Task Execution Role — pull from ECR, write logs; Task Role — used by the running app, e.g. to
-   read the RDS Secrets Manager secret, later to invoke the Company Research Agent Lambda), environment
-   configuration pointing at RDS.
-8. Create the ECS Service: Fargate launch type, both private subnets, a new security group for the tasks
-   (replaces the never-built `value-screener-apprunner-connector-sg` role — same idea, referenced by RDS's
-   security group inbound rule instead), desired count 1, Rolling deployment (default).
-9. Add the VPC Interface Endpoints needed now that the task has no route out of the VPC (Secrets Manager
-   confirmed necessary; Lambda if/when the backend invokes the Company Research Agent directly — confirm
-   at Topic 5).
+6. ~~Create the ECS Cluster~~ — done (`value-screener-cluster`, Fargate).
+7. ~~Create the Task Definition~~ — done (`value-screener-backend`, 0.25 vCPU/0.5 GB, port 8080).
+   Execution role `value-screener-ecs-execution-role` (`AmazonECSTaskExecutionRolePolicy` + inline policy
+   reading both the RDS secret and a separately-created `value-screener/admin-password-hash` secret via
+   `secretsmanager:GetSecretValue`, resolved as container **Secrets** — `DB_USERNAME`/`DB_PASSWORD` via
+   the RDS secret's JSON keys, `ADMIN_PASSWORD_HASH` via the admin secret — not as plain task-definition
+   environment variables, kept out of anything listable in the console/API). Task role
+   `value-screener-ecs-task-role` created but deliberately empty (the app makes no AWS calls itself yet).
+8. ~~Create the ECS Service~~ — done (`value-screener-backend-service`, desired count 1, both private
+   subnets, no public IP, new SG `value-screener-ecs-task-sg` — replaces the never-built
+   `value-screener-apprunner-connector-sg`, which was removed from `value-screener-rds-sg`'s inbound rule
+   in favor of this one). Load balancing skipped here, handled separately via Topic 4 step 10.
+9. ~~Add VPC Interface Endpoints~~ — done, but **hit two real failures first, not a dry run**:
+   - First deploy attempt failed outright (`ResourceInitializationError: ... unable to retrieve secret
+     from asm ... context deadline exceeded`) — confirmed the private subnets have no path to any AWS
+     API at all, exactly the Section 6 finding generalized from App Runner to ECS. ECS's deployment
+     circuit breaker then stuck the service at 0/1 desired tasks with no prior healthy revision to roll
+     back to.
+   - **Cost finding before building the fix:** the obvious fix (4 Interface Endpoints — Secrets Manager,
+     `ecr.api`, `ecr.dkr`, CloudWatch Logs — each in both AZs) would run ≈58 $/month (≈7.30 $/endpoint/AZ
+     × 4 endpoints × 2 AZs) — far more than RDS+ECS combined. **Deliberately built each Interface
+     Endpoint in only one AZ** (`eu-central-1a`/`value-screener-private-1a`) instead of both, cutting this
+     to ≈29 $/month — a real, recorded cost/resilience tradeoff, acceptable given desired count is only 1
+     task anyway. The S3 **Gateway** Endpoint (needed for ECR layer downloads) is free and was added for
+     both subnets via the shared Main Route Table without the same tradeoff.
+   - **Second blocker**: creating the Interface Endpoints with private DNS failed with "Enabling private
+     DNS requires both enableDnsSupport and enableDnsHostnames VPC attributes set to true" —
+     `value-screener-vpc` had DNS hostnames off by default (normal for a custom, non-default VPC built via
+     "VPC only"). Fixed via VPC → Edit VPC settings → enabled both attributes.
+   - A dedicated security group `value-screener-vpc-endpoints-sg` (inbound 443 from
+     `value-screener-ecs-task-sg` only) gates the four Interface Endpoints.
+   - After fixing DNS and creating all five endpoints, forced a new ECS deployment
+     (`aws ecs update-service --force-new-deployment` via console) — **task reached Running/Healthy**,
+     confirmed 2026-10-10. Secrets Manager wiring, RDS connectivity, and the whole backend compute layer
+     are now verified working end-to-end.
 10. Create API Gateway (HTTP API) + VPC Link pointing at the ECS service, as the public ingress — no new
     public subnet needed, the VPC Link's ENIs go in the existing private subnets.
 11. Extend the GitHub Actions workflow to trigger a new deployment after pushing the image (ECS has no

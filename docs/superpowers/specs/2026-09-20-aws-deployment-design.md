@@ -98,10 +98,23 @@ decisions instead of a plan sketch.
   needs general internet access (see Section 6 for why this holds even after attaching the connector).
   NAT Gateway is the single most common AWS learner cost trap (~32–35 $/month just for existing); avoiding
   it structurally, not just by discipline, is a deliberate design goal.
-- Two security groups, least-privilege and referencing each other by ID rather than by IP/CIDR:
-  - `value-screener-apprunner-connector-sg` — empty inbound, default (allow-all) outbound.
-  - `value-screener-rds-sg` — inbound TCP/5432 from `value-screener-apprunner-connector-sg` only; default
-    outbound.
+- Security groups, least-privilege and referencing each other by ID rather than by IP/CIDR (superseded
+  2026-10-10 once ECS replaced App Runner as the compute layer — see Section 6):
+  - `value-screener-ecs-task-sg` — empty inbound, default (allow-all) outbound. Replaces the never-used
+    `value-screener-apprunner-connector-sg` from the original App Runner plan.
+  - `value-screener-rds-sg` — inbound TCP/5432 from `value-screener-ecs-task-sg` only; default outbound.
+  - `value-screener-vpc-endpoints-sg` — inbound HTTPS/443 from `value-screener-ecs-task-sg` only; gates
+    the Interface Endpoints below.
+- **VPC Endpoints, added 2026-10-10** (the concrete resolution of the egress question raised in Section
+  6): four Interface Endpoints (Secrets Manager, `ecr.api`, `ecr.dkr`, CloudWatch Logs) plus one free
+  Gateway Endpoint (S3, for ECR layer downloads). **Deliberately built in only one AZ
+  (`eu-central-1a`/`value-screener-private-1a`) per Interface Endpoint, not both** — all four in both AZs
+  would run ≈58 $/month (≈7.30 $/endpoint/AZ × 4 × 2), against ≈29 $/month for one AZ each; acceptable
+  since the ECS service only runs a single task (desired count 1), so cross-AZ endpoint resilience isn't
+  load-bearing here. The Gateway Endpoint is free regardless of AZ scope, so it was attached to both
+  subnets' shared Main Route Table without the same tradeoff. Required a VPC-level fix first: creating
+  Interface Endpoints with private DNS failed until both `enableDnsSupport` and `enableDnsHostnames` were
+  turned on for the VPC (off by default for a custom "VPC only" build, unlike the Default VPC).
 
 ## 5. Database (RDS)
 
@@ -316,6 +329,18 @@ the real agent or its cost profile:
   making that condition a list containing both forms. Second run succeeded end-to-end (tests pass, OIDC
   auth, Docker build, ECR push) on tag `v0.0.1-test` — the full build/publish half of the CI/CD pipeline
   is now verified working, before any ECS resources exist to deploy to.
+- 2026-10-04 to 2026-10-10: Built the Task Definition's two IAM roles, the Task Definition itself
+  (secrets resolved from Secrets Manager via JSON-key references, not plain env vars — `DB_USERNAME`/
+  `DB_PASSWORD` from the RDS secret, `ADMIN_PASSWORD_HASH` from a newly created
+  `value-screener/admin-password-hash` secret, generated locally with the existing
+  `AdminPasswordHashGenerator` tool and never shown in this session, only the resulting hash), the ECS
+  Service, and — after a real failed first deploy (`ResourceInitializationError`, Secrets Manager
+  unreachable) — the VPC Interface/Gateway Endpoints that fixed it, scoped to one AZ per Interface
+  Endpoint for cost reasons (full reasoning and numbers in Section 4). Also hit and fixed a VPC DNS
+  settings gap (`enableDnsHostnames` off by default on a custom VPC) blocking private DNS on the
+  endpoints. Forced a new ECS deployment after the fix; task reached Running/Healthy — the backend
+  compute layer is now verified working end-to-end, confirmed 2026-10-10. Remaining for Topic 4: API
+  Gateway (HTTP API) + VPC Link for public access.
 
 ---
 

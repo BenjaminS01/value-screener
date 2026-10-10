@@ -37,14 +37,15 @@ Trigger für den Company-Research-Agent aus. Thema 5 bekommt zusätzlich eine ö
 Showcase-Demo (ratenbegrenzter "Tiefenrecherche"-Button + täglicher EventBridge-Check-in, sichtbar auf der
 Landingpage, komplett getrennt vom echten, teuren Agenten) — Details in der Plan-Datei.
 
-**In Arbeit (Thema 4, Backend-Compute):** Dockerfile, ECR-Repository, GitHub-OIDC-IAM-Rolle (kein Access
-Key) und der GitHub-Actions-Workflow (Trigger: Git-Tags `v*`, mit Test-Gate vor dem Push) stehen und sind
-**End-to-End verifiziert** (2026-10-03, Tag `v0.0.1-test`) — Build/Push-Hälfte der Pipeline läuft. Dabei
-ein GitHub-OIDC-Format-Fehler gefunden und gefixt (seit 15.07.2026 neues `sub`-Claim-Format mit
-Org-/Repo-IDs; Trust Policy akzeptiert jetzt beide Formate). Offen: ECS Cluster/Task Definition/Service
-sowie die dafür nötigen VPC-Endpoints (Secrets Manager, ggf. Lambda) — **kein NAT Gateway nötig**, da das
-Backend laut Code-Prüfung nie direkt externe APIs wie Anthropic aufruft (das liegt komplett im separaten
-Company-Research-Agent-Lambda).
+**Thema 4 (Backend-Compute): Backend läuft jetzt tatsächlich in AWS (2026-10-10).** Dockerfile,
+ECR-Repository, GitHub-OIDC-IAM-Rolle, GitHub-Actions-Workflow (Git-Tags `v*`, Test-Gate), ECS Cluster,
+Task Definition (Secrets aus Secrets Manager, nicht als Klartext-Umgebungsvariablen), ECS Service und die
+nötigen VPC-Endpoints stehen — der Task ist **Running/Healthy**, verbunden mit RDS. Dabei zwei echte
+Probleme gefunden und gefixt: (1) GitHub-OIDC-`sub`-Claim-Formatwechsel (seit 15.07.2026, Trust Policy
+akzeptiert jetzt beide Formate), (2) private Subnetze hatten keinen Weg zu AWS-APIs (Secrets Manager/ECR) —
+gelöst über VPC-Endpoints, bewusst nur je **eine** AZ pro Interface-Endpoint (Kostengrund: ~58 $ vs.
+~29 $/Monat), **kein NAT Gateway nötig**. Offen (Rest von Thema 4): API Gateway + VPC Link für den
+öffentlichen Zugang.
 
 **Noch offen:** Lambda/EventBridge (Company Research Agent), Frontend (S3/CloudFront/ACM/Route 53),
 Secrets Manager/KMS (Grundlage schon über RDS vorhanden), Cognito (Ablösung des geteilten
