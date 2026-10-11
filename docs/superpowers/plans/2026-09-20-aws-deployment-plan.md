@@ -18,7 +18,7 @@ standing git convention.
 | 1 | IAM | ✅ done (covered live during account setup) |
 | 2 | VPC & Security Groups | ✅ done — `value-screener-vpc`, 2 private subnets, 2 security groups |
 | 3 | RDS | ✅ done — `value-screener-postgres` created |
-| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | 🔄 in progress — Dockerfile, ECR, GitHub OIDC role, CI/CD workflow, ECS Cluster/Task Definition/Service, and VPC Endpoints all done; **task confirmed Running/Healthy end-to-end** (2026-10-10); next: API Gateway + VPC Link for public access |
+| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | 🔄 nearly done — **publicly reachable and verified end-to-end** (2026-10-11): Dockerfile, ECR, GitHub OIDC, CI/CD, ECS Cluster/Task Definition/Service, VPC Endpoints, Cloud Map Service Discovery, VPC Link v2, HTTP API all built and working; only remaining piece: wire the GitHub Actions workflow to trigger `ecs update-service --force-new-deployment` on each release |
 | 5 | Lambda (Company Research Agent, **manual trigger only**, no EventBridge for the real agent) **+ public showcase demo** (DynamoDB, rate-limited Lambda button, EventBridge heartbeat shown in UI — added 2026-09-22) **+ SQS DLQ on every Lambda** (pulled forward from Topic 10, added 2026-09-22) | ⏳ not started |
 | 6 | S3, CloudFront, ACM, Route 53 (frontend) | ⏳ not started |
 | 7 | Secrets Manager & KMS | ⏳ not started (RDS's Secrets-Manager-managed credential already exists as a head start) |
@@ -99,13 +99,37 @@ Two things changed the plan, both explained in full in the design spec's Decisio
      (`aws ecs update-service --force-new-deployment` via console) — **task reached Running/Healthy**,
      confirmed 2026-10-10. Secrets Manager wiring, RDS connectivity, and the whole backend compute layer
      are now verified working end-to-end.
-10. Create API Gateway (HTTP API) + VPC Link pointing at the ECS service, as the public ingress — no new
-    public subnet needed, the VPC Link's ENIs go in the existing private subnets.
-11. Extend the GitHub Actions workflow to trigger a new deployment after pushing the image (ECS has no
+10. ~~Create API Gateway (HTTP API) + VPC Link~~ — **done and verified end-to-end, 2026-10-11.** Turned
+    out to need one more layer than originally planned: HTTP API private integrations can target an ALB,
+    NLB, or an **AWS Cloud Map service** — but not an ECS Service directly. Built in order:
+    - **ECS Service Discovery (Cloud Map), with real failures along the way:** first attempt tried to
+      create a namespace inline while updating the service — rejected
+      ("Namespace cannot be created while updating a service"), but had already half-created a namespace
+      `value-screener.local` of type **HTTP**, which doesn't support DNS/SRV records at all. Deleted it,
+      created a proper **Private DNS namespace** directly in Cloud Map (type matters — chosen via an
+      "Instance discovery: API calls and DNS queries in VPCs" selector in the namespace-creation UI, not
+      a literal "type" dropdown), then re-ran the ECS service update against that one: service discovery
+      name `backend`, DNS record type **SRV** (required for API Gateway to find it — plain A/AAAA records
+      don't work for this), network address = container name + port 8080, task health propagation on.
+    - **VPC Link v2** (not classic v1, which only supports NLB targets) — new security group
+      `value-screener-vpc-link-sg`, placed in both private subnets; `value-screener-ecs-task-sg` extended
+      to allow inbound 8080 from it.
+    - **HTTP API** `value-screener-api`, one route `ANY /{proxy+}` with a private integration targeting
+      the VPC Link + the Cloud Map service.
+    - **Deploy gotchas, both self-inflicted, not AWS bugs:** the route was created without ever attaching
+      an integration to it (an easy thing to miss in the console — the route and the integration are
+      separate creation steps that must be explicitly linked), which made the API's one deployment
+      attempt fail with "no valid routes exist" and left the stage with no deployment attached — fixed by
+      attaching the integration to the route, after which the `$default` stage's auto-deploy picked it up
+      with no manual redeploy needed (a stage with auto-deploy on can't be manually selected for deploy
+      either — that's expected, not a bug).
+    - **First real public test passed:** the bare root URL correctly returned the browser's native Basic
+      Auth prompt (proves the request reaches the app and the security config is active); `GET
+      /api/portfolio/public` returned `[]` (correct — no positions exist yet — and proves a real,
+      successful round trip all the way to RDS and back, not just "the server responded").
+11. Extend the GitHub Actions workflow to trigger a new ECS deployment after pushing the image (ECS has no
     App-Runner-style automatic-redeploy-on-new-image toggle — this must be explicit, e.g.
-    `aws ecs update-service --force-new-deployment`).
-12. First real end-to-end test: tag a release, watch the pipeline build/push/deploy, confirm the backend
-    reaches RDS through the task's security group and is reachable via the API Gateway URL.
+    `aws ecs update-service --force-new-deployment`) — the one remaining piece of Topic 4.
 
 ## Topic 5 — Lambda & EventBridge, plus the showcase demo (added 2026-09-22)
 

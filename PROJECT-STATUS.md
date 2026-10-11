@@ -37,15 +37,16 @@ Trigger für den Company-Research-Agent aus. Thema 5 bekommt zusätzlich eine ö
 Showcase-Demo (ratenbegrenzter "Tiefenrecherche"-Button + täglicher EventBridge-Check-in, sichtbar auf der
 Landingpage, komplett getrennt vom echten, teuren Agenten) — Details in der Plan-Datei.
 
-**Thema 4 (Backend-Compute): Backend läuft jetzt tatsächlich in AWS (2026-10-10).** Dockerfile,
-ECR-Repository, GitHub-OIDC-IAM-Rolle, GitHub-Actions-Workflow (Git-Tags `v*`, Test-Gate), ECS Cluster,
-Task Definition (Secrets aus Secrets Manager, nicht als Klartext-Umgebungsvariablen), ECS Service und die
-nötigen VPC-Endpoints stehen — der Task ist **Running/Healthy**, verbunden mit RDS. Dabei zwei echte
-Probleme gefunden und gefixt: (1) GitHub-OIDC-`sub`-Claim-Formatwechsel (seit 15.07.2026, Trust Policy
-akzeptiert jetzt beide Formate), (2) private Subnetze hatten keinen Weg zu AWS-APIs (Secrets Manager/ECR) —
-gelöst über VPC-Endpoints, bewusst nur je **eine** AZ pro Interface-Endpoint (Kostengrund: ~58 $ vs.
-~29 $/Monat), **kein NAT Gateway nötig**. Offen (Rest von Thema 4): API Gateway + VPC Link für den
-öffentlichen Zugang.
+**Thema 4 (Backend-Compute): Backend ist öffentlich erreichbar und Ende-zu-Ende verifiziert
+(2026-10-11).** Dockerfile, ECR, GitHub-OIDC, CI/CD-Workflow, ECS Cluster/Task Definition/Service,
+VPC-Endpoints (je 1 AZ pro Interface-Endpoint, Kostengrund, kein NAT Gateway nötig), ECS Service Discovery
+(Cloud Map, Private-DNS-Namespace, SRV-Record), VPC Link v2 und eine HTTP API stehen — alles live getestet:
+Root-URL liefert den erwarteten Basic-Auth-Dialog, `GET /api/portfolio/public` liefert `[]` (korrekt, noch
+keine Positionen, aber ein echter Roundtrip über RDS). Dabei mehrere echte Probleme gefunden und gefixt
+(GitHub-OIDC-Sub-Claim-Formatwechsel seit 15.07.2026, fehlende AWS-API-Erreichbarkeit aus den privaten
+Subnetzen, ein versehentlicher HTTP- statt Private-DNS-Cloud-Map-Namespace, eine Route ohne verknüpfte
+Integration) — Details in Plan-/Design-Doku. Offen (Rest von Thema 4): GitHub-Actions-Workflow um
+`ecs update-service --force-new-deployment` ergänzen, damit neue Releases automatisch ausgerollt werden.
 
 **Noch offen:** Lambda/EventBridge (Company Research Agent), Frontend (S3/CloudFront/ACM/Route 53),
 Secrets Manager/KMS (Grundlage schon über RDS vorhanden), Cognito (Ablösung des geteilten

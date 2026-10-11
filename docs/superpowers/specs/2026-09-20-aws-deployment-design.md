@@ -43,13 +43,20 @@ decisions instead of a plan sketch.
                  |                                              |
           (browser: frontend)                         (browser/API: backend)
                  v                                              v
-          CloudFront + S3                     API Gateway (HTTP API) + VPC Link
-           (frontend)                                    (ENIs in both private subnets)
-                                                                 v
+          CloudFront + S3                     API Gateway (HTTP API)
+           (frontend)                          route ANY /{proxy+}
+                                                          v
+                                              VPC Link v2 (ENIs in both
+                                               private subnets)
+                                                          v
+                                         Cloud Map (value-screener.local,
+                                         Private DNS namespace, SRV record)
+                                                          v
    =================== VPC: value-screener-vpc (10.0.0.0/16) ===================
    |  eu-central-1a: private-1a (10.0.1.0/24)   eu-central-1b: private-1b (10.0.2.0/24)  |
    |    ECS Fargate task (backend)  <---5432--->  rds-sg  -->  RDS PostgreSQL (Single-AZ) |
-   |  no Internet Gateway, no NAT Gateway                                                 |
+   |  no Internet Gateway, no NAT Gateway — 4 Interface Endpoints (1 AZ each, cost-scoped) |
+   |  + 1 free S3 Gateway Endpoint for AWS API/ECR access                                 |
    ===============================================================================
 
    Company Research Agent: separate Lambda, MCP over Streamable HTTP, stays OUTSIDE the
@@ -341,6 +348,21 @@ the real agent or its cost profile:
   endpoints. Forced a new ECS deployment after the fix; task reached Running/Healthy — the backend
   compute layer is now verified working end-to-end, confirmed 2026-10-10. Remaining for Topic 4: API
   Gateway (HTTP API) + VPC Link for public access.
+- 2026-10-11: Built public access. Found mid-build that HTTP API private integrations need an
+  intermediary — ALB, NLB, or AWS Cloud Map — never an ECS Service directly; chose Cloud Map (Private DNS
+  namespace, SRV record) to avoid any load balancer cost, consistent with the Section 6 ALB-avoidance
+  reasoning. Hit a sequence of real, self-diagnosed failures rather than a clean build: an inline
+  namespace-creation attempt during an ECS service update was rejected outright, but had already
+  half-created an **HTTP-type** namespace (incompatible with DNS/SRV — had to be deleted and replaced
+  with a proper Private DNS namespace created directly in Cloud Map); the API's one deployment then
+  failed with "no valid routes exist" because the `/{proxy+}` route had been created without ever having
+  an integration attached to it — an easy-to-miss two-step process in the console. Fixed by attaching the
+  integration; the `$default` stage's auto-deploy picked it up without a manual redeploy (its greyed-out
+  manual-deploy option was expected behavior, not a bug). **First public end-to-end test passed**: root
+  URL triggers the browser's native Basic Auth prompt (security active, request reaches the app); `GET
+  /api/portfolio/public` returns `[]` (empty is correct — proves a real round trip through RDS, not just
+  a server responding). Topic 4 is now functionally complete; only the GitHub Actions
+  force-new-deployment step remains as a loose end.
 
 ---
 
