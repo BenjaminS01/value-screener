@@ -37,16 +37,17 @@ Trigger für den Company-Research-Agent aus. Thema 5 bekommt zusätzlich eine ö
 Showcase-Demo (ratenbegrenzter "Tiefenrecherche"-Button + täglicher EventBridge-Check-in, sichtbar auf der
 Landingpage, komplett getrennt vom echten, teuren Agenten) — Details in der Plan-Datei.
 
-**Thema 4 (Backend-Compute): Backend ist öffentlich erreichbar und Ende-zu-Ende verifiziert
-(2026-10-11).** Dockerfile, ECR, GitHub-OIDC, CI/CD-Workflow, ECS Cluster/Task Definition/Service,
+**Thema 4 (Backend-Compute): abgeschlossen (2026-10-17).** Backend ist öffentlich erreichbar, die
+komplette Pipeline von Git-Tag bis laufendem ECS-Deployment ist automatisiert und Ende-zu-Ende verifiziert
+(Tag `v0.1.0`: Tests → Build → ECR-Push → neue Task-Definition-Revision → Deploy → Stabilitätsprüfung,
+alles erfolgreich). Gebaut: Dockerfile, ECR, GitHub-OIDC, ECS Cluster/Task Definition/Service,
 VPC-Endpoints (je 1 AZ pro Interface-Endpoint, Kostengrund, kein NAT Gateway nötig), ECS Service Discovery
-(Cloud Map, Private-DNS-Namespace, SRV-Record), VPC Link v2 und eine HTTP API stehen — alles live getestet:
-Root-URL liefert den erwarteten Basic-Auth-Dialog, `GET /api/portfolio/public` liefert `[]` (korrekt, noch
-keine Positionen, aber ein echter Roundtrip über RDS). Dabei mehrere echte Probleme gefunden und gefixt
+(Cloud Map, Private-DNS-Namespace, SRV-Record), VPC Link v2, eine HTTP API und zuletzt die automatische
+Deploy-Erweiterung des GitHub-Actions-Workflows. Dabei mehrere echte Probleme gefunden und gefixt
 (GitHub-OIDC-Sub-Claim-Formatwechsel seit 15.07.2026, fehlende AWS-API-Erreichbarkeit aus den privaten
 Subnetzen, ein versehentlicher HTTP- statt Private-DNS-Cloud-Map-Namespace, eine Route ohne verknüpfte
-Integration) — Details in Plan-/Design-Doku. Offen (Rest von Thema 4): GitHub-Actions-Workflow um
-`ecs update-service --force-new-deployment` ergänzen, damit neue Releases automatisch ausgerollt werden.
+Integration) — Details in Plan-/Design-Doku. **Nächster Schritt: Thema 5** (Company Research Agent +
+Showcase-Demo + SQS-DLQ).
 
 **Noch offen:** Lambda/EventBridge (Company Research Agent), Frontend (S3/CloudFront/ACM/Route 53),
 Secrets Manager/KMS (Grundlage schon über RDS vorhanden), Cognito (Ablösung des geteilten

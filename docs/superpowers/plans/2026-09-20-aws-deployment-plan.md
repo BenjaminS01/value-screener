@@ -18,7 +18,7 @@ standing git convention.
 | 1 | IAM | ✅ done (covered live during account setup) |
 | 2 | VPC & Security Groups | ✅ done — `value-screener-vpc`, 2 private subnets, 2 security groups |
 | 3 | RDS | ✅ done — `value-screener-postgres` created |
-| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | 🔄 nearly done — **publicly reachable and verified end-to-end** (2026-10-11): Dockerfile, ECR, GitHub OIDC, CI/CD, ECS Cluster/Task Definition/Service, VPC Endpoints, Cloud Map Service Discovery, VPC Link v2, HTTP API all built and working; only remaining piece: wire the GitHub Actions workflow to trigger `ecs update-service --force-new-deployment` on each release |
+| 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | ✅ **done** (2026-10-17) — publicly reachable, fully automated tag-to-deploy pipeline verified end-to-end |
 | 5 | Lambda (Company Research Agent, **manual trigger only**, no EventBridge for the real agent) **+ public showcase demo** (DynamoDB, rate-limited Lambda button, EventBridge heartbeat shown in UI — added 2026-09-22) **+ SQS DLQ on every Lambda** (pulled forward from Topic 10, added 2026-09-22) | ⏳ not started |
 | 6 | S3, CloudFront, ACM, Route 53 (frontend) | ⏳ not started |
 | 7 | Secrets Manager & KMS | ⏳ not started (RDS's Secrets-Manager-managed credential already exists as a head start) |
@@ -127,9 +127,21 @@ Two things changed the plan, both explained in full in the design spec's Decisio
       Auth prompt (proves the request reaches the app and the security config is active); `GET
       /api/portfolio/public` returned `[]` (correct — no positions exist yet — and proves a real,
       successful round trip all the way to RDS and back, not just "the server responded").
-11. Extend the GitHub Actions workflow to trigger a new ECS deployment after pushing the image (ECS has no
-    App-Runner-style automatic-redeploy-on-new-image toggle — this must be explicit, e.g.
-    `aws ecs update-service --force-new-deployment`) — the one remaining piece of Topic 4.
+11. ~~Extend the GitHub Actions workflow to trigger a new ECS deployment~~ — **done, 2026-10-17. Topic 4
+    is now fully complete.** `--force-new-deployment` alone turned out to be insufficient (it would just
+    restart the existing task definition revision, still pointing at the old image tag) — the workflow
+    instead downloads the current task definition, uses `aws-actions/amazon-ecs-render-task-definition`
+    to produce a new revision with only the `backend` container's image updated, and
+    `aws-actions/amazon-ecs-deploy-task-definition` (with `wait-for-service-stability: true`, so a broken
+    deploy fails the CI run visibly instead of silently leaving a bad revision live) to register and roll
+    it out. Needed extending `GitHubActionsECRPushRole`'s permissions:
+    `ecs:DescribeTaskDefinition`/`RegisterTaskDefinition`/`UpdateService`/`DescribeServices` (`Resource:
+    "*"` — these ECS actions can't be scoped to one task-definition family, same situation as
+    `ecr:GetAuthorizationToken` earlier) plus `iam:PassRole` scoped to exactly the two ECS roles (required
+    because registering a task definition "hands" those roles to ECS — without this, anyone able to
+    register task definitions could otherwise attach an arbitrary, more powerful role). First full
+    pipeline run (tag `v0.1.0`) succeeded end-to-end: tests → build → push → new revision → deploy →
+    stability confirmed.
 
 ## Topic 5 — Lambda & EventBridge, plus the showcase demo (added 2026-09-22)
 
