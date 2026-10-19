@@ -145,14 +145,35 @@ Two things changed the plan, both explained in full in the design spec's Decisio
 
 ## Topic 5 — Lambda & EventBridge, plus the showcase demo (added 2026-09-22)
 
-Full design reasoning in the spec, Section 7. Two independent pieces:
+**ORDER DECIDED 2026-10-19: build part B (showcase stub Lambdas) first, part A (real agent) later.**
+Part B uses small native Lambda handlers (no Spring Boot, no container, no Web Adapter), so it is not
+blocked by the open part-A packaging decision below, teaches the Lambda fundamentals (handler, execution
+role, triggers, CloudWatch Logs, API Gateway Lambda integration, EventBridge, DynamoDB, DLQ) on a simple
+case, and produces visible showcase value at near-zero cost. Part A is deferred to a separate, later
+step; the Lambda Web Adapter question only needs answering when part A actually starts. First concrete
+step: Lambda concept walkthrough, then create the DynamoDB table (B.1) that both stubs build on.
 
-**A) The real Company Research Agent Lambda** — deploy `company-research-agent/`, wire it to the existing
-manual/operator-controlled workflow only. No EventBridge Scheduler. Attach an **SQS Dead Letter Queue**
-(pulled forward from Topic 10 — a genuine reliability need, not an artificial demo) so failed invocations
-are captured and inspectable instead of silently lost.
+**Part A STATUS 2026-10-19: not started, deferred (see order above); one decision still open.** Full design reasoning in the spec,
+Section 7 (including a status note added 2026-10-19 — read that first when resuming). Short version:
+`company-research-agent/` turned out to be a normal Spring Boot WebMVC app (embedded Tomcat), not a
+native Lambda handler, despite the design doc saying "deploys as its own Lambda". Plan is to use the
+**AWS Lambda Web Adapter** via a container image (same shape as `backend/Dockerfile` + ECR, just with the
+adapter layer added, no app code changes) rather than rewriting the app as a native handler — Lambda is
+still the right compute choice here (pay-per-invocation fits "rare, manual research trigger" far better
+than an always-on ECS task would). **Not yet confirmed by the user — confirm this approach before writing any
+code or creating AWS resources for Topic 5 part A (only relevant once part B is done).**
 
-**B) Public showcase demo** (separate, self-contained, cannot affect the real agent's cost):
+**A) The real Company Research Agent Lambda (deferred until after part B; once the above is confirmed)** — write
+`company-research-agent/Dockerfile` (Lambda Web Adapter + existing app, unmodified), create its own ECR
+repo, deploy as a container-image Lambda, wire it to the existing manual/operator-controlled workflow
+only (no EventBridge Scheduler). Still undecided: whether the backend invokes it via a Function URL
+(`AuthType: AWS_IAM`) or via a VPC Interface Endpoint + `lambda:Invoke` — depends on whether
+MCP-over-Streamable-HTTP needs a persistent HTTP endpoint or fits a single-request Lambda invocation;
+resolve this when actually wiring the invocation path. Attach an **SQS Dead Letter Queue** (pulled
+forward from Topic 10 — a genuine reliability need, not an artificial demo) so failed invocations are
+captured and inspectable instead of silently lost.
+
+**B) Public showcase demo — built FIRST** (separate, self-contained, cannot affect the real agent's cost):
 1. Create one DynamoDB table (button rate-limit counter + EventBridge heartbeat item).
 2. Write a small stub Lambda for the `DeepResearchPlaceholder` button: checks/increments the daily
    counter in DynamoDB, returns the case-study-style English response text (with a live timestamp) or a
@@ -183,8 +204,10 @@ in DynamoDB, niemals der echte, teure Agent) mit einem auf Bewerbungen zugeschni
 ein tägliches EventBridge-Rule, dessen Ergebnis sichtbar auf der Landingpage angezeigt wird — komplett
 getrennt vom echten Agenten, kann dessen Kosten nicht beeinflussen.
 
-Aktuell in Arbeit (Thema 4): Dockerfile steht, als Nächstes ECR-Repository, GitHub-OIDC-Rolle,
-GitHub-Actions-Workflow, ECS Cluster/Task Definition/Service, VPC-Endpoints, API Gateway + VPC Link als
-öffentlicher Zugang. Noch offen: Lambda (nur manueller Trigger), Frontend (S3/CloudFront/ACM/Route 53),
+Thema 4 (ECS-Backend inkl. API Gateway + VPC Link und automatischer Deploy-Pipeline) ist abgeschlossen.
+**Thema 5, Reihenfolge festgelegt am 2026-10-19:** zuerst Teil B (Showcase-Demo mit kleinen, nativen
+Stub-Lambdas — "Hallo von Lambda/EventBridge, hier kommt künftig der echte Aufruf hin", DynamoDB,
+Ratenbegrenzung, DLQ), erst danach Teil A (echter Company Research Agent, Lambda-Web-Adapter-Frage noch
+offen, erst dann zu klären). Noch offen: Lambda Teil A (nur manueller Trigger), Frontend (S3/CloudFront/ACM/Route 53),
 Secrets Manager/KMS, Cognito, CloudTrail, SQS/SNS, X-Ray, CodePipeline (Sinnhaftigkeit neu bewerten), CDK,
 sowie ein kurzer, bewusst befristeter WAF/GuardDuty/Config-Überblick.

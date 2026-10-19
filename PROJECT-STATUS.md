@@ -1,8 +1,24 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-09-22
+Letztes Update: 2026-10-19
 Aktuelle Phase: **Phase 4 (AWS-Deployment) läuft**, parallel zur AWS-Developer-Zertifizierungsvorbereitung
 des Nutzers. Phase 1 weiterhin abgeschlossen, siehe unten.
+
+**Sofortiger Einstiegspunkt für eine neue Session:** Thema 4 ist komplett fertig (Backend läuft live in
+AWS, volle CI/CD-Pipeline verifiziert). **Thema 5 ist geplant, aber noch nicht gebaut. Reihenfolge am
+2026-10-19 mit dem Nutzer festgelegt: zuerst Teil B, die Showcase-Demo** — kleine, native Stub-Lambdas
+ohne LLM-Aufruf (Button-Stub für `DeepResearchPlaceholder` mit Live-Zeitstempel, täglicher
+EventBridge-Heartbeat à la "Hello from EventBridge, hier kommt künftig der echte Aufruf hin", DynamoDB,
+Throttling/Tageslimit, SQS-DLQ). Nächster konkreter Schritt: Lambda-Grundkonzept erklären, dann die
+DynamoDB-Tabelle anlegen. **Teil A (echter Company Research Agent) kommt erst danach** — dort ist noch
+offen und erst dann zu bestätigen: `company-research-agent/` ist eine normale Spring-Boot-WebMVC-App,
+Vorschlag ist Deployment über den **AWS Lambda Web Adapter** (Container-Image, kein Code-Umbau). Details
+stehen in
+[`docs/superpowers/plans/2026-09-20-aws-deployment-plan.md`](docs/superpowers/plans/2026-09-20-aws-deployment-plan.md)
+(Abschnitt "Topic 5") und
+[`docs/superpowers/specs/2026-09-20-aws-deployment-design.md`](docs/superpowers/specs/2026-09-20-aws-deployment-design.md)
+(Abschnitt 7, "BUILD ORDER DECIDED 2026-10-19"). Die Web-Adapter-Bestätigung blockiert Teil B **nicht** —
+erst vor Beginn von Teil A dem Nutzer nochmal vorlegen.
 
 Dieses Dokument fasst den Stand zusammen, damit eine neue Session ohne erneute Erklärung anschließen kann.
 

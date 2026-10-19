@@ -208,6 +208,45 @@ unauthenticated public click. Real Anthropic web-search calls cost up to ~1 $ ea
 public button would let any visitor generate unbounded real cost, which is precisely the risk the
 manual-trigger workflow was already designed to avoid.
 
+**BUILD ORDER DECIDED 2026-10-19 (user confirmed):** the self-contained showcase demo further below
+(stub Lambdas for the `DeepResearchPlaceholder` button and the EventBridge heartbeat, DynamoDB, throttling/
+daily cap, DLQ) is built **first**, as small native Lambda handlers — no Spring Boot, no container image,
+no Lambda Web Adapter. The real Company Research Agent Lambda described in this status note is deferred
+until after that; the packaging decision below therefore does not block Topic 5 from starting and only
+needs to be confirmed once the real agent's deployment actually begins.
+
+**STATUS AS OF 2026-10-19 — real Company Research Agent Lambda (deferred, see build order above), open decision:**
+Checked the actual `company-research-agent/pom.xml` before building anything (same discipline as the
+earlier VPC-egress backend-code check) and found a real gap between the design doc's wording and the
+code: the module uses `spring-ai-starter-mcp-server-webmvc` — a **normal Spring Boot WebMVC application
+with an embedded Tomcat server**, not a native AWS Lambda handler (no `RequestHandler`/`StreamHandler`
+class anywhere in it). "Deploys as its own Lambda" in the paragraph above describes the *design intent*,
+not the current shape of the code.
+
+**Planned resolution (discussed, not yet built):** use the **AWS Lambda Web Adapter** (AWS's own
+open-source project) via a container image — it lets an unmodified standard HTTP server app run inside
+Lambda by proxying Lambda invocations to the app's normal HTTP port internally. Concretely: a `Dockerfile`
+for `company-research-agent/` similar in spirit to `backend/Dockerfile`, but with the adapter layer added,
+pushed to its own ECR repository, deployed as a container-image-based Lambda function — no application
+code changes needed. Lambda (pay-per-invocation) was deliberately chosen over an ECS Fargate service (the
+backend's pattern) specifically *because* this agent is invoked rarely/on-demand, not continuously — an
+always-on Fargate task would cost money the whole time regardless of actual usage, the opposite of this
+component's actual traffic shape. This reasoning was already in the original agent design (see
+[`2026-07-24-company-research-agent-design.md`](2026-07-24-company-research-agent-design.md) Decision
+log: "Serverless (Lambda) chosen over an always-on server after explicitly working through the cost
+question") — it just hadn't been checked against the current code shape until now.
+
+**Concrete next steps for the real agent (after the showcase demo is done), in order:** (1) confirm the Lambda Web Adapter approach with the user
+before writing anything (this was the point reached when the session ended — not yet confirmed); (2)
+write `company-research-agent/Dockerfile` (Lambda Web Adapter base layer + the existing Spring Boot
+WebMVC app, unmodified); (3) create an ECR repository for it; (4) create the Lambda function from that
+image, plus its execution role (CloudWatch Logs, and the SQS DLQ below) and a Secrets Manager secret for
+the Anthropic API key; (5) decide the exact invocation mechanism from the backend (Function URL +
+AWS_IAM auth vs. a VPC Interface Endpoint + `lambda:Invoke` — flagged as undecided back in Section 2/6,
+depends on whether MCP-over-Streamable-HTTP needs a real persistent HTTP endpoint or can be served via a
+single-request Lambda Function URL invocation — not yet resolved); (6) attach an SQS Dead Letter Queue
+(see below, pulled forward from Topic 10 as a genuine reliability need, not a demo).
+
 **Separately, added 2026-09-22 for portfolio/showcase value:** the existing `DeepResearchPlaceholder`
 button (currently pure static text, no backend call at all) and EventBridge's presence in this
 architecture both get made *genuinely live* — with a small, self-contained demo layer that cannot affect
@@ -363,6 +402,11 @@ the real agent or its cost profile:
   /api/portfolio/public` returns `[]` (empty is correct — proves a real round trip through RDS, not just
   a server responding). Topic 4 is now functionally complete; only the GitHub Actions
   force-new-deployment step remains as a loose end.
+- 2026-10-19: Topic 5 build order decided with the user: showcase demo (native stub Lambdas, DynamoDB,
+  API Gateway Lambda integration, EventBridge heartbeat, DLQ) first, real Company Research Agent Lambda
+  later. Rationale: the stubs teach the Lambda fundamentals on a simple case, aren't blocked by the open
+  Lambda-Web-Adapter packaging question (which only concerns the real agent), and deliver visible
+  showcase value at near-zero cost.
 
 ---
 
@@ -399,6 +443,11 @@ Code-Prüfung (kein direkter Anthropic-Aufruf im Backend) reichen VPC-Endpoints,
 am 2026-08-10 getroffene Beschluss, den automatischen täglichen Scheduler auf später zu verschieben, war
 in dieser Deployment-Planung bisher nicht berücksichtigt — Thema 5 (Lambda) braucht **keinen**
 EventBridge-Scheduler für v1, nur den Company-Research-Agent mit manuellem Trigger.
+
+**Reihenfolge Thema 5 (2026-10-19 festgelegt):** Zuerst die Showcase-Demo mit kleinen, nativen
+Stub-Lambdas (Button-Stub mit Live-Zeitstempel, täglicher EventBridge-Heartbeat — "Hallo, hier kommt
+künftig der echte Aufruf hin" —, DynamoDB, Ratenbegrenzung, DLQ). Der echte Company Research Agent
+(Spring-Boot-App, voraussichtlich per Lambda Web Adapter — noch nicht bestätigt) folgt erst danach.
 
 **CI/CD**: GitHub Actions mit OIDC-Föderation (kein Access Key), ausgelöst durch Git-Tags (`v*`) statt bei
 jedem Push — bewusste Release-Disziplin statt "jeder Commit ist live". Anders als App Runner deployt ECS
