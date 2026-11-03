@@ -1,10 +1,49 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-10-19
+Letztes Update: 2026-11-03
+
+## Neuplanung Scope v2 (2026-11-03): aktueller Einstiegspunkt
+
+**Maßgeblich ist jetzt
+[`docs/superpowers/specs/2026-11-03-app-scope-v2-design.md`](docs/superpowers/specs/2026-11-03-app-scope-v2-design.md).**
+Die Spec geht allen älteren Dokumenten vor, Abschnitt 11 dort listet, was jeweils überholt ist.
+Kurzfassung:
+
+- **Ziel:** Vorzeigeprojekt und daneben eigenes Werkzeug zur Aktienanalyse.
+- **Ganze App nur nach Login**, Rollen ADMIN (Nutzer selbst) und USER. USER sehen Positionen ohne
+  Stückzahl oder Preis, lesen Recherchedaten und Quartalsberichte und nutzen Chat und
+  Tiefenanalyse-Dummy mit Tageslimit. Nur der ADMIN bearbeitet das Portfolio und lädt Berichte hoch,
+  ändert und löscht sie.
+- **Oberfläche:** Portfolio und Research. Research ist auf eine Aktie ausgerichtet: Auswahl,
+  Websuche-Daten, Quartalsberichte, KI-Chat mit Zusammenfassungs-Button, Tiefenanalyse-Button.
+- **Tiefenanalyse:** Dummy-Lambda über Backend und DynamoDB-Job. Der Research Agent bleibt
+  eingefroren.
+- **Websuche-Daten im Chat:** erst validieren, hinter Feature-Flag.
+- **Gestrichen:** Screening-Trichter, Scheduler, Alarme, öffentliche Leseansicht.
+- Technik der Quartalsberichte:
+  [`2026-11-03-quarterly-report-rag-design.md`](docs/superpowers/specs/2026-11-03-quarterly-report-rag-design.md)
+  (an Scope v2 angepasst).
+- **AWS-Stand:** ECS, RDS und Interface-Endpoints wurden am 2026-11-03 gestoppt, um das Guthaben zu
+  schonen (118,40 $ Rest). Phasen 1–2 der neuen Planung laufen komplett lokal.
+- **Login (entschieden 2026-11-03):** ein ADMIN-Account und eine Handvoll eigener USER-Accounts (gleiche Rolle,
+  eigene Limits, eigener Chatverlauf) als Liste in der Konfiguration,
+  kein Cognito, Session-Cookie, Schutz gegen Passwort-Raten pro IP. Details in Abschnitt 8 der Spec.
+- **Ebenfalls entschieden:** Login-Seite vorerst nur funktional (Gestaltung in Phase 8), Limit-Zähler
+  in RDS, Hosting darf teilweise aus AWS ausgelagert werden, wenn das deutlich Kosten spart und nicht
+  kompliziert wird (vor Ende des Free Plans prüfen). Modellwahl und Limits später.
+- **Nächster Schritt:** Phase 1 (Login mit Account-Liste und
+  Rollen).
+
+Die Abschnitte darunter sind der Stand vor dieser Neuplanung. Wo sie Scope v2 widersprechen
+(insbesondere „Portfolio Research UI“ und Thema 5 Teil B als öffentlicher Button), gilt Scope v2.
+
+---
+
+Stand bis 2026-10-19:
 Aktuelle Phase: **Phase 4 (AWS-Deployment) läuft**, parallel zur AWS-Developer-Zertifizierungsvorbereitung
 des Nutzers. Phase 1 weiterhin abgeschlossen, siehe unten.
 
-**Sofortiger Einstiegspunkt für eine neue Session:** Thema 4 ist komplett fertig (Backend läuft live in
+**Sofortiger Einstiegspunkt für eine neue Session (Stand 2026-10-19, durch Scope v2 überholt):** Thema 4 ist komplett fertig (Backend läuft live in
 AWS, volle CI/CD-Pipeline verifiziert). **Thema 5 ist geplant, aber noch nicht gebaut. Reihenfolge am
 2026-10-19 mit dem Nutzer festgelegt: zuerst Teil B, die Showcase-Demo** — kleine, native Stub-Lambdas
 ohne LLM-Aufruf (Button-Stub für `DeepResearchPlaceholder` mit Live-Zeitstempel, täglicher

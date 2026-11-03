@@ -1,5 +1,10 @@
 # Screening & Research Cost Redesign — Design
 
+> **Superseded in scope (2026-11-03):** the research funnel, universe provider, scheduler and
+> screening described here are no longer planned — see
+> [`2026-11-03-app-scope-v2-design.md`](2026-11-03-app-scope-v2-design.md), Section 10. Kept as history;
+> the `ResearchCriterion` catalog derived from it is still in use.
+
 Last updated: 2026-08-10
 Status: Design approved by the user. Reconciliation steps 1-4 of the original agreed sequence are done
 (Stage 1 mechanism, Company Research Agent spec rewrite, code rewrite, first successful live calls for

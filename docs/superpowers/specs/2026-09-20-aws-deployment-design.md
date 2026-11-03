@@ -198,6 +198,12 @@ stage); the image is pushed to **ECR**, which the ECS Task Definition references
 
 ## 7. Lambda & EventBridge — the real agent, plus a public, cost-safe showcase demo
 
+> **Update 2026-11-03 (scope v2):** the app is now login-only, so the stub button is no longer a public
+> API-Gateway→Lambda route. It is triggered through the backend and the DynamoDB job table
+> (`DEEP_ANALYSIS_DEMO`), see [`2026-11-03-app-scope-v2-design.md`](2026-11-03-app-scope-v2-design.md),
+> Section 6. The real Company Research Agent Lambda (incl. Lambda Web Adapter) is frozen. The
+> EventBridge heartbeat is optional. The rest of this section is kept as history.
+
 **The real Company Research Agent** (`company-research-agent/`, already implemented and covering the
 full Section 5 criteria catalog — see
 [`2026-07-24-company-research-agent-design.md`](2026-07-24-company-research-agent-design.md)) deploys as

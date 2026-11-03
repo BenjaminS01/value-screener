@@ -5,6 +5,14 @@ of this document.** Supersedes
 [`2026-08-02-quarterly-report-upload-design.md`](2026-08-02-quarterly-report-upload-design.md) (see
 Decision log for what changed and why). German summary at the end.
 
+> **Update 2026-11-03 (scope v2):** product scope, roles and UI are now defined in
+> [`2026-11-03-app-scope-v2-design.md`](2026-11-03-app-scope-v2-design.md), which takes precedence over
+> this document. Adjusted below: visibility/roles (Section 1), API permissions (Section 4), chat history
+> per account (Section 5), limits per account (Section 9). The "evaluation" is presented in the UI as
+> **"Summarize quarterly reports"**; when implemented, the function `evaluate` and the
+> `/evaluations` endpoints are named `summarize` / `/summaries` accordingly. The job table also carries
+> the `DEEP_ANALYSIS_DEMO` jobs of the deep-analysis dummy (scope v2, Section 6).
+
 ## 1. Purpose and scope
 
 The app gets a private, per-stock document area for quarterly reports (PDF). On top of it:
@@ -18,16 +26,16 @@ The app gets a private, per-stock document area for quarterly reports (PDF). On 
 
 ### Visibility
 
-| Artifact | Visible to |
-|---|---|
-| Uploaded documents (PDF, extracted text, chunks) | Nobody publicly; logged-in users only via the app |
-| Chat | Logged-in users |
-| Evaluation results | Logged-in users |
+| Artifact | ADMIN | USER |
+|---|---|---|
+| Uploaded documents (list, open PDF) | read, upload, change metadata, delete | read only |
+| Chat | yes, daily limit | yes, daily limit; own history only |
+| Evaluation (summary) results | yes, daily limit | yes, daily limit |
 
-"Logged-in user" today means the single admin credential of `backend/`'s `SecurityConfig`; Cognito
-(AWS Topic 8) can widen this later without changing this design. Nothing from this feature is written
-into `CompanySnapshot`/`ResearchFinding`, because `GET /api/research/snapshots/**` is planned to become
-public (Portfolio Research UI design, `PROJECT-STATUS.md`).
+Nothing is public; the whole app requires login (scope v2). Roles are checked only in `backend/`.
+Results are still kept in separate tables instead of `CompanySnapshot`/`ResearchFinding`: the original
+reason (snapshot endpoint becoming public) is gone, but report results carry a report/page reference
+instead of a URL and can go stale when a report is deleted.
 
 ### Out of scope (for now)
 
@@ -95,16 +103,21 @@ Browser ─► API Gateway ─► backend/ (Spring Boot, ECS, private VPC, exist
 ### Component responsibilities
 
 **`backend/` (existing Spring Boot app)**
-- REST API (all behind the existing authentication):
-  - `GET /api/reports?isin=` — list reports of a stock with status
+- REST API (all behind login; role per endpoint):
+  - `GET /api/reports?isin=` — list reports of a stock with status (USER, ADMIN)
+  - `GET /api/reports/{id}/download-url` — short-lived presigned GET for the PDF (USER, ADMIN)
   - `POST /api/reports/upload-url` — creates the `quarterly_report` row and returns a presigned S3 POST
-  - `DELETE /api/reports/{id}`
-  - `POST /api/reports/{isin}/evaluations`, `GET /api/reports/{isin}/evaluations/latest`
-  - `POST /api/reports/{isin}/chat` → job id; `GET /api/reports/chat/{jobId}` → status/answer
-  - `GET /api/reports/{isin}/chat/history`
+    (ADMIN)
+  - `PATCH /api/reports/{id}` — correct fiscal period / report date (ADMIN)
+  - `DELETE /api/reports/{id}` (ADMIN)
+  - `POST /api/reports/{isin}/evaluations`, `GET /api/reports/{isin}/evaluations/latest` (USER, ADMIN;
+    limited)
+  - `POST /api/reports/{isin}/chat` → job id; `GET /api/reports/chat/{jobId}` → status/answer (USER,
+    ADMIN; limited; users can only poll their own jobs)
+  - `GET /api/reports/{isin}/chat/history` — the calling user's own history
 - Flyway migration `V4__create_quarterly_report.sql` (Section 5).
 - Writes jobs to DynamoDB, reads job results/status, persists finished evaluations into RDS.
-- Enforces the daily cost cap for chat/evaluation jobs.
+- Enforces the daily limits per account and job type plus the global daily cap (scope v2, Section 5.1).
 
 **`report-intelligence/` (new Quarkus module)**
 - `quarkus-amazon-lambda`; the four handlers live in one build, each deployed function selects its
@@ -161,8 +174,9 @@ deleted), `summary`.
 
 ### DynamoDB `report-jobs`
 
-- Items: `JOB#{id}` (type `EVALUATION`/`CHAT`, status, input, result, error) and
-  `CHAT#{isin}` history entries; TTL (e.g. 30 days) on chat items and finished jobs.
+- Items: `JOB#{id}` (type `EVALUATION`/`CHAT`/`DEEP_ANALYSIS_DEMO`, account, status, input, result,
+  error) and `CHAT#{account}#{isin}` history entries; TTL (e.g. 30 days) on chat items and finished
+  jobs. Event-source mappings filter by job type.
 - **Provisioned capacity with small values** (stays within the Always-Free allowance; on-demand is
   reportedly not covered by it). Stream enabled (`NEW_IMAGE`) → `evaluate`/`chat` Lambdas.
 
@@ -247,8 +261,11 @@ deleted), `summary`.
 - **Tenant/stock isolation:** `isin` filter always set server-side.
 - **Least privilege:** one IAM role per function scoped to its prefixes/table/index; backend may only
   create presigned uploads, delete documents and read/write the job table.
-- **Cost protection:** daily cap per job type in the backend, token budget per evaluation, AWS budget
-  alarms + existing budget action.
+- **Cost protection:** daily limits per account and job type plus a global daily cap in the backend,
+  max question length, token budget per evaluation, monthly spend limit in the Anthropic Console, AWS
+  budget alarms + existing budget action.
+- **Authorization:** upload/change/delete only for ADMIN (checked in the backend; the greyed-out UI
+  button is UX only); download URLs only after the role check, 5 min expiry.
 
 ## 10. Cost estimate
 
@@ -332,6 +349,10 @@ deliberately has no access key.
 - 2026-11-03: Credit at 118.40 $; user stops ECS/RDS/interface endpoints to preserve it. No live API
   test for now.
 
+- 2026-11-03 (scope v2): whole app behind login with roles ADMIN/USER; USERs may read reports and
+  use chat/summary with daily limits; chat history and limits per user account (each USER has their own); job table also serves the deep-analysis
+  dummy. See `2026-11-03-app-scope-v2-design.md`.
+
 ## Sources (checked 2026-11-03)
 
 - [AWS Docs: S3 Vectors — limitations and restrictions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors-limitations.html)
@@ -346,6 +367,10 @@ deliberately has no access key.
 ---
 
 ## Deutsche Zusammenfassung
+
+**Update (Scope v2):** Umfang, Rollen und Oberfläche regelt jetzt `2026-11-03-app-scope-v2-design.md`.
+Alles läuft hinter dem Login. Nur der Admin lädt hoch, ändert und löscht. Normale Nutzer lesen die
+Berichte und nutzen Chat und Zusammenfassung mit Tageslimit. Jeder Nutzer hat eigene Tageslimits und einen eigenen Chatverlauf.
 
 **Ziel:** Ein privater Dokumentenbereich pro Aktie für Quartalsberichte (PDF). Berichte lassen sich
 jederzeit hochladen und löschen. Dazu ein Chat pro Aktie, der jederzeit Fragen auf Basis der
