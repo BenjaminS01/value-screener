@@ -1,5 +1,9 @@
 # Quarterly Report Upload for Deep Research — Design
 
+> **Superseded 2026-11-03** by
+> [`2026-11-03-quarterly-report-rag-design.md`](2026-11-03-quarterly-report-rag-design.md)
+> (RAG chat, one-click evaluation, AWS architecture). Kept as historical record.
+
 **Status: brainstormed and approved (2026-08-02). Explicitly queued — not to be implemented yet.**
 See "Sequencing" at the bottom for why, and what must happen first.
 
