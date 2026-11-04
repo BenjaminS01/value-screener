@@ -16,3 +16,4 @@ app:
   admin:
     username: ${ADMIN_USERNAME:admin}
     password-hash: ${ADMIN_PASSWORD_HASH:}
+  users: []

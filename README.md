@@ -100,6 +100,23 @@ mvn -q spring-boot:run \
 
 Den ausgegebenen Hash als `ADMIN_PASSWORD_HASH` setzen (siehe unten).
 
+`AdminPasswordHashGenerator` erzeugt auch die Hashes für USER-Konten.
+
+### Weitere Konten (Rolle USER)
+
+Neben dem ADMIN-Konto können weitere Konten mit der Rolle `USER` konfiguriert werden (Index 0, 1, ...):
+
+```bash
+export APP_USERS_0_USERNAME=alice
+export APP_USERS_0_PASSWORD_HASH='<Hash aus AdminPasswordHashGenerator>'
+```
+
+Regeln (werden beim Start geprüft, bei einem Fehler startet die Anwendung nicht):
+
+- Benutzernamen sind nicht case-sensitiv, müssen eindeutig sein (auch gegenüber `ADMIN_USERNAME`), dürfen nicht leer sein; `*` ist reserviert.
+- Der Passwort-Hash muss ein gültiger bcrypt-Hash sein (auch für ADMIN, leer ist nicht erlaubt).
+- Passwortlänge (nur Dokumentation, aus einem Hash nicht prüfbar): ADMIN mindestens 20 Zeichen, USER mindestens 16 Zeichen. Empfohlen sind lange, zufällige Passwörter (bcrypt verwendet nur die ersten 72 Bytes).
+
 ### Backend starten
 
 ```bash
