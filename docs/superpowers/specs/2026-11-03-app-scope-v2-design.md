@@ -60,7 +60,7 @@ the scope (Section 10).
 | Research: write web-research data (`POST /api/research/snapshots`) | ✅ | ❌ |
 | Quarterly reports: list and read | ✅ | ✅ |
 | Quarterly reports: upload, change metadata, delete | ✅ | ❌ — upload button greyed out, tooltip *"Uploading reports is only available to the admin."* |
-| AI chat incl. summary button | ✅ (daily limit) | ✅ (daily limit) |
+| AI chat incl. "Evaluate quarterly reports" button | ✅ (daily limit) | ✅ (daily limit) |
 | Deep-analysis button (dummy) | ✅ | ✅ (daily limit) |
 
 UI texts stay English (decision 2026-08-20); legal pages stay German.
@@ -147,10 +147,17 @@ asynchronous jobs via DynamoDB). Changes from this document:
   are ADMIN only.
 - **"Change" a report** means: correct metadata (fiscal period, report date) via `PATCH`; replacing
   the file itself is delete + upload (keeps the pipeline simple, no re-index logic).
-- **Summary button** (was "evaluation" in the RAG design): produces a summary of *all* reports
-  currently on file for the selected stock — short overall picture, development across the quarters,
-  then the findings mapped onto the `ResearchCriterion` keys with report/page citations. Full report
-  text, not RAG (reasoning unchanged).
+- **"Evaluate quarterly reports" button** (renamed 2026-11-04 from "summary button"; called
+  "evaluation" in the RAG design): it evaluates *all* reports currently on file for the selected
+  stock. The output is a short overall picture, then the development across the quarters, then the
+  findings mapped onto the `ResearchCriterion` keys with report/page citations. It uses the full
+  report text, not RAG (reasoning unchanged).
+  - **Stored and reused** (2026-11-04): the evaluation is saved per stock and shown to everyone when
+    the stock is opened.
+  - If no report was added, deleted or changed since then, a click starts no new LLM call and uses no
+    daily quota. It shows "No new quarterly reports — evaluation already available."
+  - Only the ADMIN can force a new evaluation, e.g. after a model or prompt improvement.
+  - Free chat questions stay possible at any time.
 - **Free questions** ("general questions about the stock"): answered from the reports via RAG, with
   citations. If the sources don't cover the question, the answer says so instead of filling the gap
   from the model's training knowledge — keeps the answers checkable, which matters because results
@@ -169,9 +176,9 @@ regardless of how many accounts exist. Starting values (to be adjusted after the
 | Limit | Start value |
 |---|---|
 | Chat questions per USER per day | 10 |
-| Summaries per USER per day | 2 |
+| Report evaluations per USER per day (only runs that actually call the LLM) | 2 |
 | Deep-analysis dummy clicks per USER per day | 5 |
-| Chat questions / summaries, ADMIN per day | 50 / 10 |
+| Chat questions / report evaluations, ADMIN per day | 50 / 10 |
 | Global cap across all accounts per day (all job types) | 100 |
 
 Additional safety layers: max question length (e.g. 1,000 characters), max output tokens per call,
@@ -340,7 +347,7 @@ Deliberately not used: Cognito (more setup than a handful of fixed accounts need
 | 2 | **Research page:** stock selector, overview/fundamentals/qualitative sections, portfolio badge, report list and chat as placeholders, greyed-out upload with tooltip | no |
 | 3 | **Job table + deep-analysis dummy:** DynamoDB table, gateway endpoint, stream, `deep-analysis-demo` Lambda, polling UI, usage limits — first AWS building block | yes (≈ 0 $) |
 | 4 | **Quarterly reports:** `report-intelligence/` skeleton, upload/list/read/delete, validation, indexing (RAG design phases 0–2) | yes |
-| 5 | **Summary button** (RAG design phase 3) | yes + Anthropic |
+| 5 | **"Evaluate quarterly reports" button**, stored and reused (RAG design phase 3) | yes + Anthropic |
 | 6 | **Chat with limits** (RAG design phase 4) | yes + Anthropic |
 | 7 | **Validate web-research data in the chat** (Section 5.2) | Anthropic |
 | 8 | **Login page design** and project description for showcase visitors; until then the login page is functional only (Section 3) | no |
@@ -395,6 +402,10 @@ configuration, no Cognito, no user table), access for others (owner creates the 
   (phase 8). Usage counters live in RDS. Hosting: parts may leave AWS if that clearly cuts cost
   without making things complicated — evaluated before the Free Plan ends. Model choice and final
   limits decided later.
+- 2026-11-04: The summary button becomes "Evaluate quarterly reports". Its result is stored per stock
+  and reused. With an unchanged report set a click shows "No new quarterly reports — evaluation
+  already available.", with no LLM call and no quota used. Only the ADMIN can force a new
+  evaluation. The chat stays available at any time. Details in the RAG design, Section 6.
 
 ---
 
