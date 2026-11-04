@@ -12,6 +12,15 @@ spring:
   flyway:
     locations: classpath:db/migration
 
+server:
+  servlet:
+    session:
+      timeout: 2h
+      cookie:
+        http-only: true
+        same-site: strict
+        secure: true
+
 app:
   admin:
     username: ${ADMIN_USERNAME:admin}

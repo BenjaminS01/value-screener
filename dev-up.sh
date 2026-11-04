@@ -31,7 +31,7 @@ done
 echo "    Postgres is ready."
 
 echo "==> Starting backend (logs/backend.log)"
-(cd backend && mvn -q spring-boot:run) >logs/backend.log 2>&1 &
+(cd backend && mvn -q spring-boot:run -Dspring-boot.run.profiles=local) >logs/backend.log 2>&1 &
 BACKEND_PID=$!
 
 echo "==> Waiting for backend on :8080"
@@ -60,7 +60,7 @@ trap cleanup EXIT INT TERM
 echo ""
 echo "Frontend: http://localhost:5173"
 echo "Backend:  http://localhost:8080"
-echo "Login: ADMIN_USERNAME=$ADMIN_USERNAME, password = whatever you hashed into ADMIN_PASSWORD_HASH"
+echo "Login: username ADMIN_USERNAME ($ADMIN_USERNAME), password = the one you hashed into ADMIN_PASSWORD_HASH (session login in the app)"
 echo "Logs: tail -f logs/backend.log logs/frontend.log"
 echo "Press Ctrl+C to stop backend + frontend."
 echo ""
