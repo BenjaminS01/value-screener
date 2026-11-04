@@ -66,6 +66,36 @@ registriert, sondern vom Betreiber vergeben.
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
+### Startseite
+
+Nach dem Login landet man auf einer Startseite mit der Navigationsleiste. Vorerst steht dort nur der
+Titel, der Inhalt folgt später.
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════════════╗
+║ ●  ●  ●    https://value-screener.app/                                                       ║
+╠══════════════════════════════════════════════════════════════════════════════════════════════╣
+║  ▣ VALUE SCREENER     Portfolio     Research                      benjamin (ADMIN) · Logout  ║
+╟──────────────────────────────────────────────────────────────────────────────────────────────╢
+║                                                                                              ║
+║                                                                                              ║
+║                                                                                              ║
+║                                                                                              ║
+║                               U N S E R E   A N W E N D U N G                                ║
+║                                                                                              ║
+║                                          ──────────                                          ║
+║                                                                                              ║
+║                                                                                              ║
+║                                                                                              ║
+║                                                                                              ║
+║                                                                                              ║
+║                                                                                              ║
+║                                                                                              ║
+║  ──────────────────────────────────────────────────────────────────────────────────────────  ║
+║                  Disclaimer: no investment advice · Impressum · Datenschutz                  ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════╝
+```
+
 ### Portfolio
 
 Die Positionen des Betreibers, nach Gruppen geordnet. Ein Klick auf eine Position öffnet die Aktie im

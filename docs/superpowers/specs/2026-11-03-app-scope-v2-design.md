@@ -76,6 +76,8 @@ Login page (public): short project description · login form · Impressum · Dat
 After login:
   Header: Value Screener | Portfolio | Research | user name + role | Logout
   Footer: disclaimer · Impressum · Datenschutz
+  Start page after login (added 2026-11-04): navigation bar plus the title "Unsere Anwendung",
+  otherwise empty for now; content follows later
 ```
 
 **Login page for now: functional only** — username field, password field, login button, error
