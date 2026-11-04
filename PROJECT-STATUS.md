@@ -32,7 +32,8 @@ Kurzfassung:
   in RDS, Hosting darf teilweise aus AWS ausgelagert werden, wenn das deutlich Kosten spart und nicht
   kompliziert wird (vor Ende des Free Plans prüfen). Modellwahl und Limits später.
 - **Nächster Schritt:** Phase 1 (Login mit Account-Liste und
-  Rollen).
+  Rollen). Backend-Details, lokale Recherche mit Push ins Live-System und Aktiengruppen (2026-11-04):
+  [`2026-11-04-v2-phase1-backend-research-groups-design.md`](docs/superpowers/specs/2026-11-04-v2-phase1-backend-research-groups-design.md).
 
 Die Abschnitte darunter sind der Stand vor dieser Neuplanung. Wo sie Scope v2 widersprechen
 (insbesondere „Portfolio Research UI“ und Thema 5 Teil B als öffentlicher Button), gilt Scope v2.

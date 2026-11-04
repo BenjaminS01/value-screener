@@ -7,6 +7,12 @@ details of the quarterly-report pipeline stay in
 [`2026-11-03-quarterly-report-rag-design.md`](2026-11-03-quarterly-report-rag-design.md), adjusted to
 this document. German summary at the end.
 
+> **Update 2026-11-04:** the backend part of phase 1, the local-only research ingest with push to live,
+> and stock groups are refined in
+> [`2026-11-04-v2-phase1-backend-research-groups-design.md`](2026-11-04-v2-phase1-backend-research-groups-design.md).
+> Notably: `POST /api/research/snapshots` is replaced by token endpoints (local ingest, live import);
+> the free-text `sector` is replaced by a maintained group list.
+
 ## 1. Goal
 
 The application serves two purposes, in this order:
