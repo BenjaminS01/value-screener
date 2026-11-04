@@ -136,6 +136,51 @@ One page, stock-centric:
   because report results carry a document reference (report + page) instead of a URL and can go
   stale when a report is deleted.
 
+## 4a. Data age, investment thesis and research history (added 2026-11-04)
+
+**1. Data age.**
+- Every finding already carries an `asOfDate`. The backend returns its age, and findings older than
+  **6 months** are flagged "outdated". The threshold is configuration, `research.stale-after`,
+  default `P6M`.
+- Each stock shows "Last researched <date>" (the newest `asOfDate` of its findings). Once that
+  date is older than the threshold, the note adds "consider re-research".
+- Goal: no decision based on old figures that look current. Visible to all roles. Phase 2.
+
+**2. Investment thesis (ADMIN only).**
+- Per stock (ISIN) the ADMIN writes a thesis with three free-text fields: why it is interesting or
+  held, the expected development, and what would make him sell or drop it.
+- A manual status `WATCHING` or `REJECTED` with a short reason, plus `updated_at`.
+- "Holding" is **not** stored. It is derived from the portfolio, so the status can never contradict
+  the actual holdings. A held stock shows "Holding", and the manual status applies only to stocks
+  that are not held.
+- **Visibility: ADMIN only** (user decision 2026-11-04). The thesis and the status are personal
+  reasoning about real positions. They are never sent to USERs: separate endpoints, ADMIN role, no
+  fields in USER responses, with a test per endpoint as for the portfolio.
+- Phase 2: store and show (separate table `investment_thesis`, Flyway).
+- **Two ways to enter it** (2026-11-04): the "Edit thesis" form on the Research page (any stock, held
+  or not; status Watching/Rejected selectable only when not held) and an optional "Why are you
+  buying?" field in the portfolio "Buy position" dialog. That field writes into the same thesis;
+  when a thesis already exists, the text is appended with a date, never overwritten.
+- Phase 5: the "Evaluate quarterly reports" run receives the thesis as additional input. It adds a
+  "Thesis check" section that describes, with report/page citations, which statements in the new
+  reports support or contradict the thesis's assumptions and sell triggers. The wording stays
+  descriptive, with no buy/sell wording (existing guardrails). Only the ADMIN sees the "Thesis
+  check" section. The rest of the evaluation stays visible to all users. Changing the thesis marks
+  the thesis check, not the whole evaluation, as outdated.
+
+**3. Research history.**
+- The current state stays as it is (`company_snapshot` / `research_finding`, upsert per
+  criterion). In addition, an append-only table `research_finding_history` receives the
+  **previous** values of a finding whenever an upsert or import changes it: criterion, value, claim,
+  source, `asOfDate`, `replaced_at`, and the origin (`INGEST` local or `SYNC` import).
+  Rows are only ever added, never changed.
+- The same applies to group changes (`AI`/`MANUAL`) via a small history entry.
+- Research page: per criterion, older values can be expanded ("history"), e.g. P/E over time.
+  Visible to all roles.
+- This is additive, so it doesn't change the phase 1 plan (export/import transfer only the current
+  state). It is implemented after phase 1, together with phase 2. Existing data simply has no
+  history yet.
+
 ## 5. Quarterly reports and AI chat
 
 Technical design: [`2026-11-03-quarterly-report-rag-design.md`](2026-11-03-quarterly-report-rag-design.md)
@@ -344,10 +389,10 @@ Deliberately not used: Cognito (more setup than a handful of fixed accounts need
 | Phase | Content | Needs AWS? |
 |---|---|---|
 | 1 | **Login-only + roles:** account list (ADMIN + USER accounts) from configuration, session login, brute-force protection, `SecurityConfig`, role-dependent portfolio API incl. correct/delete, frontend login gate, header Portfolio/Research, legal pages public | no |
-| 2 | **Research page:** stock selector, overview/fundamentals/qualitative sections, portfolio badge, report list and chat as placeholders, greyed-out upload with tooltip | no |
+| 2 | **Research page:** stock selector, overview/fundamentals/qualitative sections, portfolio badge, report list and chat as placeholders, greyed-out upload with tooltip; **data age, investment thesis (ADMIN), research history** (Section 4a) | no |
 | 3 | **Job table + deep-analysis dummy:** DynamoDB table, gateway endpoint, stream, `deep-analysis-demo` Lambda, polling UI, usage limits — first AWS building block | yes (≈ 0 $) |
 | 4 | **Quarterly reports:** `report-intelligence/` skeleton, upload/list/read/delete, validation, indexing (RAG design phases 0–2) | yes |
-| 5 | **"Evaluate quarterly reports" button**, stored and reused (RAG design phase 3) | yes + Anthropic |
+| 5 | **"Evaluate quarterly reports" button**, stored and reused, incl. ADMIN-only thesis check (RAG design phase 3, Section 4a) | yes + Anthropic |
 | 6 | **Chat with limits** (RAG design phase 4) | yes + Anthropic |
 | 7 | **Validate web-research data in the chat** (Section 5.2) | Anthropic |
 | 8 | **Login page design** and project description for showcase visitors; until then the login page is functional only (Section 3) | no |
@@ -406,6 +451,10 @@ configuration, no Cognito, no user table), access for others (owner creates the 
   and reused. With an unchanged report set a click shows "No new quarterly reports — evaluation
   already available.", with no LLM call and no quota used. Only the ADMIN can force a new
   evaluation. The chat stays available at any time. Details in the RAG design, Section 6.
+
+- 2026-11-04: Added data-age flag (6 months), investment thesis with WATCHING/REJECTED status (ADMIN
+  only; "Holding" derived from the portfolio; thesis check in the report evaluation, ADMIN only) and
+  append-only research history. See Section 4a.
 
 ---
 
@@ -471,3 +520,11 @@ deutlich Kosten spart und nicht kompliziert wird. Das wird vor Ende des Free Pla
 Kostenvergleich geprüft (Kosten, Zusatzaufwand, Verlust an AWS-Lernwert). Kandidaten sind die dauerhaft
 laufenden Teile (ECS, RDS, Interface-Endpoints), die serverlosen Teile bleiben bei AWS. Modellwahl und
 endgültige Limits entscheiden wir später.
+
+**Ergänzt 2026-11-04 (Abschnitt 4a):** Angaben älter als 6 Monate werden markiert, und pro Aktie steht
+„zuletzt recherchiert am …“. Der ADMIN kann pro Aktie eine Investment-These schreiben: Kaufgrund,
+erwartete Entwicklung und Verkaufsgründe, dazu einen Status „Beobachten“ oder „Verworfen“.
+„Gehalten“ ergibt sich automatisch aus dem Portfolio. These und Status sieht **nur der ADMIN**.
+Die Auswertung der Quartalsberichte prüft die These gegen neue Berichte; auch dieser Teil ist nur
+für den ADMIN sichtbar. Neue Recherchen überschreiben alte Werte weiterhin, die alten Werte landen
+aber in einer Verlaufstabelle und sind aufklappbar.

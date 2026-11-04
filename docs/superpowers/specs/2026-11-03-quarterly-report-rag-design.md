@@ -19,6 +19,11 @@ Decision log for what changed and why). German summary at the end.
 > backend creates no new job and returns the existing evaluation with the message "No new quarterly
 > reports — evaluation already available." Only the ADMIN can force a new evaluation. See "Evaluation
 > (button in chat)" in Section 6. The chat stays available at any time.
+>
+> **Update 2026-11-04 (thesis check):** if the ADMIN has written an investment thesis for the stock
+> (scope v2, Section 4a), the evaluation receives it as input. It adds an ADMIN-only "Thesis check"
+> section: which report statements support or contradict the assumptions and sell triggers, with
+> report/page citations and descriptive wording only. USER responses never contain this section.
 
 ## 1. Purpose and scope
 

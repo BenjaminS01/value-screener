@@ -112,10 +112,36 @@ Ein **USER** sieht dieselbe Liste ohne Stückzahl, Preis, Datum und Buttons:
 ╰──────────────────────────────────────────────────────────╯
 ```
 
+Beim Kauf („+ Buy position“) kann der ADMIN den Kaufgrund gleich mit festhalten. Er landet in der
+Investment-These der Aktie:
+
+```text
+╭─ Buy position ───────────────────────────────────────────────────────────╮
+│ ISIN                      Ticker          Company                        │
+│ ┌──────────────────────┐  ┌────────────┐  ┌────────────────────────────┐ │
+│ │ DE0008404005         │  │ ALV        │  │ Allianz SE                 │ │
+│ └──────────────────────┘  └────────────┘  └────────────────────────────┘ │
+│ Quantity          Entry price       Purchase date                        │
+│ ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐                 │
+│ │ 12           │  │ 268.40       │  │ 2026-11-04       │                 │
+│ └──────────────┘  └──────────────┘  └──────────────────┘                 │
+│                                                                          │
+│ Why are you buying?  (optional, saved to the investment thesis)          │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Market leader in insurance; dividend raised for 10 years in a row.   │ │
+│ │                                                                      │ │
+│ │                                                                      │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│                                                 [ Cancel ]  [ Buy ]      │
+╰──────────────────────────────────────────────────────────────────────────╯
+```
+
 ### Research
 
-Eine Seite pro Aktie, hier aus Sicht des ADMIN. Ein USER sieht dieselbe Seite. Gruppe ändern und
-Berichte hochladen kann er nicht, der Upload-Button ist für ihn ausgegraut.
+Eine Seite pro Aktie, hier aus Sicht des ADMIN. Ein USER sieht dieselbe Seite **ohne** Investment-These
+und ohne den Abschnitt „Thesis check“ in der Auswertung. Gruppe ändern und Berichte hochladen kann er
+nicht, der Upload-Button ist für ihn ausgegraut.
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -128,34 +154,45 @@ Berichte hochladen kann er nicht, der Upload-Button ist für ihn ausgegraut.
 ║  │ Group: All        ▾│  │ Alphabet Inc. (GOOGL)        ▾│  │  ◆ Owner holds this position │ ║
 ║  └────────────────────┘  └───────────────────────────────┘  └──────────────────────────────┘ ║
 ║                                                                                              ║
-║  ╭─ A · Overview ─────────────────────────────────────────────────────────────────────────╮  ║
+║  ╭─ Overview ─────────────────────────────────────────────────────────────────────────────╮  ║
 ║  │ Alphabet Inc. · GOOGL · US02079K3059 · USA     Group: Internet Platforms  [ change ▾ ] │  ║
 ║  │ Search, YouTube, Android and Google Cloud; revenue mainly from advertising.            │  ║
+║  │ Last researched 2026-10-31 · Status: Holding (from portfolio)                          │  ║
 ║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
-║  ╭─ B · Fundamentals ─────────────────────────────────────────────────────────────────────╮  ║
+║  ╭─ Investment thesis · ADMIN only ───────────────────────────────────────────────────────╮  ║
+║  │ Status        Holding  (from portfolio)                                                │  ║
+║  │ Why           Dominant search/ads business funds Cloud and AI; strong net cash.        │  ║
+║  │ Expected      Cloud margin keeps rising; buybacks continue at today's pace.            │  ║
+║  │ Sell if       Search share falls clearly, or capex eats free cash flow for 2+ years.   │  ║
+║  │               updated 2026-09-12                                       [ Edit thesis ] │  ║
+║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
+║  ╭─ Fundamentals ─────────────────────────────────────────────────────────────────────────╮  ║
 ║  │ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐    │  ║
 ║  │ │ P/E              │ │ P/B              │ │ 5y Ø P/E         │ │ ROE              │    │  ║
 ║  │ │ 24.1             │ │ 6.8              │ │ 26.3             │ │ 31.2 %           │    │  ║
-║  │ │ 2026-10-31 · src │ │ 2026-10-31 · src │ │ 2026-10-31 · src │ │ FY2025 · src     │    │  ║
+║  │ │ 2026-10-31 · src │ │ 2026-10-31 · src │ │ ! old: 2026-03-02│ │ FY2025 · src     │    │  ║
 ║  │ └──────────────────┘ └──────────────────┘ └──────────────────┘ └──────────────────┘    │  ║
 ║  │ + 5y Ø P/B · debt/equity · current ratio · net margin · FCF positive · …               │  ║
+║  │ ▾ P/E history:  2026-10-31  24.1   ·   2026-03-02  27.8   ·   2025-09-15  22.4         │  ║
 ║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
-║  ╭─ C · Qualitative findings ─────────────────────────────────────────────────────────────╮  ║
-║  │ Moat                Network effects in search and ads; high switching costs.   src     │  ║
-║  │ Management          Steady buybacks, little dilution.                          src     │  ║
-║  │ Value trap          not researched                                                     │  ║
+║  ╭─ Qualitative findings ─────────────────────────────────────────────────────────────────╮  ║
+║  │ Moat            Network effects in search and ads.         src  ▸ history              │  ║
+║  │ Management      Steady buybacks, little dilution.          src  ▸ history              │  ║
+║  │ Value trap      not researched                                                         │  ║
 ║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
-║  ╭─ D · Quarterly reports ────────────────────────────────────────────────────────────────╮  ║
+║  ╭─ Quarterly reports ────────────────────────────────────────────────────────────────────╮  ║
 ║  │ Period    File                    Uploaded     Status    Pages                         │  ║
 ║  │ 2026-Q3   GOOG-10-Q-Q3-2026.pdf   2026-11-10   Indexed   58      [ Open ]              │  ║
 ║  │ 2026-Q1   GOOG-10-Q-Q1-2026.pdf   2026-11-04   Indexed   54      [ Open ]              │  ║
 ║  │                                                                                        │  ║
 ║  │ [ Upload report ]  ADMIN only — greyed out for USERs                                   │  ║
 ║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
-║  ╭─ E · AI chat ──────────────────────────────────────────────────────────────────────────╮  ║
+║  ╭─ AI chat ──────────────────────────────────────────────────────────────────────────────╮  ║
 ║  │ [ Evaluate quarterly reports ]                              Questions left today: 7/10 │  ║
 ║  │ ╭─ Evaluation · 2026-11-10 · reports Q1 + Q3 2026 ───────────────────────────────────╮ │  ║
 ║  │ │ Margins stable to rising, free cash flow clearly positive, low debt …              │ │  ║
+║  │ │ Thesis check (ADMIN only): Cloud margin assumption supported [Q3 2026, p. 31];     │ │  ║
+║  │ │   capex rising faster than expected [Q3 2026, p. 44].                              │ │  ║
 ║  │ │ No new quarterly reports — evaluation already available.                           │ │  ║
 ║  │ ╰────────────────────────────────────────────────────────────────────────────────────╯ │  ║
 ║  │                                   you: Wie hat sich die operative Marge entwickelt?    │  ║
@@ -165,13 +202,43 @@ Berichte hochladen kann er nicht, der Upload-Button ist für ihn ausgegraut.
 ║  │ └────────────────────────────────────────────────────────────────────────┘  └────────┘ │  ║
 ║  │ [ New conversation ]   Please don't enter personal data.                               │  ║
 ║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
-║  ╭─ F · Deep analysis ────────────────────────────────────────────────────────────────────╮  ║
+║  ╭─ Deep analysis ────────────────────────────────────────────────────────────────────────╮  ║
 ║  │ [ Run deep analysis ]   → "Lambda deep-analysis-demo invoked at 2026-11-12T14:05:12Z"  │  ║
 ║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
 ║                                                                                              ║
 ║  ──────────────────────────────────────────────────────────────────────────────────────────  ║
 ║                  Disclaimer: no investment advice · Impressum · Datenschutz                  ║
 ╚══════════════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+Über „Edit thesis“ öffnet sich das Formular für die Investment-These. Es funktioniert für jede Aktie,
+auch für eine, die nicht im Portfolio ist. „Holding“ setzt das System selbst, solange die Aktie im
+Portfolio ist. Sonst wählt der ADMIN `Watching` oder `Rejected` mit Begründung:
+
+```text
+╭─ Edit investment thesis · Intel Corp. · ADMIN only ──────────────────────╮
+│ Status                                                                   │
+│ ( ) Holding   - set automatically while the stock is in the portfolio    │
+│ (•) Watching   ( ) Rejected                                              │
+│ Reason for status                                                        │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Wait for two quarters of foundry margin data.                        │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│ Why interesting / why bought                                             │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Low P/B versus own 5y average; large asset base.                     │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│ Expected development                                                     │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Foundry losses shrink from 2027 on.                                  │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│ Sell / drop if                                                           │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Dividend cut followed by new share dilution.                         │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│ last updated 2026-10-05                            [ Cancel ]  [ Save ]  │
+╰──────────────────────────────────────────────────────────────────────────╯
 ```
 
 ---
@@ -204,8 +271,26 @@ Die Auswahl lässt sich nach Gruppe filtern.
   eine Aktie gemeint, die nur billig aussieht, weil das Geschäft Probleme hat.
 - Jede Angabe hat **Quelle und Datum**. Fehlendes wird als „not researched“ angezeigt, damit Lücken
   sichtbar bleiben.
+- **Alter der Daten:** Angaben älter als 6 Monate werden als veraltet markiert. Pro Aktie steht
+  „Last researched …“, damit niemand mit alten Zahlen entscheidet, die aktuell aussehen.
+- **Verlauf:** Neue Recherchen überschreiben alte Werte nicht spurlos. Ältere Stände sind
+  aufklappbar, z. B. wie sich das KGV oder die Einschätzung des Burggrabens verändert hat.
 - **Interessenkonflikt:** Hält der Betreiber die Aktie, wird das deutlich markiert
   („Owner holds this position“).
+
+### Investment-These (nur ADMIN)
+
+Value Investing heißt auch, vorher aufzuschreiben, *warum* man eine Aktie hält und *was* einen zum
+Verkauf bringen würde. Der ADMIN hält pro Aktie fest:
+
+- den Kaufgrund,
+- die erwartete Entwicklung,
+- die Verkaufsgründe,
+- einen Status `Watching` oder `Rejected` mit Begründung.
+
+„Holding“ ergibt sich automatisch aus dem Portfolio. Bei der Auswertung neuer Quartalsberichte
+prüft ein Abschnitt „Thesis check“, welche Aussagen die Annahmen stützen oder ihnen widersprechen,
+mit Seitenangabe. These, Status und Thesis check sind **nur für den ADMIN** sichtbar.
 
 ### Gruppen
 
@@ -255,6 +340,7 @@ Ablauf im Hintergrund funktioniert. Die eigentliche Analyse kommt später.
 | Berichte hochladen, ändern, löschen | ✅ | ❌ |
 | Chat und Berichtsauswertung | ✅ höheres Tageslimit | ✅ eigenes Tageslimit, eigener Verlauf |
 | Auswertung erzwingen | ✅ | ❌ |
+| Investment-These und Thesis check | ✅ | ❌ nicht sichtbar |
 
 Alle Rechte prüft das Backend. Ausgegraute Buttons im Frontend sind nur ein Hinweis für den Nutzer,
 kein Schutz.
