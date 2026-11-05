@@ -382,6 +382,38 @@ Markt-Screening und keine Alarme. Keine öffentliche Ansicht und keine Selbstreg
 
 ---
 
+## Sicherheit: Schutz des Logins
+
+**Warum:** Die Login-Seite ist öffentlich erreichbar, und jeder kann dort automatisiert Passwörter
+ausprobieren. Teure Schutzdienste wie Cognito oder eine WAF werden bewusst nicht eingesetzt, weil das
+Budget bei etwa 20 €/Monat liegt. Deshalb schützt sich das Backend selbst, ohne Zusatzkosten, gegen
+drei Angriffe:
+
+1. viele Passwörter von einem Rechner aus probieren → **Bremse pro IP**
+2. einen Account von vielen Rechnern aus angreifen → **Sperre pro Account**
+3. herausfinden, welche Benutzernamen existieren → **gleiche Antwort und gleiche Antwortzeit**
+
+| Baustein | Was er tut |
+|---|---|
+| `LoginThrottleInterceptor` + `LoginThrottleWebConfig` | Prüft bei jedem Login-Versuch zuerst die Bremse pro IP, noch bevor das Passwort angeschaut wird. Ab dem 6. Versuch pro Minute kommt `429` „Too many login attempts“ mit Wartezeit. Die Wartezeit wächst mit jeder Wiederholung von 1 bis auf 15 Minuten. |
+| `LoginAttemptGuard` | Hält die Zähler: Versuche pro IP und Fehlversuche pro Account. Nach 10 Fehlversuchen ist der Account 15 Minuten gesperrt. Unbekannte Benutzernamen werden nicht gezählt, damit niemand mit erfundenen Namen den Speicher füllen kann. |
+| `AuthController` | Beachtet beim Login die Sperre. Auch während der Sperre läuft die volle Passwortprüfung, und die Antwort ist gleich („Invalid username or password“). So verraten weder der Text noch die Antwortzeit, ob ein Account existiert oder gesperrt ist. |
+| `ClientIpResolver` | Ermittelt die IP-Adresse des Besuchers. Hinter API Gateway steht die echte IP im Header `X-Forwarded-For`. Ob diesem Header vertraut wird, ist eine Einstellung, standardmäßig aus, damit niemand seine IP fälschen kann. |
+| `LoginAudit` | Protokolliert jeden Login-Versuch mit Benutzername, IP und Grund, aber nie das Passwort. Steuerzeichen werden entfernt, damit niemand gefälschte Zeilen ins Protokoll schreiben kann. |
+| `ClockConfig` | Stellt die Uhrzeit als eigenen Baustein bereit. Dadurch können die Tests die Zeit vorspulen, statt 15 Minuten wirklich zu warten. |
+| `application.yml` | Enthält die Einstellung `app.security.trust-forwarded-for: false`. |
+| Tests | Prüfen Grenzen und Wartezeiten, die Sperre und ihr Ende, dass parallele Fehlversuche korrekt gezählt werden und dass unbekannte Namen nicht gespeichert werden. Außerdem prüfen sie, dass auch während der Sperre die Passwortprüfung läuft und dass die Bremse in der echten Verdrahtung aktiv ist. |
+
+Dazu kommen:
+
+- **Session-Cookie** statt Basic Auth: `HttpOnly`, `Secure`, `SameSite=Strict`, nach dem Login eine neue Session-ID.
+- **CSRF-Schutz** für alle ändernden Anfragen.
+- **Schreibrechte standardmäßig nur für ADMIN.** Ein vergessener Endpoint ist damit geschlossen statt offen.
+- In AWS zusätzlich die Drosselung der Login-Route durch API Gateway.
+
+**Bewusste Grenze:** Wer einen Benutzernamen kennt, kann diesen Nutzer für 15 Minuten aussperren. Das
+wird in Kauf genommen, weil es nur eine Handvoll persönlich vergebener Konten gibt.
+
 ## AWS-Infrastruktur (Zielbild, grob)
 
 Region `eu-central-1`.

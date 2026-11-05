@@ -1,5 +1,6 @@
 package com.valuescreener.security;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -8,6 +9,11 @@ import jakarta.servlet.http.Cookie;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+import java.time.Duration;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -25,6 +31,36 @@ class AuthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private MutableClock clock;
+
+    @Autowired
+    private LoginAttemptGuard guard;
+
+    @org.springframework.boot.test.mock.mockito.SpyBean
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping handlerMapping;
+
+    @BeforeEach
+    void resetThrottleState() {
+        // Guard state lives in the cached context; a long jump expires all windows, blocks and locks.
+        clock.advance(Duration.ofHours(2));
+    }
+
+    private static RequestPostProcessor fromIp(String ip) {
+        return request -> {
+            request.setRemoteAddr(ip);
+            return request;
+        };
+    }
+
+    private ResultActions loginFrom(String ip, String username, String password) throws Exception {
+        return mockMvc.perform(post("/api/auth/login").with(csrf()).with(fromIp(ip))
+                .contentType("application/json").content(body(username, password)));
+    }
 
     private static String body(String username, String password) {
         return "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
@@ -141,6 +177,86 @@ class AuthControllerTest {
                         .contentType("application/json").content("{not json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().json("{\"error\":\"Invalid request\"}", true));
+    }
+
+    @Test
+    void sixthAttemptWithinMinuteIs429WithRetryAfter() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            loginFrom("10.0.0.1", "nobody", "x").andExpect(status().isUnauthorized());
+        }
+        loginFrom("10.0.0.1", "admin", "admin-password-123456789")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(content().json("{\"error\":\"Too many login attempts\"}", true));
+        // Other IPs are unaffected, and the block ends after a minute.
+        loginFrom("10.0.0.2", "admin", "admin-password-123456789").andExpect(status().isOk());
+        clock.advance(Duration.ofSeconds(60));
+        loginFrom("10.0.0.1", "admin", "admin-password-123456789").andExpect(status().isOk());
+    }
+
+    @Test
+    void lockedAccountRejectsCorrectPasswordWithGenericMessage() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            loginFrom("10.1.0." + i, "alice", "wrong").andExpect(status().isUnauthorized());
+        }
+        loginFrom("10.1.1.1", "alice", "alice-password-1234")
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().json("{\"error\":\"Invalid username or password\"}", true));
+        clock.advance(Duration.ofMinutes(15));
+        loginFrom("10.1.1.1", "alice", "alice-password-1234").andExpect(status().isOk());
+    }
+
+    @Test
+    void lockedAccountStillDoesBcryptWorkAndNeverSucceeds() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            loginFrom("10.4.0." + i, "alice", "wrong").andExpect(status().isUnauthorized());
+        }
+        org.mockito.Mockito.clearInvocations(passwordEncoder);
+        loginFrom("10.4.1.1", "alice", "alice-password-1234")
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().json("{\"error\":\"Invalid username or password\"}", true));
+        org.mockito.Mockito.verify(passwordEncoder, org.mockito.Mockito.atLeastOnce())
+                .matches(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        assertThat(guard.isAccountLocked("alice")).isTrue();
+    }
+
+    @Test
+    void loginThrottleInterceptorIsRegisteredForLoginEndpoint() throws Exception {
+        var request = new org.springframework.mock.web.MockHttpServletRequest("POST", "/api/auth/login");
+        org.springframework.web.util.ServletRequestPathUtils.parseAndCache(request);
+        var chain = handlerMapping.getHandler(request);
+        assertThat(chain).isNotNull();
+        assertThat(chain.getInterceptorList()).anyMatch(i -> i instanceof LoginThrottleInterceptor);
+
+        var other = new org.springframework.mock.web.MockHttpServletRequest("GET", "/api/auth/me");
+        org.springframework.web.util.ServletRequestPathUtils.parseAndCache(other);
+        assertThat(handlerMapping.getHandler(other).getInterceptorList())
+                .noneMatch(i -> i instanceof LoginThrottleInterceptor);
+    }
+
+    @Test
+    void unknownUsernamesAreNotTracked() throws Exception {
+        int trackedBefore = guard.trackedAccountCount(); // the guard is shared across tests in the cached context
+        for (int i = 0; i < 50; i++) {
+            loginFrom("10.2.0." + i, UUID.randomUUID().toString(), "x")
+                    .andExpect(status().isUnauthorized());
+        }
+        assertThat(guard.trackedAccountCount()).isEqualTo(trackedBefore);
+        loginFrom("10.2.9.9", "admin", "admin-password-123456789").andExpect(status().isOk());
+    }
+
+    @Test
+    void malformedLoginBodyIs400AndCounts() throws Exception {
+        String[] bodies = {"{}", "not json", body("admin", "x".repeat(10_000))};
+        for (String b : bodies) {
+            mockMvc.perform(post("/api/auth/login").with(csrf()).with(fromIp("10.3.0.1"))
+                            .contentType("application/json").content(b))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().json("{\"error\":\"Invalid request\"}", true));
+        }
+        loginFrom("10.3.0.1", "nobody", "x").andExpect(status().isUnauthorized());
+        loginFrom("10.3.0.1", "nobody", "x").andExpect(status().isUnauthorized());
+        loginFrom("10.3.0.1", "nobody", "x").andExpect(status().isTooManyRequests());
     }
 
     @Test

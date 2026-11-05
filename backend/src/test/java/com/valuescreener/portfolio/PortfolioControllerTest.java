@@ -18,7 +18,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(PortfolioController.class)
+@WebMvcTest(value = PortfolioController.class, excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
+        type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
+        classes = com.valuescreener.security.LoginThrottleWebConfig.class))
 @AutoConfigureMockMvc(addFilters = false)
 class PortfolioControllerTest {
 

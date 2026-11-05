@@ -46,10 +46,19 @@ public class AuthController {
             new HttpSessionSecurityContextRepository();
     private final CsrfTokenRepository csrfTokenRepository;
     private final LogoutHandler logoutHandler;
+    private final LoginAttemptGuard guard;
+    private final ClientIpResolver ipResolver;
+    private final AccountRegistry accountRegistry;
 
     public AuthController(UserDetailsService userDetailsService,
                           PasswordEncoder passwordEncoder,
-                          CsrfTokenRepository csrfTokenRepository) {
+                          CsrfTokenRepository csrfTokenRepository,
+                          LoginAttemptGuard guard,
+                          ClientIpResolver ipResolver,
+                          AccountRegistry accountRegistry) {
+        this.guard = guard;
+        this.ipResolver = ipResolver;
+        this.accountRegistry = accountRegistry;
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
@@ -74,14 +83,33 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest login,
                                    HttpServletRequest request, HttpServletResponse response) throws IOException {
         String username = AccountRegistry.normalize(login.username());
+        String ip = ipResolver.resolve(request);
+        // An account lock gives the same answer as a wrong password, so it reveals nothing.
+        if (guard.isAccountLocked(username)) {
+            LoginAudit.failure(username, ip, "ACCOUNT_LOCKED");
+            // Do the same BCrypt work as a real attempt so response time does not reveal the lock; the
+            // outcome is discarded, even a correct password is not accepted.
+            try {
+                authenticationManager.authenticate(
+                        UsernamePasswordAuthenticationToken.unauthenticated(username, login.password()));
+            } catch (AuthenticationException ignored) {
+                // expected for wrong passwords
+            }
+            return invalidCredentials();
+        }
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(username, login.password()));
         } catch (AuthenticationException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(java.util.Map.of("error", "Invalid username or password"));
+            if (accountRegistry.exists(username)) {
+                guard.recordFailure(username);
+            }
+            LoginAudit.failure(username, ip, "BAD_CREDENTIALS");
+            return invalidCredentials();
         }
+        guard.recordSuccess(username);
+        LoginAudit.success(username, ip);
         sessionStrategy.onAuthentication(authentication, request, response);
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
@@ -91,6 +119,11 @@ public class AuthController {
         // does not need an extra round trip before its first write.
         csrfTokenRepository.saveToken(csrfTokenRepository.generateToken(request), request, response);
         return ResponseEntity.ok(toView(authentication));
+    }
+
+    private static ResponseEntity<?> invalidCredentials() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(java.util.Map.of("error", "Invalid username or password"));
     }
 
     @PostMapping("/logout")

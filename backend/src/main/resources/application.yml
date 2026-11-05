@@ -26,3 +26,5 @@ app:
     username: ${ADMIN_USERNAME:admin}
     password-hash: ${ADMIN_PASSWORD_HASH:}
   users: []
+  security:
+    trust-forwarded-for: false

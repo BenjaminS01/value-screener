@@ -1,5 +1,6 @@
 package com.valuescreener.security;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -13,8 +14,14 @@ import java.util.Map;
 @RestControllerAdvice(assignableTypes = AuthController.class)
 public class AuthExceptionHandler {
 
+    private static String ip(HttpServletRequest request) {
+        Object resolved = request.getAttribute(LoginThrottleInterceptor.CLIENT_IP_ATTRIBUTE);
+        return resolved != null ? resolved.toString() : request.getRemoteAddr();
+    }
+
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
-    public ResponseEntity<Map<String, String>> invalidRequest() {
+    public ResponseEntity<Map<String, String>> invalidRequest(HttpServletRequest request) {
+        LoginAudit.failure(null, ip(request), "MALFORMED");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid request"));
     }
 }
