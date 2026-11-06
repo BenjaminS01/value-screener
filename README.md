@@ -501,57 +501,79 @@ das restliche Home-Verzeichnis (der Skill weist in seinem Security-Abschnitt sel
 ab, falls er außerhalb der Sandbox gestartet wird):
 
 ```bash
-export ADMIN_USERNAME=admin
-export ADMIN_PASSWORD=<dein-klartext-passwort>
+export RESEARCH_INGEST_TOKEN='<token aus MachineTokenGenerator>'
 ./docker/claude-sandbox/run.sh
 ```
 
-Selbst falls die Prompt-Injection-Mitigation versagt, bleibt ein potenzieller Schaden auf das gemountete
-Repo beschränkt statt auf den restlichen Rechner überzugreifen.
+Was die Sandbox dabei bekommt und was nicht:
+
+- **Kein ADMIN-Passwort.** Die Sandbox erhält nur `RESEARCH_INGEST_TOKEN`, ein Bearer-Token mit genau einem
+  Recht: `POST /api/research/ingest/snapshots` am **lokalen** Backend. Es öffnet weder Portfolio noch
+  Login-Endpoints noch das Live-System.
+- **Das Repo ist read-only gemountet** (`/workspace:ro`). Eine manipulierte Sitzung kann keine Skripte
+  ändern, die der Betreiber später auf dem Host ausführt.
+- **Der Ingest-Endpoint existiert nur lokal.** Er ist nur mit `app.research-ingest.enabled=true`
+  (Profil `local`) registriert, sonst antwortet der Pfad mit `404`. In AWS ist er nie aktiv.
+- **Der Skill zeigt vor dem Senden das vollständige JSON** und wartet auf dein ausdrückliches OK.
+- **Achtung, `.env` ist aus der Sandbox lesbar** (read-only heißt nicht unlesbar). Deshalb stehen dort nur
+  **Hashes** (`ADMIN_PASSWORD_HASH`, `APP_RESEARCH_INGEST_TOKEN_HASH`), nie Klartext-Tokens oder
+  -Passwörter. Aus dem gleichen Grund ist ein **starkes ADMIN-Passwort** wichtig: Wer den bcrypt-Hash
+  lesen kann, kann offline raten.
+
+Selbst falls die Prompt-Injection-Mitigation versagt, bleibt ein potenzieller Schaden auf das Schreiben
+einzelner Snapshots in die lokale Datenbank beschränkt.
+
+### Token erzeugen
+
+Einmalig, analog zum Admin-Passwort-Hash (siehe unten):
+
+```bash
+cd backend
+mvn -q spring-boot:run -Dspring-boot.run.main-class=com.valuescreener.security.MachineTokenGenerator
+```
+
+(Alternativ nach `mvn compile`: `java -cp target/classes com.valuescreener.security.MachineTokenGenerator`.)
+
+Ausgabe: zwei Zeilen `token=<...>` und `sha256=<...>`.
+
+- `sha256` kommt als `APP_RESEARCH_INGEST_TOKEN_HASH=<sha256>` in die `.env` (siehe `.env.example`). Das
+  lokale Backend (`dev-up.sh`, Profil `local`) startet nicht ohne diesen Wert.
+- `token` wird **nur** in der Shell exportiert, die die Sandbox startet: `export RESEARCH_INGEST_TOKEN='<token>'`.
+  Nicht in `.env`, nicht ins Repo.
 
 ### Manueller Testablauf für den `research-company`-Skill
 
-Es gibt ein Passwort, das an zwei Stellen in zwei Formen gebraucht wird: das Backend speichert nur den
-bcrypt-**Hash** (`ADMIN_PASSWORD_HASH`), der Skill braucht für HTTP Basic Auth das **Klartext-Passwort**
-(`ADMIN_PASSWORD`). Beide müssen zum selben Passwort gehören.
-
-1. **Hash erzeugen** (einmalig, z. B. per `AdminPasswordHashGenerator`, siehe oben "Admin-Passwort-Hash
-   erzeugen", oder extern per beliebigem bcrypt-Tool).
-2. **Backend starten** (Terminal 1):
+1. **Token und Hash erzeugen** (siehe oben) und den Hash als `APP_RESEARCH_INGEST_TOKEN_HASH` in die `.env`
+   eintragen. Außerdem muss `ADMIN_PASSWORD_HASH` gesetzt sein (siehe "Admin-Passwort-Hash erzeugen").
+2. **Backend starten** (Terminal 1, im Projekt-Root; startet auch Postgres und das Frontend):
    ```bash
-   cd backend
-   export ADMIN_USERNAME=admin
-   export ADMIN_PASSWORD_HASH='<Hash aus Schritt 1>'
-   mvn spring-boot:run
+   ./dev-up.sh
    ```
-   Falls Verbindungsfehler zu Postgres: `docker compose up -d` (siehe oben) zuerst ausführen.
+   Alternativ nur das Backend: `APP_RESEARCH_INGEST_TOKEN_HASH` und `ADMIN_PASSWORD_HASH` exportieren und
+   `cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=local` (ohne Profil `local` ist der Ingest-
+   Endpoint aus).
 3. **Sandbox starten** (Terminal 2, im Projekt-Root):
    ```bash
-   export ADMIN_USERNAME=admin
-   export ADMIN_PASSWORD='<Klartext-Passwort aus Schritt 1>'
+   export RESEARCH_INGEST_TOKEN='<token aus Schritt 1>'
    ./docker/claude-sandbox/run.sh
    ```
    Beim allerersten Start fragt Claude Code im Container einmalig nach Login — separat vom Host-Login,
-   bleibt danach im benannten Docker-Volume erhalten.
+   bleibt danach im benannten Docker-Volume erhalten. Prüfe beim ersten Start, dass Claude Code mit dem
+   read-only gemounteten `/workspace` normal startet.
 4. **Recherche anstoßen** (im Sandbox-Prompt): z. B. `research AAPL`. Der Skill sollte automatisch
-   greifen, mit `WebSearch`/`WebFetch` recherchieren (nie `company-research-agent` aufrufen) und am Ende
-   selbst per `curl -X POST` an `http://host.docker.internal:8080/api/research/snapshots` persistieren.
-5. **Von außen verifizieren** (Terminal 1 oder ein drittes, **nicht** in der Sandbox —
-   `ADMIN_USERNAME`/`ADMIN_PASSWORD` müssen dort erneut exportiert sein):
+   greifen, mit `WebSearch`/`WebFetch` recherchieren (nie `company-research-agent` aufrufen), dir das
+   vollständige JSON zeigen und nach deinem OK per `curl -X POST` an
+   `http://host.docker.internal:8080/api/research/ingest/snapshots` persistieren.
+5. **Von außen verifizieren** (Terminal 1 oder ein drittes, **nicht** in der Sandbox). Das Lesen läuft über
+   die Session des Browsers; im UI unter "Research" erscheint der neue Snapshot mit den Findings, jedes mit
+   eigener Quelle (`sourceUrl`), Datum (`asOfDate`) und deskriptiv formuliertem `claim`. Den Ingest-Endpoint
+   selbst kannst du so prüfen (Token wird nicht auf der Kommandozeile übergeben):
    ```bash
-   curl -i -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" http://localhost:8080/api/research/snapshots/<ISIN>
+   curl -i -H @<(printf 'Authorization: Bearer %s\n' "$RESEARCH_INGEST_TOKEN") \
+     -H 'Content-Type: application/json' -d '{}' http://localhost:8080/api/research/ingest/snapshots
    ```
-   Erwartet: `HTTP/1.1 200` und die recherchierten Findings als JSON, jedes mit eigener Quelle
-   (`sourceUrl`), Datum (`asOfDate`) und deskriptiv formuliertem `claim`.
-
-## Phase 1: Projekt-Grundgerüst + Portfolio-Grundfunktion
-
-### Voraussetzungen
-
-- Java 21
-- Maven 3.9+
-- Node.js 20+
-- Docker (für die lokale Postgres-Instanz)
+   Erwartet: `HTTP/1.1 400` (Token akzeptiert, leeres Payload abgelehnt). Ohne oder mit falschem Token:
+   `401` mit `{"error":"Authentication required"}`; ohne Profil `local`: `404`.
 
 ### Lokale Postgres-Datenbank starten
 

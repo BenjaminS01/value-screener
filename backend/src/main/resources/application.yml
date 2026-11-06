@@ -28,3 +28,7 @@ app:
   users: []
   security:
     trust-forwarded-for: false
+  research-ingest:
+    enabled: false
+  research-sync:
+    enabled: false

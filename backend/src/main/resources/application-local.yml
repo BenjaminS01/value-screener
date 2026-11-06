@@ -3,3 +3,7 @@ server:
     session:
       cookie:
         secure: false
+
+app:
+  research-ingest:
+    enabled: true

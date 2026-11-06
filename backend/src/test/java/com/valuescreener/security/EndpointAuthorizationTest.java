@@ -41,7 +41,7 @@ class EndpointAuthorizationTest {
     private CompanySnapshotService companySnapshotService;
 
     static Stream<String> writeEndpoints() {
-        return Stream.of("/api/portfolio", "/api/portfolio/sell", "/api/research/snapshots");
+        return Stream.of("/api/portfolio", "/api/portfolio/sell");
     }
 
     private MockHttpServletRequestBuilder write(String path) {
@@ -104,6 +104,12 @@ class EndpointAuthorizationTest {
     @MethodSource("portfolioItemWrites")
     void anonymousPutAndDeleteAre401(MockHttpServletRequestBuilder request) throws Exception {
         mockMvc.perform(request.with(csrf())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void oldPostSnapshotsEndpointIsGone() throws Exception {
+        mockMvc.perform(write("/api/research/snapshots").with(user("admin").roles("ADMIN")).with(csrf()))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test

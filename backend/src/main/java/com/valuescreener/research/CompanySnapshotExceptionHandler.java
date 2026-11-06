@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = CompanySnapshotController.class)
+@RestControllerAdvice(assignableTypes = {CompanySnapshotController.class, ResearchIngestController.class})
 public class CompanySnapshotExceptionHandler {
 
     @ExceptionHandler(CompanySnapshotNotFoundException.class)

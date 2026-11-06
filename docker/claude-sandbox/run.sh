@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs Claude Code in an isolated container with only this repo mounted in —
+# Runs Claude Code in an isolated container with only this repo mounted in (read-only) —
 # not the host's home directory. See README.md "Sandbox für Web-Recherche-Skills".
 #
 # Logs in on its own (first run only) instead of reusing the host's real
@@ -17,9 +17,9 @@ docker build -t "$IMAGE" "$SCRIPT_DIR"
 
 docker run -it --rm \
   --add-host=host.docker.internal:host-gateway \
-  -v "$REPO_ROOT:/workspace" \
+  -v "$REPO_ROOT:/workspace:ro" \
   -v "value-screener-claude-sandbox-home:/root/.claude" \
-  -e ADMIN_USERNAME \
-  -e ADMIN_PASSWORD \
+  -e RESEARCH_INGEST_TOKEN \
+  -e VALUE_SCREENER_SANDBOX=1 \
   -e BACKEND_URL=http://host.docker.internal:8080 \
   "$IMAGE" "$@"

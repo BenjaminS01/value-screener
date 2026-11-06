@@ -19,6 +19,13 @@ if [[ -z "${ADMIN_PASSWORD_HASH:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "${APP_RESEARCH_INGEST_TOKEN_HASH:-}" ]]; then
+  echo "APP_RESEARCH_INGEST_TOKEN_HASH is not set in .env (the local profile enables the research ingest endpoint)."
+  echo "Generate a token + hash first (see .env.example):"
+  echo "  cd backend && mvn -q spring-boot:run -Dspring-boot.run.main-class=com.valuescreener.security.MachineTokenGenerator"
+  exit 1
+fi
+
 mkdir -p logs
 
 echo "==> Starting Postgres (docker compose)"

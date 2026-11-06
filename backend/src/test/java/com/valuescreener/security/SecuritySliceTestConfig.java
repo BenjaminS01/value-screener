@@ -13,7 +13,7 @@ import java.util.List;
  * admin / admin-password-123456789 (ADMIN), alice / alice-password-1234 (USER).
  */
 @TestConfiguration
-@Import({SecurityConfig.class, AccountRegistry.class, JsonSecurityErrorHandlers.class,
+@Import({SecurityConfig.class, MachineTokenSecurityConfig.class, AccountRegistry.class, JsonSecurityErrorHandlers.class,
         LoginAttemptGuard.class, ClientIpResolver.class,
         LoginThrottleWebConfig.class})
 public class SecuritySliceTestConfig {
