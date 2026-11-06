@@ -4,6 +4,8 @@ import com.valuescreener.portfolio.PortfolioController;
 import com.valuescreener.portfolio.PortfolioService;
 import com.valuescreener.research.CompanySnapshotController;
 import com.valuescreener.research.CompanySnapshotService;
+import com.valuescreener.research.StockGroupController;
+import com.valuescreener.research.StockGroupService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -22,12 +24,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({PortfolioController.class, CompanySnapshotController.class})
+@WebMvcTest({PortfolioController.class, CompanySnapshotController.class, StockGroupController.class})
 @Import(SecuritySliceTestConfig.class)
 class EndpointAuthorizationTest {
 
@@ -39,6 +42,9 @@ class EndpointAuthorizationTest {
 
     @MockBean
     private CompanySnapshotService companySnapshotService;
+
+    @MockBean
+    private StockGroupService stockGroupService;
 
     static Stream<String> writeEndpoints() {
         return Stream.of("/api/portfolio", "/api/portfolio/sell");
@@ -139,5 +145,32 @@ class EndpointAuthorizationTest {
     @Test
     void nonErrorDispatchToUnknownPathStillRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/error")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void groupListAsUserIs200() throws Exception {
+        mockMvc.perform(get("/api/research/groups").with(user("alice").roles("USER")))
+                .andExpect(status().isOk());
+    }
+
+    static Stream<MockHttpServletRequestBuilder> groupWrites() {
+        return Stream.of(
+                post("/api/research/groups").contentType("application/json").content("{\"key\":\"X_Y\",\"name\":\"X\"}"),
+                patch("/api/research/groups/BANKS").contentType("application/json").content("{\"name\":\"X\"}"),
+                delete("/api/research/groups/BANKS"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("groupWrites")
+    void groupWritesAsUserAre403(MockHttpServletRequestBuilder request) throws Exception {
+        mockMvc.perform(request.with(user("alice").roles("USER")).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest
+    @MethodSource("groupWrites")
+    void groupWritesAsAdminAreNotRejectedBySecurity(MockHttpServletRequestBuilder request) throws Exception {
+        MvcResult result = mockMvc.perform(request.with(user("admin").roles("ADMIN")).with(csrf())).andReturn();
+        assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
     }
 }

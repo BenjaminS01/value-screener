@@ -6,4 +6,6 @@ import java.util.Optional;
 
 public interface CompanySnapshotRepository extends JpaRepository<CompanySnapshot, Long> {
     Optional<CompanySnapshot> findByIsin(String isin);
+
+    long countByStockGroup_Key(String key);
 }
