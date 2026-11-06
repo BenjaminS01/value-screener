@@ -173,4 +173,26 @@ class EndpointAuthorizationTest {
         MvcResult result = mockMvc.perform(request.with(user("admin").roles("ADMIN")).with(csrf())).andReturn();
         assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
     }
+
+    private static MockHttpServletRequestBuilder putGroup() {
+        return put("/api/research/snapshots/US0378331005/group")
+                .contentType("application/json").content("{\"groupKey\":\"BANKS\"}");
+    }
+
+    @Test
+    void putSnapshotGroupAsUserIs403() throws Exception {
+        mockMvc.perform(putGroup().with(user("alice").roles("USER")).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void putSnapshotGroupAnonymousIs401() throws Exception {
+        mockMvc.perform(putGroup().with(csrf())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void putSnapshotGroupAsAdminIsNotRejectedBySecurity() throws Exception {
+        MvcResult result = mockMvc.perform(putGroup().with(user("admin").roles("ADMIN")).with(csrf())).andReturn();
+        assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+    }
 }

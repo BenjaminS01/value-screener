@@ -43,4 +43,11 @@ class StockGroupTest {
         assertThat(group.getSortOrder()).isEqualTo(15);
         assertThatThrownBy(() -> group.rename(" ")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rejectsReservedKeyNone() {
+        assertThatThrownBy(() -> new StockGroup("none", "None", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+    }
 }

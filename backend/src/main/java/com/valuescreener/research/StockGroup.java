@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
 public class StockGroup {
 
     private static final Pattern KEY_PATTERN = Pattern.compile("[A-Z][A-Z0-9_]{1,39}");
+    /** Reserved: "?group=none" filters ungrouped stocks. */
+    private static final String RESERVED_NONE = "NONE";
 
     @Id
     @Column(name = "key", length = 40)
@@ -47,6 +49,9 @@ public class StockGroup {
         String normalized = trimUpper(key);
         if (!KEY_PATTERN.matcher(normalized).matches()) {
             throw new IllegalArgumentException("key must match [A-Z][A-Z0-9_]{1,39}");
+        }
+        if (RESERVED_NONE.equals(normalized)) {
+            throw new IllegalArgumentException("key NONE is reserved");
         }
         return normalized;
     }

@@ -1,17 +1,22 @@
 package com.valuescreener.portfolio;
 
+import com.valuescreener.research.StockGroupLookup;
+import com.valuescreener.research.StockGroupRef;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PortfolioService {
 
     private final PortfolioPositionRepository repository;
+    private final StockGroupLookup stockGroups;
 
-    public PortfolioService(PortfolioPositionRepository repository) {
+    public PortfolioService(PortfolioPositionRepository repository, StockGroupLookup stockGroups) {
         this.repository = repository;
+        this.stockGroups = stockGroups;
     }
 
     @Transactional
@@ -56,17 +61,28 @@ public class PortfolioService {
         repository.delete(find(isin));
     }
 
+    @Transactional(readOnly = true)
     public List<PortfolioPositionView> listForUser() {
-        return repository.findAll().stream()
-                .map(p -> new PortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName()))
+        List<PortfolioPosition> positions = repository.findAll();
+        Map<String, StockGroupRef> groups = groupsFor(positions);
+        return positions.stream()
+                .map(p -> new PortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName(),
+                        groups.get(p.getIsin())))
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<AdminPortfolioPositionView> listForAdmin() {
-        return repository.findAll().stream()
+        List<PortfolioPosition> positions = repository.findAll();
+        Map<String, StockGroupRef> groups = groupsFor(positions);
+        return positions.stream()
                 .map(p -> new AdminPortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName(),
-                        p.getQuantity(), p.getEntryPrice(), p.getPurchaseDate()))
+                        groups.get(p.getIsin()), p.getQuantity(), p.getEntryPrice(), p.getPurchaseDate()))
                 .toList();
+    }
+
+    private Map<String, StockGroupRef> groupsFor(List<PortfolioPosition> positions) {
+        return stockGroups.groupsByIsin(positions.stream().map(PortfolioPosition::getIsin).toList());
     }
 
     private PortfolioPosition find(String isin) {

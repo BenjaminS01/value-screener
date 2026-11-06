@@ -53,7 +53,7 @@ class PortfolioControllerTest {
     @Test
     void adminGetsHoldingsFields() throws Exception {
         when(portfolioService.listForAdmin()).thenReturn(List.of(new AdminPortfolioPositionView(
-                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15))));
+                "AAPL", "US0378331005", "Apple Inc.", null, new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15))));
 
         mockMvc.perform(get("/api/portfolio").principal(ADMIN))
                 .andExpect(status().isOk())
@@ -66,7 +66,7 @@ class PortfolioControllerTest {
     @Test
     void userResponseHasNoHoldingsKeys() throws Exception {
         when(portfolioService.listForUser())
-                .thenReturn(List.of(new PortfolioPositionView("AAPL", "US0378331005", "Apple Inc.")));
+                .thenReturn(List.of(new PortfolioPositionView("AAPL", "US0378331005", "Apple Inc.", null)));
 
         mockMvc.perform(get("/api/portfolio").principal(USER))
                 .andExpect(status().isOk())
@@ -79,6 +79,20 @@ class PortfolioControllerTest {
         verify(portfolioService, never()).listForAdmin();
     }
 
+
+    @Test
+    void userViewHasGroupButNoHoldings() throws Exception {
+        when(portfolioService.listForUser()).thenReturn(List.of(new PortfolioPositionView(
+                "AAPL", "US0378331005", "Apple Inc.", new com.valuescreener.research.StockGroupRef("SEMICONDUCTORS", "Semiconductors"))));
+
+        mockMvc.perform(get("/api/portfolio").principal(USER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].group.key").value("SEMICONDUCTORS"))
+                .andExpect(jsonPath("$[0].group.name").value("Semiconductors"))
+                .andExpect(jsonPath("$[0].quantity").doesNotExist())
+                .andExpect(jsonPath("$[0].entryPrice").doesNotExist())
+                .andExpect(jsonPath("$[0].purchaseDate").doesNotExist());
+    }
     @Test
     void putReturns204() throws Exception {
         mockMvc.perform(put("/api/portfolio/US0378331005").contentType("application/json").content(CORRECTION))

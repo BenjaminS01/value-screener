@@ -1,5 +1,7 @@
 package com.valuescreener.research;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -8,22 +10,32 @@ import java.util.List;
 @Service
 public class CompanySnapshotService {
 
-    private final CompanySnapshotRepository repository;
+    private static final Logger log = LoggerFactory.getLogger(CompanySnapshotService.class);
+    private static final String NO_GROUP_FILTER = "none";
 
-    public CompanySnapshotService(CompanySnapshotRepository repository) {
+    private final CompanySnapshotRepository repository;
+    private final StockGroupService groups;
+
+    public CompanySnapshotService(CompanySnapshotRepository repository, StockGroupService groups) {
         this.repository = repository;
+        this.groups = groups;
     }
 
     @Transactional
-    public CompanySnapshotView upsert(UpsertCompanySnapshotRequest request) {
+    public CompanySnapshotView upsert(UpsertCompanySnapshotRequest request, GroupSource source) {
         String normalizedIsin = request.isin().trim().toUpperCase();
         CompanySnapshot snapshot = repository.findByIsin(normalizedIsin).orElse(null);
+        StockGroup group = groups.require(StockGroup.trimUpper(request.groupKey()));
         if (snapshot == null) {
             snapshot = new CompanySnapshot(request.ticker(), request.isin(), request.companyName(),
-                    request.sector(), request.country(), request.businessDescription());
+                    request.country(), request.businessDescription());
         } else {
-            snapshot.applyUpdate(request.companyName(), request.sector(), request.country(),
-                    request.businessDescription());
+            snapshot.applyUpdate(request.companyName(), request.country(), request.businessDescription());
+        }
+        StockGroup kept = snapshot.getStockGroup();
+        if (!snapshot.assignGroup(group, source) && (kept == null || !kept.getKey().equals(group.getKey()))) {
+            log.info("group proposal ignored isin={} proposed={} kept={}",
+                    normalizedIsin, group.getKey(), kept == null ? null : kept.getKey());
         }
         List<FindingRequest> findings = request.findings() != null ? request.findings() : List.of();
         for (FindingRequest finding : findings) {
@@ -33,16 +45,38 @@ public class CompanySnapshotService {
         return CompanySnapshotView.from(repository.save(snapshot));
     }
 
+    @Transactional
+    public CompanySnapshotView assignGroupManually(String isin, String groupKey) {
+        String normalizedIsin = normalizeIsin(isin);
+        CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
+                .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
+        snapshot.assignGroup(groups.require(StockGroup.trimUpper(groupKey)), GroupSource.MANUAL);
+        return CompanySnapshotView.from(repository.save(snapshot));
+    }
+
+    /** null = all, "none" = ungrouped, otherwise a (normalized) group key; an unknown key yields an empty list. */
     @Transactional(readOnly = true)
-    public List<CompanySnapshotView> listAll() {
-        return repository.findAll().stream().map(CompanySnapshotView::from).toList();
+    public List<CompanySnapshotView> list(String groupFilter) {
+        List<CompanySnapshot> snapshots;
+        if (groupFilter == null) {
+            snapshots = repository.findAll();
+        } else if (NO_GROUP_FILTER.equalsIgnoreCase(groupFilter.trim())) {
+            snapshots = repository.findAllByStockGroupIsNull();
+        } else {
+            snapshots = repository.findAllByStockGroup_Key(StockGroup.trimUpper(groupFilter));
+        }
+        return snapshots.stream().map(CompanySnapshotView::from).toList();
     }
 
     @Transactional(readOnly = true)
     public CompanySnapshotView getByIsin(String isin) {
-        String normalizedIsin = isin.trim().toUpperCase();
+        String normalizedIsin = normalizeIsin(isin);
         return repository.findByIsin(normalizedIsin)
                 .map(CompanySnapshotView::from)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(isin));
+    }
+
+    private static String normalizeIsin(String isin) {
+        return isin == null ? "" : isin.trim().toUpperCase();
     }
 }

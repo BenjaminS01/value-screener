@@ -5,6 +5,7 @@ import com.valuescreener.portfolio.PortfolioService;
 import com.valuescreener.research.CompanySnapshotService;
 import com.valuescreener.research.CompanySnapshotView;
 import com.valuescreener.research.ResearchIngestController;
+import com.valuescreener.research.StockGroupService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -35,7 +36,7 @@ class MachineTokenSecurityTest {
     static final String SYNC_TOKEN_HASH = "a2f6fa2e108788e52648c1ff4d7c11c54e7f3909d4534b9b9063668f913f476b";
     static final String BODY = """
             {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.",
-             "sector":"Information Technology","country":"USA",
+             "country":"USA","groupKey":"SEMICONDUCTORS",
              "businessDescription":"Designs consumer electronics.","findings":[]}
             """;
     static final String UNAUTHENTICATED_JSON = "{\"error\":\"Authentication required\"}";
@@ -54,16 +55,28 @@ class MachineTokenSecurityTest {
         private CompanySnapshotService snapshotService;
 
         @MockBean
+        private StockGroupService groupService;
+
+        @MockBean
         private PortfolioService portfolioService;
 
         @Test
         void validTokenCanPostSnapshot() throws Exception {
-            when(snapshotService.upsert(any())).thenReturn(new CompanySnapshotView(
-                    1L, "AAPL", "US0378331005", "Apple Inc.", "IT", "USA", "x", List.of()));
+            when(snapshotService.upsert(any(), any())).thenReturn(new CompanySnapshotView(
+                    1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of()));
             mockMvc.perform(post("/api/research/ingest/snapshots")
                             .header("Authorization", "Bearer " + TOKEN)
                             .contentType("application/json").content(BODY))
                     .andExpect(status().isOk());
+        }
+
+        @Test
+        void tokenCanReadGroupCatalogAndAnonymousCannot() throws Exception {
+            mockMvc.perform(get("/api/research/ingest/groups").header("Authorization", "Bearer " + TOKEN))
+                    .andExpect(status().isOk());
+            mockMvc.perform(get("/api/research/ingest/groups"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(content().json(UNAUTHENTICATED_JSON));
         }
 
         @Test
@@ -135,6 +148,9 @@ class MachineTokenSecurityTest {
         private CompanySnapshotService snapshotService;
 
         @MockBean
+        private StockGroupService groupService;
+
+        @MockBean
         private PortfolioService portfolioService;
 
         @Test
@@ -164,6 +180,9 @@ class MachineTokenSecurityTest {
 
         @MockBean
         private CompanySnapshotService snapshotService;
+
+        @MockBean
+        private StockGroupService groupService;
 
         @MockBean
         private PortfolioService portfolioService;
