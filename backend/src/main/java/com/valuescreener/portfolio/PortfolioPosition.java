@@ -59,6 +59,20 @@ public class PortfolioPosition {
         this.purchaseDate = Objects.requireNonNull(purchaseDate, "purchaseDate must not be null");
     }
 
+    /** Replaces all mutable fields; the ISIN is intentionally not changeable. */
+    public void correct(String ticker, String companyName, BigDecimal quantity, BigDecimal entryPrice, LocalDate purchaseDate) {
+        String validTicker = requireValidTicker(ticker);
+        String validCompanyName = requireNonBlank(companyName, "companyName");
+        BigDecimal validQuantity = requirePositive(quantity, "quantity");
+        BigDecimal validEntryPrice = requirePositive(entryPrice, "entryPrice");
+        LocalDate validPurchaseDate = Objects.requireNonNull(purchaseDate, "purchaseDate must not be null");
+        this.ticker = validTicker;
+        this.companyName = validCompanyName;
+        this.quantity = validQuantity;
+        this.entryPrice = validEntryPrice;
+        this.purchaseDate = validPurchaseDate;
+    }
+
     private static String requireValidTicker(String ticker) {
         if (ticker == null || ticker.isBlank()) {
             throw new IllegalArgumentException("ticker must not be blank");

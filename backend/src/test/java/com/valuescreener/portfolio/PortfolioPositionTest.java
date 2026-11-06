@@ -136,4 +136,29 @@ class PortfolioPositionTest {
         assertThat(position.getQuantity()).isEqualByComparingTo("0");
         assertThat(position.isClosed()).isTrue();
     }
+
+    @Test
+    void correctReplacesFieldsAndKeepsIsin() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        position.correct(" aapl2 ", " Apple Corp. ", new BigDecimal("7"), new BigDecimal("111.50"), LocalDate.of(2026, 2, 2));
+
+        assertThat(position.getIsin()).isEqualTo("US0378331005");
+        assertThat(position.getTicker()).isEqualTo("AAPL2");
+        assertThat(position.getCompanyName()).isEqualTo("Apple Corp.");
+        assertThat(position.getQuantity()).isEqualByComparingTo("7");
+        assertThat(position.getEntryPrice()).isEqualByComparingTo("111.50");
+        assertThat(position.getPurchaseDate()).isEqualTo(LocalDate.of(2026, 2, 2));
+    }
+
+    @Test
+    void correctRejectsNonPositiveQuantity() {
+        PortfolioPosition position = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("20"), new BigDecimal("160.00"), LocalDate.of(2026, 1, 15));
+
+        assertThatThrownBy(() -> position.correct("AAPL", "Apple Inc.", BigDecimal.ZERO, new BigDecimal("160.00"), LocalDate.of(2026, 1, 15)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(position.getQuantity()).isEqualByComparingTo("20");
+    }
 }

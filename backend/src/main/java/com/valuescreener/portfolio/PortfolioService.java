@@ -43,9 +43,35 @@ public class PortfolioService {
         }
     }
 
-    public List<PublicPortfolioPositionView> listPublicPositions() {
+    @Transactional
+    public void correct(String isin, CorrectPositionRequest request) {
+        PortfolioPosition position = find(isin);
+        position.correct(request.ticker(), request.companyName(), request.quantity(),
+                request.entryPrice(), request.purchaseDate());
+        repository.save(position);
+    }
+
+    @Transactional
+    public void delete(String isin) {
+        repository.delete(find(isin));
+    }
+
+    public List<PortfolioPositionView> listForUser() {
         return repository.findAll().stream()
-                .map(position -> new PublicPortfolioPositionView(position.getTicker(), position.getCompanyName(), position.getIsin()))
+                .map(p -> new PortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName()))
                 .toList();
+    }
+
+    public List<AdminPortfolioPositionView> listForAdmin() {
+        return repository.findAll().stream()
+                .map(p -> new AdminPortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName(),
+                        p.getQuantity(), p.getEntryPrice(), p.getPurchaseDate()))
+                .toList();
+    }
+
+    private PortfolioPosition find(String isin) {
+        String normalized = isin == null ? "" : isin.trim().toUpperCase();
+        return repository.findByIsin(normalized)
+                .orElseThrow(() -> new PositionNotFoundException(normalized));
     }
 }

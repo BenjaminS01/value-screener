@@ -93,14 +93,86 @@ class PortfolioServiceTest {
     }
 
     @Test
-    void listPublicPositionsExposesTickerCompanyNameAndIsin() {
+    void listForUserExposesOnlyTickerIsinAndCompanyName() {
         PortfolioService service = new PortfolioService(repository);
         PortfolioPosition position = new PortfolioPosition(
                 "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
         when(repository.findAll()).thenReturn(List.of(position));
 
-        List<PublicPortfolioPositionView> result = service.listPublicPositions();
+        assertThat(service.listForUser())
+                .containsExactly(new PortfolioPositionView("MSFT", "US5949181045", "Microsoft Corp."));
+    }
 
-        assertThat(result).containsExactly(new PublicPortfolioPositionView("MSFT", "Microsoft Corp.", "US5949181045"));
+    @Test
+    void listForAdminIncludesHoldings() {
+        PortfolioService service = new PortfolioService(repository);
+        PortfolioPosition position = new PortfolioPosition(
+                "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
+        when(repository.findAll()).thenReturn(List.of(position));
+
+        assertThat(service.listForAdmin()).containsExactly(new AdminPortfolioPositionView(
+                "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1)));
+    }
+
+    private static CorrectPositionRequest correction() {
+        return new CorrectPositionRequest("AAPL", "Apple Inc.", new BigDecimal("3"), new BigDecimal("99.00"), LocalDate.of(2026, 4, 1));
+    }
+
+    @Test
+    void correctUnknownIsinThrowsNotFound() {
+        PortfolioService service = new PortfolioService(repository);
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.correct("US0378331005", correction()))
+                .isInstanceOf(PositionNotFoundException.class);
+    }
+
+    @Test
+    void correctUpdatesPositionAndSaves() {
+        PortfolioService service = new PortfolioService(repository);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+
+        service.correct("US0378331005", correction());
+
+        verify(repository).save(existing);
+        assertThat(existing.getQuantity()).isEqualByComparingTo("3");
+        assertThat(existing.getEntryPrice()).isEqualByComparingTo("99.00");
+    }
+
+    @Test
+    void deleteRemovesPosition() {
+        PortfolioService service = new PortfolioService(repository);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+
+        service.delete("US0378331005");
+
+        verify(repository).delete(existing);
+    }
+
+    @Test
+    void deleteUnknownIsinThrowsNotFound() {
+        PortfolioService service = new PortfolioService(repository);
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.delete("US0378331005"))
+                .isInstanceOf(PositionNotFoundException.class);
+    }
+
+    @Test
+    void correctAndDeleteNormalizeIsin() {
+        PortfolioService service = new PortfolioService(repository);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+
+        service.correct(" us0378331005 ", correction());
+        service.delete(" us0378331005 ");
+
+        verify(repository).save(existing);
+        verify(repository).delete(existing);
     }
 }

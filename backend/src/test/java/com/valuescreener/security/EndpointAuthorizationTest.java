@@ -20,8 +20,10 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -75,6 +77,33 @@ class EndpointAuthorizationTest {
     void adminWriteWithoutCsrfIs403(String path) throws Exception {
         mockMvc.perform(write(path).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isForbidden());
+    }
+
+    static Stream<MockHttpServletRequestBuilder> portfolioItemWrites() {
+        String body = "{\"ticker\":\"AAPL\",\"companyName\":\"Apple\",\"quantity\":1,\"entryPrice\":1,\"purchaseDate\":\"2026-04-01\"}";
+        return Stream.of(
+                put("/api/portfolio/US0378331005").contentType("application/json").content(body),
+                delete("/api/portfolio/US0378331005"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("portfolioItemWrites")
+    void userPutAndDeleteAre403(MockHttpServletRequestBuilder request) throws Exception {
+        mockMvc.perform(request.with(user("alice").roles("USER")).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest
+    @MethodSource("portfolioItemWrites")
+    void adminPutAndDeleteAreNot403(MockHttpServletRequestBuilder request) throws Exception {
+        MvcResult result = mockMvc.perform(request.with(user("admin").roles("ADMIN")).with(csrf())).andReturn();
+        assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+    }
+
+    @ParameterizedTest
+    @MethodSource("portfolioItemWrites")
+    void anonymousPutAndDeleteAre401(MockHttpServletRequestBuilder request) throws Exception {
+        mockMvc.perform(request.with(csrf())).andExpect(status().isUnauthorized());
     }
 
     @Test
