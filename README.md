@@ -651,11 +651,16 @@ docker compose up -d
 ```bash
 cd backend
 mvn -q spring-boot:run \
-  -Dspring-boot.run.main-class=com.valuescreener.security.AdminPasswordHashGenerator \
-  -Dspring-boot.run.arguments=<dein-passwort>
+  -Dspring-boot.run.main-class=com.valuescreener.security.AdminPasswordHashGenerator
 ```
 
-Den ausgegebenen Hash als `ADMIN_PASSWORD_HASH` setzen (siehe unten).
+Das Passwort wird verdeckt abgefragt (zweimal, bei Abweichung Abbruch) und nie als Argument übergeben, damit es nicht in Shell-History oder `ps` landet. Falls `spring-boot:run` keine Konsole bereitstellt, liest der Generator eine Zeile von stdin und warnt auf stderr, dass die Eingabe nicht verdeckt ist.
+
+Den ausgegebenen Hash in `.env` eintragen, **in einfachen Anführungszeichen**, weil `dev-up.sh` die Datei per `source` einliest und die `$` sonst von der Shell expandiert werden (Abbruch mit `$2: unbound variable`):
+
+```bash
+ADMIN_PASSWORD_HASH='$2a$10$...'
+```
 
 `AdminPasswordHashGenerator` erzeugt auch die Hashes für USER-Konten.
 
