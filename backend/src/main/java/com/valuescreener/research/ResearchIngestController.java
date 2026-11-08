@@ -3,6 +3,7 @@ package com.valuescreener.research;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,5 +35,11 @@ public class ResearchIngestController {
     @PostMapping("/snapshots")
     public CompanySnapshotView upsert(@Valid @RequestBody UpsertCompanySnapshotRequest request) {
         return service.upsert(request, GroupSource.AI);
+    }
+
+    /** Reviewed snapshot in import format, for the host-side push script. */
+    @GetMapping("/snapshots/{isin}/export")
+    public UpsertCompanySnapshotRequest export(@PathVariable String isin) {
+        return service.export(isin);
     }
 }

@@ -45,6 +45,25 @@ public class CompanySnapshotService {
         return CompanySnapshotView.from(repository.save(snapshot));
     }
 
+    /** Snapshot in import format (stored group and group source); requires a group so the live import is valid. */
+    @Transactional(readOnly = true)
+    public UpsertCompanySnapshotRequest export(String isin) {
+        String normalizedIsin = normalizeIsin(isin);
+        CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
+                .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
+        StockGroup group = snapshot.getStockGroup();
+        if (group == null) {
+            throw new StockGroupConflictException("Assign a group before exporting");
+        }
+        List<FindingRequest> findings = snapshot.getFindings().stream()
+                .map(f -> new FindingRequest(f.getCriterionKey(), f.getNumericValue(), f.getBooleanValue(),
+                        f.getClaim(), f.getSourceUrl(), f.getAsOfDate()))
+                .toList();
+        return new UpsertCompanySnapshotRequest(snapshot.getTicker(), snapshot.getIsin(),
+                snapshot.getCompanyName(), snapshot.getCountry(), snapshot.getBusinessDescription(),
+                group.getKey(), snapshot.getGroupSource(), findings);
+    }
+
     @Transactional
     public CompanySnapshotView assignGroupManually(String isin, String groupKey) {
         String normalizedIsin = normalizeIsin(isin);

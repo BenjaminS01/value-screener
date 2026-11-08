@@ -214,4 +214,58 @@ class CompanySnapshotServiceTest {
         assertThatThrownBy(() -> service.getByIsin("US0378331005"))
                 .isInstanceOf(CompanySnapshotNotFoundException.class);
     }
+
+    @Test
+    void exportRoundTripsThroughUpsert() {
+        CompanySnapshot stored = existing();
+        stored.assignGroup(SEMIS, GroupSource.AI);
+        stored.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
+                "Trailing P/E of 28.0.", "https://example.com/aapl-key-stats", LocalDate.of(2026, 8, 1));
+        stored.upsertFinding(ResearchCriterion.MOAT_ASSESSMENT, null, true,
+                "Wide moat.", null, LocalDate.of(2026, 8, 5));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(stored));
+
+        UpsertCompanySnapshotRequest exported = service.export(" us0378331005 ");
+
+        assertThat(exported.groupKey()).isEqualTo("SEMICONDUCTORS");
+        assertThat(exported.groupSource()).isEqualTo(GroupSource.AI);
+        assertThat(exported.findings()).hasSize(2);
+
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
+
+        CompanySnapshotView imported = service.upsert(exported, exported.groupSource());
+
+        assertThat(imported).isEqualTo(CompanySnapshotView.from(stored));
+    }
+
+    @Test
+    void exportWithoutGroupIsConflict() {
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing()));
+
+        assertThatThrownBy(() -> service.export("US0378331005"))
+                .isInstanceOf(StockGroupConflictException.class)
+                .hasMessage("Assign a group before exporting");
+    }
+
+    @Test
+    void exportUnknownIsinThrowsNotFound() {
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.export("US0378331005"))
+                .isInstanceOf(CompanySnapshotNotFoundException.class);
+    }
+
+    @Test
+    void exportCarriesManualSource() {
+        CompanySnapshot stored = existing();
+        stored.assignGroup(BANKS, GroupSource.MANUAL);
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(stored));
+
+        UpsertCompanySnapshotRequest exported = service.export("US0378331005");
+
+        assertThat(exported.groupKey()).isEqualTo("BANKS");
+        assertThat(exported.groupSource()).isEqualTo(GroupSource.MANUAL);
+    }
 }

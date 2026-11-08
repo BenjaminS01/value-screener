@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = {CompanySnapshotController.class, ResearchIngestController.class})
+@RestControllerAdvice(assignableTypes = {CompanySnapshotController.class, ResearchIngestController.class,
+        ResearchSyncController.class})
 public class CompanySnapshotExceptionHandler {
 
     @ExceptionHandler(CompanySnapshotNotFoundException.class)

@@ -575,6 +575,71 @@ Ausgabe: zwei Zeilen `token=<...>` und `sha256=<...>`.
    Erwartet: `HTTP/1.1 400` (Token akzeptiert, leeres Payload abgelehnt). Ohne oder mit falschem Token:
    `401` mit `{"error":"Authentication required"}`; ohne Profil `local`: `404`.
 
+### Recherchedaten ins Live-System übertragen
+
+Recherchiert wird nur lokal (Sandbox, Ingest-Token). Ins Live-System gelangen ausschließlich Snapshots, die
+du geprüft hast (Gruppe zugewiesen), und nur von deinem Rechner aus: `scripts/push-research.sh <ISIN>` holt den
+Export vom lokalen Backend und schickt ihn mit einem **eigenen Sync-Token** an das Live-Backend. Das Skript läuft
+auf dem Host, nie in der Sandbox (dort bricht es mit Fehler ab).
+
+1. **Sync-Token erzeugen** (wie im Abschnitt "Token erzeugen"): `MachineTokenGenerator` ausführen. `sha256` ist
+   für das Live-System, `token` für deinen Rechner. Das Skript verweigert die Arbeit, wenn Sync- und
+   Ingest-Token identisch sind.
+2. **Live-System**: nur der Hash geht nach SSM, als `APP_RESEARCH_SYNC_TOKEN_HASH=<sha256>` zusammen mit
+   `APP_RESEARCH_SYNC_ENABLED=true`. Ist der Sync nicht aktiviert, antwortet `/api/research/sync/snapshots`
+   mit `404`; ist er aktiviert, aber der Hash fehlt oder ist ungültig, startet das Backend nicht.
+3. **Zugangsdaten auf dem Rechner**: Datei `~/.config/value-screener/live.env` anlegen (außerhalb des Repos,
+   nur für dich lesbar) und mit einem Editor füllen, damit kein Token in der Shell-History landet:
+   ```bash
+   mkdir -p ~/.config/value-screener && (umask 077; : > ~/.config/value-screener/live.env)
+   nano ~/.config/value-screener/live.env
+   ```
+   Inhalt der Datei (Unix-Zeilenenden, keine Anführungszeichen nötig):
+   ```
+   LIVE_BACKEND_URL=https://<live-backend>
+   RESEARCH_SYNC_TOKEN=<token aus Schritt 1>
+   RESEARCH_INGEST_TOKEN=<Ingest-Token des lokalen Backends>
+   ```
+   Das Skript bricht ab, wenn die Datei fehlt, für Gruppe/Andere lesbar ist oder Windows-Zeilenenden (CRLF)
+   hat. Tokens stehen nie auf der Kommandozeile und werden nie ausgegeben; das Skript zeigt nur ISIN und
+   HTTP-Status.
+4. **Übertragen** (lokales Backend läuft, Standard `http://localhost:8080`, änderbar mit `LOCAL_BACKEND_URL`):
+   ```bash
+   scripts/push-research.sh US0378331005
+   ```
+   `LIVE_BACKEND_URL` muss mit `https://` beginnen (nur `http://localhost:<port>` bzw. `http://127.0.0.1:<port>`
+   ist für lokale Tests erlaubt).
+
+Hinweise:
+
+- Fehler `409` beim Export: dem Snapshot ist noch keine Gruppe zugewiesen. `422` beim Import: die Gruppe
+  existiert live nicht, eine später lokal neu angelegte Gruppe muss also auch im Live-System angelegt werden.
+- Eine manuell gesetzte Gruppe (`MANUAL`) wird mit übertragen und live nicht von einem KI-Vorschlag überschrieben.
+
+#### Lokaler End-to-End-Test mit einem zweiten Backend als "Live"
+
+Das "Live"-Backend braucht eine **eigene Datenbank**, sonst beweist der Test nichts:
+
+1. Datenbank anlegen (Postgres läuft per `docker compose up -d`):
+   ```bash
+   docker compose exec postgres createdb -U value_screener value_screener_live
+   ```
+2. Zweites Backend starten, **ohne** Profil `local` (Ingest aus, wie live), nur mit dem Hash. Flyway legt die
+   Gruppen (V4) auch in dieser Datenbank an; `ADMIN_PASSWORD_HASH` wird wie gewohnt gebraucht:
+   ```bash
+   cd backend
+   DB_URL=jdbc:postgresql://localhost:5432/value_screener_live SERVER_PORT=8081 \
+   APP_RESEARCH_SYNC_ENABLED=true APP_RESEARCH_SYNC_TOKEN_HASH=<sha256> \
+   mvn spring-boot:run
+   ```
+3. In `live.env` `LIVE_BACKEND_URL=http://localhost:8081` setzen, dann `scripts/push-research.sh <ISIN>`
+   ausführen. Erwartet: zweimal `HTTP 200`.
+4. Gegenprobe direkt in der "Live"-Datenbank:
+   ```bash
+   docker compose exec postgres psql -U value_screener -d value_screener_live \
+     -c "select isin, company_name, group_source from company_snapshot"
+   ```
+
 ### Lokale Postgres-Datenbank starten
 
 ```bash

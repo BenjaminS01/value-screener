@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-/** groupSource is accepted for compatibility but ignored: the server decides the source from the entry path. */
+/** groupSource is only honored on the sync path (reviewed export); the ingest path ignores it and always records AI. */
 public record UpsertCompanySnapshotRequest(
         @NotBlank String ticker,
         @NotBlank @Pattern(regexp = "\\s*[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]\\s*") String isin,

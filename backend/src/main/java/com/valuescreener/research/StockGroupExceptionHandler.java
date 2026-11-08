@@ -14,7 +14,7 @@ import java.util.Map;
  * {@link StockGroupIllegalArgumentHandler} does so (with a body) for StockGroupController only.
  */
 @RestControllerAdvice(assignableTypes = {StockGroupController.class, CompanySnapshotController.class,
-        ResearchIngestController.class})
+        ResearchIngestController.class, ResearchSyncController.class})
 public class StockGroupExceptionHandler {
 
     @ExceptionHandler(StockGroupNotFoundException.class)

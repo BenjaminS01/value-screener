@@ -5,6 +5,7 @@ import com.valuescreener.portfolio.PortfolioService;
 import com.valuescreener.research.CompanySnapshotService;
 import com.valuescreener.research.CompanySnapshotView;
 import com.valuescreener.research.ResearchIngestController;
+import com.valuescreener.research.ResearchSyncController;
 import com.valuescreener.research.StockGroupService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -132,7 +133,7 @@ class MachineTokenSecurityTest {
         }
     }
 
-    @WebMvcTest({ResearchIngestController.class, PortfolioController.class})
+    @WebMvcTest({ResearchIngestController.class, ResearchSyncController.class, PortfolioController.class})
     @Import(SecuritySliceTestConfig.class)
     @TestPropertySource(properties = {
             "app.research-ingest.enabled=true",
@@ -152,6 +153,31 @@ class MachineTokenSecurityTest {
 
         @MockBean
         private PortfolioService portfolioService;
+
+        @Test
+        void syncTokenCanImport() throws Exception {
+            when(snapshotService.upsert(any(), any())).thenReturn(new CompanySnapshotView(
+                    1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of()));
+            mockMvc.perform(post("/api/research/sync/snapshots")
+                            .header("Authorization", "Bearer test-sync-token")
+                            .contentType("application/json").content(BODY))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void ingestTokenCannotImport() throws Exception {
+            mockMvc.perform(post("/api/research/sync/snapshots")
+                            .header("Authorization", "Bearer " + TOKEN)
+                            .contentType("application/json").content(BODY))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void syncTokenCannotUseIngest() throws Exception {
+            mockMvc.perform(get("/api/research/ingest/groups")
+                            .header("Authorization", "Bearer test-sync-token"))
+                    .andExpect(status().isUnauthorized());
+        }
 
         @Test
         void ingestTokenIs401OnEnabledSyncPath() throws Exception {

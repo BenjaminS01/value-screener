@@ -167,4 +167,37 @@ class ResearchIngestControllerTest {
                 .andExpect(jsonPath("$[0].key").value("BANKS"))
                 .andExpect(jsonPath("$[1].key").value("DIVERSIFIED_OTHER"));
     }
+
+    @Test
+    void exportReturnsImportPayload() throws Exception {
+        when(service.export("US0378331005")).thenReturn(new UpsertCompanySnapshotRequest(
+                "AAPL", "US0378331005", "Apple Inc.", "USA", "x", "SEMICONDUCTORS", GroupSource.MANUAL,
+                List.of(new FindingRequest(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
+                        "Trailing P/E of 28.0.", "https://example.com/x", LocalDate.of(2026, 8, 1)))));
+
+        mockMvc.perform(get("/api/research/ingest/snapshots/US0378331005/export"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isin").value("US0378331005"))
+                .andExpect(jsonPath("$.groupKey").value("SEMICONDUCTORS"))
+                .andExpect(jsonPath("$.groupSource").value("MANUAL"))
+                .andExpect(jsonPath("$.findings[0].criterionKey").value("PE_RATIO"));
+    }
+
+    @Test
+    void exportWithoutGroupIs409() throws Exception {
+        when(service.export("US0378331005"))
+                .thenThrow(new StockGroupConflictException("Assign a group before exporting"));
+
+        mockMvc.perform(get("/api/research/ingest/snapshots/US0378331005/export"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Assign a group before exporting"));
+    }
+
+    @Test
+    void exportUnknownIsinIs404() throws Exception {
+        when(service.export("US0378331005")).thenThrow(new CompanySnapshotNotFoundException("US0378331005"));
+
+        mockMvc.perform(get("/api/research/ingest/snapshots/US0378331005/export"))
+                .andExpect(status().isNotFound());
+    }
 }
