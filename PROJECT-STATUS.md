@@ -1,6 +1,17 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-03
+Letztes Update: 2026-11-08
+
+## v2 Phase 1 Backend (2026-11-08): aktueller Einstiegspunkt
+
+**Für eine neue Session zuerst lesen:
+[`docs/superpowers/plans/2026-11-08-v2-phase1-handoff.md`](docs/superpowers/plans/2026-11-08-v2-phase1-handoff.md).**
+Branch `feature/v2-phase1-backend`: alle 8 Tasks des Phase-1-Plans (Login, Rollen, Brute-Force-Schutz,
+Portfolio, lokaler Recherche-Eingang, Aktiengruppen, Export und Live-Import) sind committet. Weiter mit
+den nächsten Schritten: Schlussprüfung des Branches, kompletter `mvn test` mit Docker, Branch
+abschließen, danach nächste Phase (Frontend). Tokens und Test der Übertragung ins Live-System erst
+ganz am Ende des Projekts (zu kompliziert, siehe Abschnitt 3a im Übergabedokument).
+Arbeitsweise mit dem Nutzer und zurückgestellte Punkte stehen ebenfalls im Übergabedokument.
 
 ## Neuplanung Scope v2 (2026-11-03): aktueller Einstiegspunkt
 
