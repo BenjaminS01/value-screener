@@ -1,6 +1,7 @@
 package com.valuescreener.security;
 
 import jakarta.servlet.DispatcherType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,8 +32,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CsrfTokenRepository csrfTokenRepository() {
-        return CookieCsrfTokenRepository.withHttpOnlyFalse();
+    public CsrfTokenRepository csrfTokenRepository(
+            @Value("${server.servlet.session.cookie.secure:true}") boolean secureCookie) {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        // HttpOnly stays false: the SPA must read the cookie to echo it in the X-XSRF-TOKEN header.
+        repository.setCookieCustomizer(c -> c.secure(secureCookie).sameSite("Strict"));
+        return repository;
     }
 
     /** Browser session chain: login-only, reads need a session, everything else is ADMIN by default. */

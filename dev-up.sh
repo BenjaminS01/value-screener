@@ -10,9 +10,21 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+if grep -q $'\r' .env; then
+  echo ".env has Windows line endings (CRLF), which break the values when sourced." >&2
+  echo "Convert it to LF:  sed -i 's/\r$//' .env" >&2
+  exit 1
+fi
+
 set -a
 source .env
 set +a
+
+if [[ -z "${ADMIN_USERNAME-unset}" ]]; then
+  echo "ADMIN_USERNAME is set but empty in .env; an empty value overrides the default and breaks startup." >&2
+  echo "Set ADMIN_USERNAME=admin (or another name), or remove the line." >&2
+  exit 1
+fi
 
 if [[ -z "${ADMIN_PASSWORD_HASH:-}" ]]; then
   echo "ADMIN_PASSWORD_HASH is not set in .env. Generate it first (see .env.example) and fill it in."

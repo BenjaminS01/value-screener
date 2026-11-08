@@ -209,4 +209,40 @@ class PortfolioControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void malformedJsonReturnsUniform400() throws Exception {
+        mockMvc.perform(post("/api/portfolio").contentType("application/json").content("{not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().json("{\"error\":\"Invalid request\"}", true));
+    }
+
+    @Test
+    void notFoundHasErrorBody() throws Exception {
+        doThrow(new PositionNotFoundException("US0378331005")).when(portfolioService).delete(any());
+
+        mockMvc.perform(delete("/api/portfolio/US0378331005"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().json("{\"error\":\"Position not found\"}", true));
+    }
+
+    @Test
+    void illegalArgumentHasErrorBodyWithMessage() throws Exception {
+        doThrow(new IllegalArgumentException("Cannot sell more than held")).when(portfolioService).sell(any());
+
+        mockMvc.perform(post("/api/portfolio/sell").contentType("application/json")
+                        .content("{\"isin\":\"US0378331005\",\"quantity\":1000}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().json("{\"error\":\"Cannot sell more than held\"}", true));
+    }
+
+    @Test
+    void illegalArgumentWithoutMessageFallsBackToInvalidRequest() throws Exception {
+        doThrow(new IllegalArgumentException()).when(portfolioService).sell(any());
+
+        mockMvc.perform(post("/api/portfolio/sell").contentType("application/json")
+                        .content("{\"isin\":\"US0378331005\",\"quantity\":1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().json("{\"error\":\"Invalid request\"}", true));
+    }
 }

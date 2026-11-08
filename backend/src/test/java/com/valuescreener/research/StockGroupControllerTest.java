@@ -129,4 +129,34 @@ class StockGroupControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error").value("Unknown group key: NOPE"));
     }
+
+    @Test
+    void updateRejectsSortOrderOutOfRange() throws Exception {
+        for (int bad : new int[]{-1, 1_000_001}) {
+            mockMvc.perform(patch("/api/research/groups/BANKS").contentType("application/json")
+                            .content("{\"sortOrder\":" + bad + "}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                            .json("{\"error\":\"Invalid request\"}", true));
+        }
+    }
+
+    @Test
+    void updateAcceptsSortOrderBounds() throws Exception {
+        when(service.update(org.mockito.ArgumentMatchers.eq("BANKS"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(BANKS);
+        for (int ok : new int[]{0, 1_000_000}) {
+            mockMvc.perform(patch("/api/research/groups/BANKS").contentType("application/json")
+                            .content("{\"sortOrder\":" + ok + "}"))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void malformedJsonReturnsUniform400() throws Exception {
+        mockMvc.perform(post("/api/research/groups").contentType("application/json").content("{not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .json("{\"error\":\"Invalid request\"}", true));
+    }
 }

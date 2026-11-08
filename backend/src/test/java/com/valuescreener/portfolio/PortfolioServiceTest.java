@@ -197,4 +197,43 @@ class PortfolioServiceTest {
         verify(repository).save(existing);
         verify(repository).delete(existing);
     }
+
+    @Test
+    void buyNormalizesIsinForLookupAndMergesIntoExisting() {
+        PortfolioService service = new PortfolioService(repository, lookup);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+
+        service.buy(new BuyPositionRequest("aapl", " us0378331005 ", "Apple Inc.",
+                new BigDecimal("10"), new BigDecimal("170.00"), LocalDate.of(2026, 3, 1)));
+
+        assertThat(existing.getQuantity()).isEqualByComparingTo("20");
+        verify(repository).save(existing);
+    }
+
+    @Test
+    void buyStoresNormalizedIsinOnNewPosition() {
+        PortfolioService service = new PortfolioService(repository, lookup);
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+
+        service.buy(new BuyPositionRequest("aapl", " us0378331005 ", "Apple Inc.",
+                new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)));
+
+        ArgumentCaptor<PortfolioPosition> captor = ArgumentCaptor.forClass(PortfolioPosition.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getIsin()).isEqualTo("US0378331005");
+    }
+
+    @Test
+    void sellNormalizesIsinForLookup() {
+        PortfolioService service = new PortfolioService(repository, lookup);
+        PortfolioPosition existing = new PortfolioPosition(
+                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
+
+        service.sell(new SellPositionRequest("us0378331005 ", new BigDecimal("4")));
+
+        assertThat(existing.getQuantity()).isEqualByComparingTo("6");
+    }
 }

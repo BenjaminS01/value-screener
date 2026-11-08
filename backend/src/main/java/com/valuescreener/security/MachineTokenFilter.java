@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -33,8 +34,10 @@ public class MachineTokenFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String token = extractToken(request.getHeader("Authorization"));
         if (token != null && TokenHasher.matches(token, expectedSha256Hex)) {
-            SecurityContextHolder.getContext().setAuthentication(new PreAuthenticatedAuthenticationToken(
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(new PreAuthenticatedAuthenticationToken(
                     "machine", null, List.of(new SimpleGrantedAuthority(authority))));
+            SecurityContextHolder.setContext(context);
         }
         chain.doFilter(request, response);
     }

@@ -21,11 +21,12 @@ public class PortfolioService {
 
     @Transactional
     public void buy(BuyPositionRequest request) {
-        PortfolioPosition position = repository.findByIsin(request.isin()).orElse(null);
+        String isin = normalizeIsin(request.isin());
+        PortfolioPosition position = repository.findByIsin(isin).orElse(null);
 
         if (position == null) {
             repository.save(new PortfolioPosition(
-                    request.ticker(), request.isin(), request.companyName(),
+                    request.ticker(), isin, request.companyName(),
                     request.quantity(), request.entryPrice(), request.purchaseDate()));
             return;
         }
@@ -36,8 +37,7 @@ public class PortfolioService {
 
     @Transactional
     public void sell(SellPositionRequest request) {
-        PortfolioPosition position = repository.findByIsin(request.isin())
-                .orElseThrow(() -> new PositionNotFoundException(request.isin()));
+        PortfolioPosition position = find(request.isin());
 
         position.recordSale(request.quantity());
 
@@ -85,8 +85,12 @@ public class PortfolioService {
         return stockGroups.groupsByIsin(positions.stream().map(PortfolioPosition::getIsin).toList());
     }
 
+    private static String normalizeIsin(String isin) {
+        return isin == null ? "" : isin.trim().toUpperCase();
+    }
+
     private PortfolioPosition find(String isin) {
-        String normalized = isin == null ? "" : isin.trim().toUpperCase();
+        String normalized = normalizeIsin(isin);
         return repository.findByIsin(normalized)
                 .orElseThrow(() -> new PositionNotFoundException(normalized));
     }

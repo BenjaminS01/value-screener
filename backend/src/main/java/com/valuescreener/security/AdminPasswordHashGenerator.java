@@ -6,6 +6,7 @@ import java.io.BufferedReader;
 import java.io.Console;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -30,6 +31,8 @@ public class AdminPasswordHashGenerator {
             second = console.readPassword("Repeat password: ");
         } else {
             System.err.println("WARNING: no console available, reading ONE line from stdin; input is NOT hidden.");
+            System.err.print("Password (input visible): ");
+            System.err.flush();
             BufferedReader reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
             String line = reader.readLine();
             first = line == null ? null : line.toCharArray();
@@ -52,7 +55,7 @@ public class AdminPasswordHashGenerator {
             if (repeat == null || !Arrays.equals(password, repeat)) {
                 throw new IllegalArgumentException("passwords do not match");
             }
-            return new BCryptPasswordEncoder().encode(java.nio.CharBuffer.wrap(password));
+            return new BCryptPasswordEncoder().encode(CharBuffer.wrap(password));
         } finally {
             if (password != null) Arrays.fill(password, '\0');
             if (repeat != null) Arrays.fill(repeat, '\0');

@@ -28,8 +28,10 @@ public class ResearchSyncController {
     public CompanySnapshotView sync(@Valid @RequestBody UpsertCompanySnapshotRequest request) {
         GroupSource source = request.groupSource() == null ? GroupSource.AI : request.groupSource();
         CompanySnapshotView view = service.upsert(request, source);
+        SnapshotGroupView group = view.group();
         log.info("research import isin={} group={} source={} findings={} via=sync-token",
-                view.isin(), request.groupKey(), source, view.findings().size());
+                view.isin(), group == null ? "-" : group.key(), group == null ? "-" : group.source(),
+                view.findings().size());
         return view;
     }
 }

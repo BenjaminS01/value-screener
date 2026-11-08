@@ -654,7 +654,7 @@ mvn -q spring-boot:run \
   -Dspring-boot.run.main-class=com.valuescreener.security.AdminPasswordHashGenerator
 ```
 
-Das Passwort wird verdeckt abgefragt (zweimal, bei Abweichung Abbruch) und nie als Argument übergeben, damit es nicht in Shell-History oder `ps` landet. Falls `spring-boot:run` keine Konsole bereitstellt, liest der Generator eine Zeile von stdin und warnt auf stderr, dass die Eingabe nicht verdeckt ist.
+Das Passwort wird verdeckt abgefragt (zweimal, bei Abweichung Abbruch) und nie als Argument übergeben, damit es nicht in Shell-History oder `ps` landet. Falls `spring-boot:run` keine Konsole bereitstellt, liest der Generator eine Zeile von stdin und warnt auf stderr, dass die Eingabe nicht verdeckt ist. Die Ausgabe des Generators daher nicht umleiten oder pipen (`> datei`, `| clip.exe`, `| tee`), sonst gibt es keine Konsole und die Passworteingabe wird sichtbar.
 
 Den ausgegebenen Hash in `.env` eintragen, **in einfachen Anführungszeichen**, weil `dev-up.sh` die Datei per `source` einliest und die `$` sonst von der Shell expandiert werden (Abbruch mit `$2: unbound variable`):
 

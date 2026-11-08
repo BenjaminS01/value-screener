@@ -80,6 +80,17 @@ command -v curl >/dev/null || { echo "curl is required." >&2; exit 1; }
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
+# Prints only the value of the JSON "error" field of a response body file (never the whole body).
+# Output is stripped to printable ASCII and capped at 200 chars. Prints nothing if absent/not JSON.
+print_error_field() {
+  local value
+  value="$(grep -o '"error"[[:space:]]*:[[:space:]]*"\([^"\\]\|\\.\)*"' "$1" 2>/dev/null | head -n 1 \
+    | sed 's/^"error"[[:space:]]*:[[:space:]]*"//; s/"$//' | tr -cd '[:print:]' | cut -c1-200)" || true
+  if [[ -n "$value" ]]; then
+    echo "Server error: $value" >&2
+  fi
+}
+
 # Prints only the HTTP status code; the response body goes to the given file and is never printed.
 http_status() {
   local token="$1" out="$2"
@@ -94,6 +105,7 @@ CODE="$(http_status "$RESEARCH_INGEST_TOKEN" "$EXPORT_FILE" \
 echo "ISIN $ISIN: export from local backend -> HTTP ${CODE:-000}"
 if [[ ! "$CODE" =~ ^2[0-9][0-9]$ ]]; then
   echo "Export failed (404 = unknown ISIN, 409 = no group assigned, 401/000 = token or backend problem)." >&2
+  print_error_field "$EXPORT_FILE"
   exit 1
 fi
 
@@ -103,6 +115,7 @@ CODE="$(http_status "$RESEARCH_SYNC_TOKEN" "$WORK/response.json" \
 echo "ISIN $ISIN: import into live backend -> HTTP ${CODE:-000}"
 if [[ ! "$CODE" =~ ^2[0-9][0-9]$ ]]; then
   echo "Import failed (422 = group missing live, 401 = wrong sync token, 404 = sync disabled live)." >&2
+  print_error_field "$WORK/response.json"
   exit 1
 fi
 echo "ISIN $ISIN: pushed."
