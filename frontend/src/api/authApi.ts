@@ -24,6 +24,12 @@ export function login(username: string, password: string): Promise<AuthUser> {
   })
 }
 
-export function logout(): Promise<void> {
-  return apiFetch<void>('/api/auth/logout', { method: 'POST' })
+export async function logout(): Promise<void> {
+  try {
+    await apiFetch<void>('/api/auth/logout', { method: 'POST', handleUnauthorized: false })
+  } catch (e) {
+    // 401 means the session is already gone, which is what logout wants anyway.
+    if (e instanceof ApiError && e.status === 401) return
+    throw e
+  }
 }

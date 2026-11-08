@@ -73,4 +73,19 @@ describe('authApi', () => {
     expect(path).toBe('/api/auth/logout')
     expect(init.method).toBe('POST')
   })
+
+  it('logout treats 401 as success without firing the unauthorized handler', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    vi.stubGlobal('fetch', vi.fn(async () => json(401, { error: 'Authentication required' })))
+    await expect(logout()).resolves.toBeUndefined()
+    expect(handler).not.toHaveBeenCalled()
+    setUnauthorizedHandler(null)
+  })
+
+  it('logout still rejects on other errors', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json(500, { error: 'boom' })))
+    const e = await rejection(logout())
+    expect(e.status).toBe(500)
+  })
 })

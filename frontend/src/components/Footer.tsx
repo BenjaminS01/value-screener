@@ -1,4 +1,10 @@
-export function Footer() {
+import { Navigate } from '../navigation'
+
+interface FooterProps {
+  navigate: Navigate
+}
+
+export function Footer({ navigate }: FooterProps) {
   return (
     <footer>
       <p>
@@ -8,6 +14,10 @@ export function Footer() {
         Anlageziele oder finanziellen Verhältnisse. Jegliche Entscheidung liegt in der
         Verantwortung des Nutzers.
       </p>
+      <nav>
+        <button onClick={() => navigate({ name: 'impressum' })}>Impressum</button>
+        <button onClick={() => navigate({ name: 'datenschutz' })}>Datenschutz</button>
+      </nav>
     </footer>
   )
 }
