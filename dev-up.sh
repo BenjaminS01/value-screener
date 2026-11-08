@@ -10,12 +10,31 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+if grep -q $'\r' .env; then
+  echo ".env has Windows line endings (CRLF), which break the values when sourced." >&2
+  echo "Convert it to LF:  sed -i 's/\r$//' .env" >&2
+  exit 1
+fi
+
 set -a
 source .env
 set +a
 
+if [[ -z "${ADMIN_USERNAME-unset}" ]]; then
+  echo "ADMIN_USERNAME is set but empty in .env; an empty value overrides the default and breaks startup." >&2
+  echo "Set ADMIN_USERNAME=admin (or another name), or remove the line." >&2
+  exit 1
+fi
+
 if [[ -z "${ADMIN_PASSWORD_HASH:-}" ]]; then
   echo "ADMIN_PASSWORD_HASH is not set in .env. Generate it first (see .env.example) and fill it in."
+  exit 1
+fi
+
+if [[ -z "${APP_RESEARCH_INGEST_TOKEN_HASH:-}" ]]; then
+  echo "APP_RESEARCH_INGEST_TOKEN_HASH is not set in .env (the local profile enables the research ingest endpoint)."
+  echo "Generate a token + hash first (see .env.example):"
+  echo "  cd backend && mvn -q spring-boot:run -Dspring-boot.run.main-class=com.valuescreener.security.MachineTokenGenerator"
   exit 1
 fi
 
@@ -31,7 +50,7 @@ done
 echo "    Postgres is ready."
 
 echo "==> Starting backend (logs/backend.log)"
-(cd backend && mvn -q spring-boot:run) >logs/backend.log 2>&1 &
+(cd backend && mvn -q spring-boot:run -Dspring-boot.run.profiles=local) >logs/backend.log 2>&1 &
 BACKEND_PID=$!
 
 echo "==> Waiting for backend on :8080"
@@ -60,7 +79,7 @@ trap cleanup EXIT INT TERM
 echo ""
 echo "Frontend: http://localhost:5173"
 echo "Backend:  http://localhost:8080"
-echo "Login: ADMIN_USERNAME=$ADMIN_USERNAME, password = whatever you hashed into ADMIN_PASSWORD_HASH"
+echo "Login: username ADMIN_USERNAME ($ADMIN_USERNAME), password = the one you hashed into ADMIN_PASSWORD_HASH (session login in the app)"
 echo "Logs: tail -f logs/backend.log logs/frontend.log"
 echo "Press Ctrl+C to stop backend + frontend."
 echo ""

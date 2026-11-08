@@ -1,0 +1,9 @@
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+app:
+  research-ingest:
+    enabled: true

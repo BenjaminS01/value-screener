@@ -3,9 +3,14 @@ package com.valuescreener.research;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -35,8 +40,16 @@ public class CompanySnapshot {
     @Column(name = "company_name", nullable = false, length = 200)
     private String companyName;
 
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String sector;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_key")
+    private StockGroup stockGroup;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "group_source", length = 10)
+    private GroupSource groupSource;
 
     @Column(nullable = false, length = 100)
     private String country;
@@ -55,21 +68,35 @@ public class CompanySnapshot {
         // JPA
     }
 
-    public CompanySnapshot(String ticker, String isin, String companyName, String sector, String country,
+    public CompanySnapshot(String ticker, String isin, String companyName, String country,
                             String businessDescription) {
         this.ticker = requireValidTicker(ticker);
         this.isin = requireValidIsin(isin);
         this.companyName = requireNonBlank(companyName, "companyName");
-        this.sector = requireNonBlank(sector, "sector");
         this.country = requireNonBlank(country, "country");
         this.businessDescription = requireNonBlank(businessDescription, "businessDescription");
     }
 
-    public void applyUpdate(String companyName, String sector, String country, String businessDescription) {
+    public void applyUpdate(String companyName, String country, String businessDescription) {
         this.companyName = requireNonBlank(companyName, "companyName");
-        this.sector = requireNonBlank(sector, "sector");
         this.country = requireNonBlank(country, "country");
         this.businessDescription = requireNonBlank(businessDescription, "businessDescription");
+    }
+
+    /**
+     * Sets the group unless it is MANUAL and the proposal comes from AI: the owner's choice always wins.
+     * @return true if the group was set, false if the proposal was ignored
+     */
+    public boolean assignGroup(StockGroup group, GroupSource source) {
+        if (group == null || source == null) {
+            throw new IllegalArgumentException("group and source must not be null");
+        }
+        if (this.groupSource == GroupSource.MANUAL && source == GroupSource.AI) {
+            return false;
+        }
+        this.stockGroup = group;
+        this.groupSource = source;
+        return true;
     }
 
     public void upsertFinding(ResearchCriterion criterionKey, BigDecimal numericValue, Boolean booleanValue,
@@ -119,7 +146,8 @@ public class CompanySnapshot {
     public String getTicker() { return ticker; }
     public String getIsin() { return isin; }
     public String getCompanyName() { return companyName; }
-    public String getSector() { return sector; }
+    public StockGroup getStockGroup() { return stockGroup; }
+    public GroupSource getGroupSource() { return groupSource; }
     public String getCountry() { return country; }
     public String getBusinessDescription() { return businessDescription; }
     public List<ResearchFinding> getFindings() { return List.copyOf(findings); }

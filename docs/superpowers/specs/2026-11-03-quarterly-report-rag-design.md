@@ -12,6 +12,18 @@ Decision log for what changed and why). German summary at the end.
 > **"Summarize quarterly reports"**; when implemented, the function `evaluate` and the
 > `/evaluations` endpoints are named `summarize` / `/summaries` accordingly. The job table also carries
 > the `DEEP_ANALYSIS_DEMO` jobs of the deep-analysis dummy (scope v2, Section 6).
+>
+> **Update 2026-11-04:** the button is labelled **"Evaluate quarterly reports"**, so the names stay
+> `evaluate` / `/evaluations`. This replaces the `summarize` / `/summaries` renaming above. An
+> evaluation is **stored per stock and reused**: when the set of indexed reports hasn't changed, the
+> backend creates no new job and returns the existing evaluation with the message "No new quarterly
+> reports — evaluation already available." Only the ADMIN can force a new evaluation. See "Evaluation
+> (button in chat)" in Section 6. The chat stays available at any time.
+>
+> **Update 2026-11-04 (thesis check):** if the ADMIN has written an investment thesis for the stock
+> (scope v2, Section 4a), the evaluation receives it as input. It adds an ADMIN-only "Thesis check"
+> section: which report statements support or contradict the assumptions and sell triggers, with
+> report/page citations and descriptive wording only. USER responses never contain this section.
 
 ## 1. Purpose and scope
 
@@ -110,8 +122,8 @@ Browser ─► API Gateway ─► backend/ (Spring Boot, ECS, private VPC, exist
     (ADMIN)
   - `PATCH /api/reports/{id}` — correct fiscal period / report date (ADMIN)
   - `DELETE /api/reports/{id}` (ADMIN)
-  - `POST /api/reports/{isin}/evaluations`, `GET /api/reports/{isin}/evaluations/latest` (USER, ADMIN;
-    limited)
+  - `POST /api/reports/{isin}/evaluations` (USER, ADMIN; limited; reuses an up-to-date evaluation,
+    `?force=true` ADMIN only), `GET /api/reports/{isin}/evaluations/latest` (USER, ADMIN)
   - `POST /api/reports/{isin}/chat` → job id; `GET /api/reports/chat/{jobId}` → status/answer (USER,
     ADMIN; limited; users can only poll their own jobs)
   - `GET /api/reports/{isin}/chat/history` — the calling user's own history
@@ -147,9 +159,11 @@ Browser ─► API Gateway ─► backend/ (Spring Boot, ECS, private VPC, exist
 | `status` | `PENDING_UPLOAD` → `VALIDATING` → `INDEXED` / `REJECTED` / `DELETING` → (row deleted) |
 | `rejection_reason`, `created_at`, `updated_at`, `version` | |
 
-`report_evaluation` — one row per button click: `id`, `isin`, `created_at`, `model`,
-`prompt_version`, `report_ids` (the reports used), `status`, `stale` (set when one of its reports is
-deleted), `summary`.
+`report_evaluation` — one row per evaluation that actually ran, not per click. Columns: `id`,
+`isin`, `created_at`, `model`, `prompt_version`, `report_ids` (the reports used, sorted), `status`,
+`stale`, `forced` (ADMIN override), `summary`. `stale` is set when one of its reports is deleted or
+its metadata is changed via `PATCH`. Evaluations are per stock, not per account: everyone sees the
+same latest evaluation.
 
 `report_evaluation_finding` — per criterion: `evaluation_id`, `criterion_key` (`ResearchCriterion`),
 `numeric_value`, `boolean_value`, `claim`, `report_id`, `page`, `as_of_date`. Mirrors
@@ -199,9 +213,25 @@ deleted), `summary`.
 3. Backend removes the row once cleanup reports done; evaluations that used this report get
    `stale = true`.
 
-**Evaluation (button in chat)**
-1. UI → `POST /api/reports/{isin}/evaluations`. Backend checks the daily cap, writes an `EVALUATION`
-   job (with the ids of all `INDEXED` reports of the stock).
+**Evaluation (button "Evaluate quarterly reports" in the chat)**
+0. When the stock is opened, the UI loads `GET …/evaluations/latest` and shows the stored evaluation
+   with its date and the reports it covers, plus a "stale" note if it is out of date. No click is
+   needed to read it.
+1. UI → `POST /api/reports/{isin}/evaluations`. Before anything else, the backend compares the sorted
+   ids of all `INDEXED` reports of the stock with the `report_ids` of the latest non-stale
+   `DONE` evaluation:
+   - **Same set:** no job and no LLM call, and nothing is counted against the daily limit. The
+     response is `200` with the existing evaluation and the message
+     `"No new quarterly reports — evaluation already available."`
+   - **An `EVALUATION` job for this stock is already running:** no new job. The response returns
+     that job id with the message "Evaluation in progress".
+   - **Different set** (a report added, deleted or its metadata changed), or no evaluation yet: the
+     backend checks the daily limit, writes an `EVALUATION` job with those report ids, and the
+     response is `202` with the job id.
+   - **`?force=true`:** only the ADMIN may use it (a USER gets `403`). It skips the "same set" check
+     and still counts against the ADMIN's daily limit. Use case: a better model or prompt version.
+     The evaluation is stored with `forced = true`.
+   - **Zero `INDEXED` reports:** `409` "No indexed quarterly reports for this stock".
 2. Stream → `evaluate`: loads `pages/{id}.json` of each report and sends them to Claude as `document`
    blocks with custom content (one content block per page) and citations enabled — every citation then
    points to report + page. Text instead of the PDF itself: cheaper, and page-precise.
@@ -352,6 +382,10 @@ deliberately has no access key.
 - 2026-11-03 (scope v2): whole app behind login with roles ADMIN/USER; USERs may read reports and
   use chat/summary with daily limits; chat history and limits per user account (each USER has their own); job table also serves the deep-analysis
   dummy. See `2026-11-03-app-scope-v2-design.md`.
+- 2026-11-04: Button named "Evaluate quarterly reports" (UI English). The result is stored per stock
+  and reused. With an unchanged report set the user sees "No new quarterly reports — evaluation
+  already available.", with no new LLM call and no limit consumed. Only the ADMIN can force a new
+  evaluation. The chat stays available at any time. Reason: cost and no pointless repeat calls.
 
 ## Sources (checked 2026-11-03)
 

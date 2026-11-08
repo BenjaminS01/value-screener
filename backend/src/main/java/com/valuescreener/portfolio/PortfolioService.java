@@ -1,26 +1,32 @@
 package com.valuescreener.portfolio;
 
+import com.valuescreener.research.StockGroupLookup;
+import com.valuescreener.research.StockGroupRef;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PortfolioService {
 
     private final PortfolioPositionRepository repository;
+    private final StockGroupLookup stockGroups;
 
-    public PortfolioService(PortfolioPositionRepository repository) {
+    public PortfolioService(PortfolioPositionRepository repository, StockGroupLookup stockGroups) {
         this.repository = repository;
+        this.stockGroups = stockGroups;
     }
 
     @Transactional
     public void buy(BuyPositionRequest request) {
-        PortfolioPosition position = repository.findByIsin(request.isin()).orElse(null);
+        String isin = normalizeIsin(request.isin());
+        PortfolioPosition position = repository.findByIsin(isin).orElse(null);
 
         if (position == null) {
             repository.save(new PortfolioPosition(
-                    request.ticker(), request.isin(), request.companyName(),
+                    request.ticker(), isin, request.companyName(),
                     request.quantity(), request.entryPrice(), request.purchaseDate()));
             return;
         }
@@ -31,8 +37,7 @@ public class PortfolioService {
 
     @Transactional
     public void sell(SellPositionRequest request) {
-        PortfolioPosition position = repository.findByIsin(request.isin())
-                .orElseThrow(() -> new PositionNotFoundException(request.isin()));
+        PortfolioPosition position = find(request.isin());
 
         position.recordSale(request.quantity());
 
@@ -43,9 +48,50 @@ public class PortfolioService {
         }
     }
 
-    public List<PublicPortfolioPositionView> listPublicPositions() {
-        return repository.findAll().stream()
-                .map(position -> new PublicPortfolioPositionView(position.getTicker(), position.getCompanyName(), position.getIsin()))
+    @Transactional
+    public void correct(String isin, CorrectPositionRequest request) {
+        PortfolioPosition position = find(isin);
+        position.correct(request.ticker(), request.companyName(), request.quantity(),
+                request.entryPrice(), request.purchaseDate());
+        repository.save(position);
+    }
+
+    @Transactional
+    public void delete(String isin) {
+        repository.delete(find(isin));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PortfolioPositionView> listForUser() {
+        List<PortfolioPosition> positions = repository.findAll();
+        Map<String, StockGroupRef> groups = groupsFor(positions);
+        return positions.stream()
+                .map(p -> new PortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName(),
+                        groups.get(p.getIsin())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminPortfolioPositionView> listForAdmin() {
+        List<PortfolioPosition> positions = repository.findAll();
+        Map<String, StockGroupRef> groups = groupsFor(positions);
+        return positions.stream()
+                .map(p -> new AdminPortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName(),
+                        groups.get(p.getIsin()), p.getQuantity(), p.getEntryPrice(), p.getPurchaseDate()))
+                .toList();
+    }
+
+    private Map<String, StockGroupRef> groupsFor(List<PortfolioPosition> positions) {
+        return stockGroups.groupsByIsin(positions.stream().map(PortfolioPosition::getIsin).toList());
+    }
+
+    private static String normalizeIsin(String isin) {
+        return isin == null ? "" : isin.trim().toUpperCase();
+    }
+
+    private PortfolioPosition find(String isin) {
+        String normalized = normalizeIsin(isin);
+        return repository.findByIsin(normalized)
+                .orElseThrow(() -> new PositionNotFoundException(normalized));
     }
 }

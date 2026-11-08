@@ -1,0 +1,50 @@
+CREATE TABLE stock_group (
+    key VARCHAR(40) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    sort_order INT NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+INSERT INTO stock_group (key, name, sort_order) VALUES
+    ('BANKS', 'Banks', 10),
+    ('INSURANCE', 'Insurance', 20),
+    ('ASSET_MANAGEMENT_EXCHANGES', 'Asset Management & Exchanges', 30),
+    ('PAYMENTS_FINTECH', 'Payments & Fintech', 40),
+    ('OIL_GAS', 'Oil & Gas', 50),
+    ('RENEWABLE_ENERGY', 'Renewable Energy', 60),
+    ('UTILITIES', 'Utilities', 70),
+    ('CHEMICALS', 'Chemicals', 80),
+    ('MINING_METALS', 'Mining & Metals', 90),
+    ('CONSTRUCTION_BUILDING_MATERIALS', 'Construction & Building Materials', 100),
+    ('INDUSTRIAL_MACHINERY', 'Industrial Machinery', 110),
+    ('ELECTRICAL_EQUIPMENT_AUTOMATION', 'Electrical Equipment & Automation', 120),
+    ('AEROSPACE_DEFENSE', 'Aerospace & Defense', 130),
+    ('TRANSPORTATION_LOGISTICS', 'Transportation & Logistics', 140),
+    ('AUTOMOTIVE', 'Automotive & Suppliers', 150),
+    ('BUSINESS_SERVICES', 'Business Services', 160),
+    ('FOOD_BEVERAGES', 'Food & Beverages', 170),
+    ('HOUSEHOLD_PERSONAL_CARE', 'Household & Personal Care', 180),
+    ('LUXURY_APPAREL', 'Luxury & Apparel', 190),
+    ('RETAIL_ECOMMERCE', 'Retail & E-Commerce', 200),
+    ('TRAVEL_HOSPITALITY', 'Travel, Hotels & Restaurants', 210),
+    ('PHARMA', 'Pharma', 220),
+    ('BIOTECH', 'Biotech', 230),
+    ('MEDICAL_TECHNOLOGY', 'Medical Technology', 240),
+    ('HEALTH_CARE_SERVICES', 'Health Care Services', 250),
+    ('SEMICONDUCTORS', 'Semiconductors', 260),
+    ('SOFTWARE', 'Software', 270),
+    ('CYBERSECURITY', 'Cybersecurity', 280),
+    ('IT_SERVICES', 'IT Services', 290),
+    ('HARDWARE_ELECTRONICS', 'Hardware & Electronics', 300),
+    ('INTERNET_PLATFORMS', 'Internet Platforms', 310),
+    ('MEDIA_ENTERTAINMENT', 'Media & Entertainment', 320),
+    ('TELECOMMUNICATIONS', 'Telecommunications', 330),
+    ('REAL_ESTATE', 'Real Estate', 340),
+    ('DIVERSIFIED_OTHER', 'Diversified / Other', 350);
+
+ALTER TABLE company_snapshot
+    ADD COLUMN group_key VARCHAR(40) REFERENCES stock_group(key),
+    ADD COLUMN group_source VARCHAR(10),
+    ALTER COLUMN sector DROP NOT NULL,
+    ADD CONSTRAINT ck_company_snapshot_group_source CHECK (group_source IN ('AI', 'MANUAL')),
+    ADD CONSTRAINT ck_company_snapshot_group_pair CHECK ((group_key IS NULL) = (group_source IS NULL));
