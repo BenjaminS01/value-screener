@@ -6,11 +6,14 @@ Letztes Update: 2026-11-08
 
 **Für eine neue Session zuerst lesen:
 [`docs/superpowers/plans/2026-11-08-v2-phase1-handoff.md`](docs/superpowers/plans/2026-11-08-v2-phase1-handoff.md).**
-Branch `feature/v2-phase1-backend`: alle 8 Tasks des Phase-1-Plans (Login, Rollen, Brute-Force-Schutz,
-Portfolio, lokaler Recherche-Eingang, Aktiengruppen, Export und Live-Import) sind committet. Weiter mit
-den nächsten Schritten: Schlussprüfung des Branches, kompletter `mvn test` mit Docker, Branch
-abschließen, danach nächste Phase (Frontend). Tokens und Test der Übertragung ins Live-System erst
-ganz am Ende des Projekts (zu kompliziert, siehe Abschnitt 3a im Übergabedokument).
+**Phase 1 Backend ist fertig.** Branch `feature/v2-phase1-backend`: alle 8 Tasks des Phase-1-Plans
+(Login, Rollen, Brute-Force-Schutz, Portfolio, lokaler Recherche-Eingang, Aktiengruppen, Export und
+Live-Import) sind committet. Die Schlussprüfung des ganzen Branches ist erledigt, ihre Korrekturen sind in
+`6ca504f` und `cc18fae` committet. Der komplette `mvn test` mit Docker ist grün (266 Tests, 2026-11-08).
+Nächste Schritte: Branch abschließen (Merge nach `main`), danach die nächste Phase (Frontend) mit Spec
+und Plan. Die Voraussetzungen für den Live-Betrieb stehen in Abschnitt 9 der Phase-1-Spec. Tokens und
+Test der Übertragung ins Live-System erst ganz am Ende des Projekts (zu kompliziert, siehe Abschnitt 3a
+im Übergabedokument).
 Arbeitsweise mit dem Nutzer und zurückgestellte Punkte stehen ebenfalls im Übergabedokument.
 
 ## Neuplanung Scope v2 (2026-11-03): aktueller Einstiegspunkt

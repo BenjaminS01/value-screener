@@ -9,8 +9,8 @@ enthält alles, was bisher nur im Chat oder in lokalen, nicht eingecheckten Date
 - **Spec:** [`docs/superpowers/specs/2026-11-04-v2-phase1-backend-research-groups-design.md`](../specs/2026-11-04-v2-phase1-backend-research-groups-design.md)
   (übergeordnet: [`2026-11-03-app-scope-v2-design.md`](../specs/2026-11-03-app-scope-v2-design.md)).
 - **Plan:** [`2026-11-04-v2-phase1-backend-login-research-groups.md`](2026-11-04-v2-phase1-backend-login-research-groups.md),
-  Tasks 1–8. **Alle 8 Tasks sind umgesetzt, geprüft und committet.** Offen ist nur der Abschnitt
-  „Finish“ des Plans plus die Punkte unten.
+  Tasks 1–8. **Alle 8 Tasks sind umgesetzt, geprüft und committet, die Schlussprüfung ist erledigt.**
+  Offen ist nur noch der Abschluss des Branches (siehe Abschnitt 3).
 
 | Task | Inhalt | Commit |
 |---|---|---|
@@ -27,15 +27,35 @@ enthält alles, was bisher nur im Chat oder in lokalen, nicht eingecheckten Date
 - Er trägt versehentlich die Commit-Message von Task 7. Richtig wäre:
   `feat(research): export + token-protected live import; push script for the host`.
 - `scripts/push-research.sh` ist in git als nicht ausführbar gespeichert (Modus `100644`, weil
-  `core.fileMode=false`). Korrektur: `git update-index --chmod=+x scripts/push-research.sh` und committen.
+  `core.fileMode=false`). Gilt auch für `dev-up.sh` und `docker/claude-sandbox/run.sh`; Korrektur siehe
+  unten bei der Schlussprüfung.
 - Beides entscheidet und erledigt der Nutzer (er macht alle git-Operationen).
+
+**Schlussprüfung (2026-11-08) erledigt.** Ein Review des ganzen Branches fand nichts Kritisches. Die
+Korrekturen sind in zwei Runden umgesetzt, jeweils geprüft und vom Nutzer committet:
+- `6ca504f` (Runde A): Die 23 Maschinen-Token-Tests liefen vorher nie, weil sie in `static`-Unterklassen
+  steckten, die Surefire überspringt. Jetzt stehen sie in drei eigenständigen Klassen. Der Test
+  „ausgeschaltet → 404“ ist jetzt aussagekräftig. Der Hash-Generator liest das Passwort verdeckt. Die
+  Anführungszeichen in `.env.example` und README sind richtig, und `ADMIN_USERNAME=admin` ist vorbelegt.
+- `cc18fae` (Runde B):
+  - einheitliche JSON-Fehler über `web/GlobalRequestErrorHandler`, 409 bei Wettlauf-Konflikten,
+    Grenzen für `sortOrder`
+  - ISIN-Normalisierung bei Kauf und Verkauf
+  - XSRF-Cookie mit `SameSite=Strict` und `Secure` aus der Konfiguration (live geprüft)
+  - `LoginAudit` filtert alle Steuerzeichen, `MachineTokenFilter` arbeitet mit einem leeren Kontext,
+    der Sync-Log nennt die tatsächlich gespeicherte Gruppe
+  - `.gitattributes`, `dev-up.sh` prüft CRLF und ein leeres `ADMIN_USERNAME`, das Push-Skript zeigt nur
+    das Feld `error`
+- Noch offen für den Nutzer: `dev-up.sh`, `docker/claude-sandbox/run.sh` und `scripts/push-research.sh`
+  sind in git noch `100644`. Korrektur:
+  `git update-index --chmod=+x dev-up.sh docker/claude-sandbox/run.sh scripts/push-research.sh` und committen.
 
 ## 2. Teststand
 
-- Alle Tests ohne Docker: **230 grün** (2026-11-06, in der Claude-Umgebung).
-- Kompletter Lauf mit Docker (`cd backend && mvn test`, inkl. Testcontainers wie
-  `StockGroupMigrationTest`, `CompanySnapshotRepositoryTest`): **zuletzt nach Task 2 gelaufen (99 Tests
-  grün). Für den Stand nach Task 8 noch offen.**
+- Kompletter Lauf mit Docker (`cd backend && mvn test`, inkl. Testcontainers): **266 Tests grün**
+  (2026-11-08, nach `cc18fae`).
+- Hinweis: Vor einem Zählen `backend/target/surefire-reports` löschen. Dort liegen sonst noch alte
+  Berichte gelöschter Testklassen.
 - Manueller Test am 2026-11-08 durch den Nutzer: `./dev-up.sh` gestartet, Sandbox
   (`docker/claude-sandbox/run.sh`) gestartet, Schreibschutz (`! touch /workspace/test.txt`) und
   Recherche („Recherchiere Apple“) durchgeführt — laut Nutzer erledigt.
@@ -47,11 +67,9 @@ enthält alles, was bisher nur im Chat oder in lokalen, nicht eingecheckten Date
 **Ganz normal mit den nächsten Tasks weitermachen.** An den Tokens wird jetzt nichts geändert, und
 der Übertragungstest wird jetzt nicht gemacht (siehe 3a).
 
-1. **Schlussprüfung des ganzen Branches** (Review auf dem stärksten Modell) mit den zurückgestellten
-   Punkten aus Abschnitt 5, außer den Token-Themen aus 3a.
-2. Plan-Abschnitt „Finish“: kompletter `mvn test` mit Docker durch den Nutzer, `PROJECT-STATUS.md`
-   aktualisieren (Phase 1 Backend fertig), dann Branch abschließen
-   (superpowers:finishing-a-development-branch; git macht der Nutzer).
+1. ~~Schlussprüfung des ganzen Branches~~ erledigt (2026-11-08, siehe oben).
+2. ~~Kompletter `mvn test` mit Docker, `PROJECT-STATUS.md` aktualisieren~~ erledigt. Offen: Branch
+   abschließen (superpowers:finishing-a-development-branch; git macht der Nutzer).
 3. Nächste Phase laut Scope-v2-Spec planen (Frontend für Login, Portfolio, Research mit Gruppen),
    mit Spec und Plan wie bisher.
 
@@ -110,7 +128,14 @@ Ideen für später (nicht beschlossen):
 
 ## 5. Zurückgestellte Punkte für die Schlussprüfung
 
-Muss vor Abschluss erledigt werden:
+**Stand 2026-11-08: Alle Punkte unten sind in der Schlussprüfung erledigt oder bewusst gelassen**,
+außer der Beschriftung der Generator-Ausgabe (Abschnitt 3a). Bewusst gelassen: festes IP-Fenster und
+O(n)-Aufräumen (Task 3), `List<?>` (Task 4), ungültiger `groupSource` beim Ingest (Task 7), Frontend
+nutzt noch `sector` (Frontend-Phase). Kleine Reste aus den Korrektur-Reviews (optional):
+`\p{Cntrl}` erfasst keine C1-Steuerzeichen; der Sync-Log ist ungetestet; ein doppelter
+`MethodArgumentNotValidException`-Handler in `StockGroupIllegalArgumentHandler`.
+
+Ursprüngliche Liste. Muss vor Abschluss erledigt werden:
 - `.env.example` behauptet, der bcrypt-Hash brauche keine Anführungszeichen. Falsch: `dev-up.sh`
   liest `.env` mit `source`, deshalb `ADMIN_PASSWORD_HASH='$2a$…'` in einfachen Anführungszeichen.
 - README „Admin-Passwort-Hash erzeugen“ und `.env.example` übergeben das Passwort als Argument
