@@ -82,12 +82,13 @@ describe('ResearchLibraryPage', () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 500,
+      headers: new Headers(),
       json: async () => [],
     })
 
     render(<ResearchLibraryPage />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Failed to load .*: 500/)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/HTTP 500/)
   })
 
   it('expands a company to show its research findings', async () => {

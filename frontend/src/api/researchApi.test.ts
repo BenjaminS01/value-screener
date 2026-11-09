@@ -28,23 +28,26 @@ describe('researchApi', () => {
     }
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
+      status: 200,
+      headers: new Headers(),
       json: async () => [snapshot],
     })
 
     const result = await fetchAllSnapshots()
 
     expect(result).toEqual([snapshot])
-    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots')
+    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots', expect.objectContaining({ method: 'GET' }))
   })
 
   it('fetchAllSnapshots throws when the backend request fails', async () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 500,
+      headers: new Headers(),
       json: async () => [],
     })
 
-    await expect(fetchAllSnapshots()).rejects.toThrow('Failed to load research snapshots: 500')
+    await expect(fetchAllSnapshots()).rejects.toThrow('HTTP 500')
   })
 
   it('fetchSnapshot returns the snapshot for a known isin', async () => {
@@ -60,19 +63,22 @@ describe('researchApi', () => {
     }
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
+      status: 200,
+      headers: new Headers(),
       json: async () => snapshot,
     })
 
     const result = await fetchSnapshot('US0378331005')
 
     expect(result).toEqual(snapshot)
-    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots/US0378331005')
+    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots/US0378331005', expect.objectContaining({ method: 'GET' }))
   })
 
   it('fetchSnapshot returns null for an unknown isin', async () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 404,
+      headers: new Headers(),
       json: async () => ({}),
     })
 

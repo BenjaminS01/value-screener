@@ -74,7 +74,7 @@ function App() {
   } else if (user === null) {
     content = <LoginPage onLoggedIn={handleLoggedIn} navigate={setView} notice={notice} />
   } else if (view.name === 'portfolio') {
-    content = <PortfolioPage />
+    content = <PortfolioPage user={user} navigate={setView} />
   } else if (view.name === 'research') {
     content = <ResearchLibraryPage />
   } else if (view.name === 'researchDetail') {

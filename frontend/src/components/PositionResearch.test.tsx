@@ -56,13 +56,14 @@ describe('PositionResearch', () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 500,
+      headers: new Headers(),
       json: async () => ({}),
     })
 
     render(<PositionResearch isin="US0378331005" />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Failed to load research snapshot: 500',
+      'HTTP 500',
     )
   })
 })

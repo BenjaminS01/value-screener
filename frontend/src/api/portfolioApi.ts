@@ -1,18 +1,28 @@
-export interface PublicPosition {
+import { apiFetch } from './apiClient'
+
+export interface GroupRef {
+  key: string
+  name: string
+}
+
+export interface Position {
   ticker: string
-  companyName: string
   isin: string
+  companyName: string
+  group: GroupRef | null
 }
 
-export async function fetchPublicPositions(): Promise<PublicPosition[]> {
-  const response = await fetch('/api/portfolio/public')
-  if (!response.ok) {
-    throw new Error(`Failed to load portfolio: ${response.status}`)
-  }
-  return response.json()
+export interface AdminPosition extends Position {
+  quantity: number
+  entryPrice: number
+  purchaseDate: string
 }
 
-export interface AddPositionInput {
+export function fetchPortfolio(): Promise<Position[] | AdminPosition[]> {
+  return apiFetch<Position[] | AdminPosition[]>('/api/portfolio')
+}
+
+export interface BuyPositionInput {
   ticker: string
   isin: string
   companyName: string
@@ -21,22 +31,37 @@ export interface AddPositionInput {
   purchaseDate: string
 }
 
-export interface Credentials {
-  username: string
-  password: string
+export async function buyPosition(input: BuyPositionInput): Promise<void> {
+  await apiFetch<void>('/api/portfolio', { method: 'POST', body: input })
 }
 
-export async function buyPosition(credentials: Credentials, input: AddPositionInput): Promise<void> {
-  const authHeader = 'Basic ' + btoa(`${credentials.username}:${credentials.password}`)
-  const response = await fetch('/api/portfolio', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: authHeader,
-    },
-    body: JSON.stringify(input),
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to add position: ${response.status}`)
-  }
+export async function sellPosition(isin: string, quantity: number): Promise<void> {
+  await apiFetch<void>('/api/portfolio/sell', { method: 'POST', body: { isin, quantity } })
+}
+
+export interface CorrectPositionInput {
+  ticker: string
+  companyName: string
+  quantity: number
+  entryPrice: number
+  purchaseDate: string
+}
+
+export async function correctPosition(isin: string, input: CorrectPositionInput): Promise<void> {
+  await apiFetch<void>(`/api/portfolio/${encodeURIComponent(isin)}`, { method: 'PUT', body: input })
+}
+
+export async function deletePosition(isin: string): Promise<void> {
+  await apiFetch<void>(`/api/portfolio/${encodeURIComponent(isin)}`, { method: 'DELETE' })
+}
+
+// Kept only until Task 4 rewrites ResearchLibraryPage (still imports it).
+export interface PublicPosition {
+  ticker: string
+  companyName: string
+  isin: string
+}
+
+export function fetchPublicPositions(): Promise<PublicPosition[]> {
+  return apiFetch<PublicPosition[]>('/api/portfolio/public')
 }

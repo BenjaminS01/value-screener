@@ -1,3 +1,5 @@
+import { ApiError, apiFetch } from './apiClient'
+
 export interface Finding {
   criterionKey: string
   numericValue: number | null
@@ -18,21 +20,15 @@ export interface CompanySnapshot {
   findings: Finding[]
 }
 
-export async function fetchAllSnapshots(): Promise<CompanySnapshot[]> {
-  const response = await fetch('/api/research/snapshots')
-  if (!response.ok) {
-    throw new Error(`Failed to load research snapshots: ${response.status}`)
-  }
-  return response.json()
+export function fetchAllSnapshots(): Promise<CompanySnapshot[]> {
+  return apiFetch<CompanySnapshot[]>('/api/research/snapshots')
 }
 
 export async function fetchSnapshot(isin: string): Promise<CompanySnapshot | null> {
-  const response = await fetch(`/api/research/snapshots/${isin}`)
-  if (response.status === 404) {
-    return null
+  try {
+    return await apiFetch<CompanySnapshot>(`/api/research/snapshots/${encodeURIComponent(isin)}`)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null
+    throw e
   }
-  if (!response.ok) {
-    throw new Error(`Failed to load research snapshot: ${response.status}`)
-  }
-  return response.json()
 }
