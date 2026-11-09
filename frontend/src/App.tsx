@@ -7,7 +7,7 @@ import { DatenschutzPage } from './pages/DatenschutzPage'
 import { ImpressumPage } from './pages/ImpressumPage'
 import { LoginPage } from './pages/LoginPage'
 import { PortfolioPage } from './pages/PortfolioPage'
-import { ResearchLibraryPage } from './pages/ResearchLibraryPage'
+import { ResearchOverviewPage } from './pages/ResearchOverviewPage'
 import { StartPage } from './pages/StartPage'
 
 const SESSION_EXPIRED_NOTE = 'Sitzung abgelaufen, bitte erneut anmelden'
@@ -76,7 +76,7 @@ function App() {
   } else if (view.name === 'portfolio') {
     content = <PortfolioPage user={user} navigate={setView} />
   } else if (view.name === 'research') {
-    content = <ResearchLibraryPage />
+    content = <ResearchOverviewPage user={user} navigate={setView} />
   } else if (view.name === 'researchDetail') {
     content = <h1>Recherche {view.isin}</h1>
   } else {

@@ -54,14 +54,3 @@ export async function correctPosition(isin: string, input: CorrectPositionInput)
 export async function deletePosition(isin: string): Promise<void> {
   await apiFetch<void>(`/api/portfolio/${encodeURIComponent(isin)}`, { method: 'DELETE' })
 }
-
-// Kept only until Task 4 rewrites ResearchLibraryPage (still imports it).
-export interface PublicPosition {
-  ticker: string
-  companyName: string
-  isin: string
-}
-
-export function fetchPublicPositions(): Promise<PublicPosition[]> {
-  return apiFetch<PublicPosition[]>('/api/portfolio/public')
-}

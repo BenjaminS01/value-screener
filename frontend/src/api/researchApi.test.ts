@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchAllSnapshots, fetchSnapshot } from './researchApi'
+import { assignGroup, fetchAllSnapshots, fetchGroups, fetchSnapshot } from './researchApi'
 
 describe('researchApi', () => {
   beforeEach(() => {
@@ -12,8 +12,8 @@ describe('researchApi', () => {
       ticker: 'AAPL',
       isin: 'US0378331005',
       companyName: 'Apple Inc.',
-      sector: 'Technology',
       country: 'US',
+      group: { key: 'tech', name: 'Technologie', source: 'AI' },
       businessDescription: 'Consumer electronics.',
       findings: [
         {
@@ -56,8 +56,8 @@ describe('researchApi', () => {
       ticker: 'AAPL',
       isin: 'US0378331005',
       companyName: 'Apple Inc.',
-      sector: 'Technology',
       country: 'US',
+      group: { key: 'tech', name: 'Technologie', source: 'AI' },
       businessDescription: 'Consumer electronics.',
       findings: [],
     }
@@ -85,5 +85,27 @@ describe('researchApi', () => {
     const result = await fetchSnapshot('US9999999999')
 
     expect(result).toBeNull()
+  })
+
+  it('fetchGroups returns the group catalog', async () => {
+    const groups = [{ key: 'tech', name: 'Technologie', sortOrder: 1, stockCount: 2 }]
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200, headers: new Headers(), json: async () => groups,
+    })
+    expect(await fetchGroups()).toEqual(groups)
+    expect(fetch).toHaveBeenCalledWith('/api/research/groups', expect.objectContaining({ method: 'GET' }))
+  })
+
+  it('assignGroup PUTs the group key and returns the updated snapshot', async () => {
+    document.cookie = 'XSRF-TOKEN=tok'
+    const updated = { id: 1, isin: 'US0378331005' }
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200, headers: new Headers(), json: async () => updated,
+    })
+    expect(await assignGroup('US0378331005', 'tech')).toEqual(updated)
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/research/snapshots/US0378331005/group',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ groupKey: 'tech' }) }),
+    )
   })
 })

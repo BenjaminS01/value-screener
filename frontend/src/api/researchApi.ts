@@ -9,14 +9,29 @@ export interface Finding {
   asOfDate: string
 }
 
+export type GroupSource = 'AI' | 'MANUAL'
+
+export interface SnapshotGroup {
+  key: string
+  name: string
+  source: GroupSource
+}
+
+export interface StockGroup {
+  key: string
+  name: string
+  sortOrder: number
+  stockCount: number
+}
+
 export interface CompanySnapshot {
   id: number
   ticker: string
   isin: string
   companyName: string
-  sector: string
-  country: string
+  country: string | null
   businessDescription: string
+  group: SnapshotGroup | null
   findings: Finding[]
 }
 
@@ -31,4 +46,15 @@ export async function fetchSnapshot(isin: string): Promise<CompanySnapshot | nul
     if (e instanceof ApiError && e.status === 404) return null
     throw e
   }
+}
+
+export function fetchGroups(): Promise<StockGroup[]> {
+  return apiFetch<StockGroup[]>('/api/research/groups')
+}
+
+export function assignGroup(isin: string, groupKey: string): Promise<CompanySnapshot> {
+  return apiFetch<CompanySnapshot>(`/api/research/snapshots/${encodeURIComponent(isin)}/group`, {
+    method: 'PUT',
+    body: { groupKey },
+  })
 }

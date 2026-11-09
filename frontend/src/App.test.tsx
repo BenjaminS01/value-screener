@@ -14,8 +14,8 @@ vi.mock('./pages/PortfolioPage', async () => {
     },
   }
 })
-vi.mock('./pages/ResearchLibraryPage', () => ({
-  ResearchLibraryPage: () => <h1>Research-Seite</h1>,
+vi.mock('./pages/ResearchOverviewPage', () => ({
+  ResearchOverviewPage: () => <h1>Research-Seite</h1>,
 }))
 
 const USER = { username: 'ben', role: 'ADMIN' }
