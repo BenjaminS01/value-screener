@@ -7,6 +7,7 @@ import { DatenschutzPage } from './pages/DatenschutzPage'
 import { ImpressumPage } from './pages/ImpressumPage'
 import { LoginPage } from './pages/LoginPage'
 import { PortfolioPage } from './pages/PortfolioPage'
+import { ResearchDetailPage } from './pages/ResearchDetailPage'
 import { ResearchOverviewPage } from './pages/ResearchOverviewPage'
 import { StartPage } from './pages/StartPage'
 
@@ -78,7 +79,7 @@ function App() {
   } else if (view.name === 'research') {
     content = <ResearchOverviewPage user={user} navigate={setView} />
   } else if (view.name === 'researchDetail') {
-    content = <h1>Recherche {view.isin}</h1>
+    content = <ResearchDetailPage user={user} isin={view.isin} navigate={setView} />
   } else {
     content = <StartPage />
   }
