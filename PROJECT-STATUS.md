@@ -2,7 +2,42 @@
 
 Letztes Update: 2026-11-12
 
-## v2 Phase 2a Frontend (2026-11-12): aktueller Einstiegspunkt
+## v2 Phase 2 (2a + 2b) fertig (2026-11-12): aktueller Einstiegspunkt
+
+**Phase 2 ist fertig.** Branch `feature/v2-phase2-frontend` wird nach `main` gemergt.
+- **2b-Spec:** [`docs/superpowers/specs/2026-11-12-v2-phase2b-data-age-thesis-history-design.md`](docs/superpowers/specs/2026-11-12-v2-phase2b-data-age-thesis-history-design.md)
+- **2b-Plan:** [`docs/superpowers/plans/2026-11-12-v2-phase2b-data-age-thesis-history.md`](docs/superpowers/plans/2026-11-12-v2-phase2b-data-age-thesis-history.md)
+- **2b umgesetzt:**
+  - **Daten-Alter:** Befunde älter als 9 Monate (`research.stale-after`, Standard `P9M`) gelten als
+    „veraltet“. Jede Aktie zeigt „Zuletzt recherchiert …“ und bei Bedarf „Neu-Recherche erwägen“.
+  - **Investment-These je ISIN:** drei Texte und der Status Beobachten/Abgelehnt.
+    - **USER lesen sie** mit dem Hinweis „Persönliche Einschätzung des Betreibers, keine
+      Anlageempfehlung.“, nur der ADMIN bearbeitet sie. Das ist eine geänderte Entscheidung, die
+      Scope-Spec und das README sind angepasst.
+    - „Halte ich“ wird aus dem Portfolio abgeleitet.
+    - „Warum kaufst du?“ im Kaufen-Formular hängt den Text mit Datum an die These an.
+  - **Recherche-Historie:** In zwei Tabellen wird nur geschrieben, nie geändert (Migrationen V5 und
+    V6 für die These). Geänderte Befunde und Gruppenwechsel werden mit Herkunft festgehalten
+    (INGEST, SYNC oder MANUAL). Auf der Detailseite gibt es „Verlauf (n)“ und einen
+    „Gruppenverlauf“.
+    - Zahlen werden auf 4 Nachkommastellen gerundet, damit keine falschen Verlaufseinträge
+      entstehen.
+    - Eine Gruppe, die im Verlauf vorkommt, kann nicht gelöscht werden.
+- **Commits 2b:** `6cea0ce`…`525b2eb` (5 Tasks; `bdcf709` enthält die These, trägt aber die Message von
+  Task 2) und `94a5700` (Korrekturen aus der Schlussprüfung, mit einem Integrationstest gegen
+  Postgres).
+- **Prüfung:** Backend `mvn test` 343 Tests grün, Frontend `npm test` 155 Tests grün,
+  `npm run build` grün. Manueller Test durch den Nutzer als ADMIN und USER am 2026-11-12 bestanden.
+- **Bewusst offen gelassen (klein):**
+  - Datumsangaben laufen in UTC, ein Kaufgrund kurz nach Mitternacht trägt das Datum des Vortags.
+  - Keine Wertprüfung für die Gruppenquelle in V5.
+  - Die Fehlermeldung bei ungültiger ISIN hängt davon ab, ob ein Kaufgrund mitgeschickt wird.
+  - Dazu die kleinen Reste aus 2a (siehe unten).
+- **Nächster Schritt:** Phase 3 laut Scope-v2-Spec Abschnitt 12, „Job-Tabelle und
+  Tiefenanalyse-Dummy“. Das ist der erste AWS-Baustein (DynamoDB, Gateway-Endpunkt, Lambda,
+  Polling-Oberfläche, Nutzungslimits). Wie immer mit Spec und Plan.
+
+## v2 Phase 2a Frontend (2026-11-12): abgeschlossen, Teil von Phase 2
 
 **Phase 2a ist fertig.** Branch `feature/v2-phase2-frontend` (abgezweigt nach dem Merge von Phase 1, PR #2).
 - **Spec:** [`docs/superpowers/specs/2026-11-08-v2-phase2a-frontend-design.md`](docs/superpowers/specs/2026-11-08-v2-phase2a-frontend-design.md)
@@ -24,9 +59,7 @@ Letztes Update: 2026-11-12
     abgelaufen“.
   - Kein Text „Keine Treffer“ bei leerer Suche.
   - Auf der Login-Seite stehen die Rechtslinks doppelt (auf der Seite und im Footer).
-- **Nächster Schritt: Phase 2b** mit eigener Spec und eigenem Plan: Daten-Alter, Investment-These (nur
-  ADMIN), Recherche-Historie (Scope-v2-Spec Abschnitt 4a). Neue Tabellen und Endpunkte im Backend plus
-  Anzeige im Frontend. Phase 2 ist fertig, wenn 2a und 2b stehen.
+- Danach folgte Phase 2b (siehe oben).
 
 ## v2 Phase 1 Backend (2026-11-08): abgeschlossen, nach `main` gemergt
 

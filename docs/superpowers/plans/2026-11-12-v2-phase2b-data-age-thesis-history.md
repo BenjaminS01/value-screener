@@ -199,5 +199,5 @@
 
 ## Finish
 
-- [ ] User checks manually against `./dev-up.sh` as ADMIN and USER: stale markers (e.g. temporarily set `RESEARCH_STALE_AFTER=P1D` or research an old date), thesis read (USER) and edit (ADMIN), purchase reason appended, history after re-researching a stock with changed values and after a manual group change.
-- [ ] Final whole-branch review over phase 2a + 2b, `PROJECT-STATUS.md` (phase 2 done), then finish the branch (superpowers:finishing-a-development-branch; git by the user).
+- [x] User checks manually against `./dev-up.sh` as ADMIN and USER: stale markers (e.g. temporarily set `RESEARCH_STALE_AFTER=P1D` or research an old date), thesis read (USER) and edit (ADMIN), purchase reason appended, history after re-researching a stock with changed values and after a manual group change.
+- [x] Final whole-branch review over phase 2a + 2b, `PROJECT-STATUS.md` (phase 2 done), then finish the branch (superpowers:finishing-a-development-branch; git by the user).
