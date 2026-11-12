@@ -15,10 +15,13 @@ public class CompanySnapshotService {
 
     private final CompanySnapshotRepository repository;
     private final StockGroupService groups;
+    private final ResearchFreshness freshness;
 
-    public CompanySnapshotService(CompanySnapshotRepository repository, StockGroupService groups) {
+    public CompanySnapshotService(CompanySnapshotRepository repository, StockGroupService groups,
+                                  ResearchFreshness freshness) {
         this.repository = repository;
         this.groups = groups;
+        this.freshness = freshness;
     }
 
     @Transactional
@@ -42,7 +45,7 @@ public class CompanySnapshotService {
             snapshot.upsertFinding(finding.criterionKey(), finding.numericValue(), finding.booleanValue(),
                     finding.claim(), finding.sourceUrl(), finding.asOfDate());
         }
-        return CompanySnapshotView.from(repository.save(snapshot));
+        return CompanySnapshotView.from(repository.save(snapshot), freshness);
     }
 
     /** Snapshot in import format (stored group and group source); requires a group so the live import is valid. */
@@ -70,7 +73,7 @@ public class CompanySnapshotService {
         CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
         snapshot.assignGroup(groups.require(StockGroup.trimUpper(groupKey)), GroupSource.MANUAL);
-        return CompanySnapshotView.from(repository.save(snapshot));
+        return CompanySnapshotView.from(repository.save(snapshot), freshness);
     }
 
     /** null = all, "none" = ungrouped, otherwise a (normalized) group key; an unknown key yields an empty list. */
@@ -84,14 +87,14 @@ public class CompanySnapshotService {
         } else {
             snapshots = repository.findAllByStockGroup_Key(StockGroup.trimUpper(groupFilter));
         }
-        return snapshots.stream().map(CompanySnapshotView::from).toList();
+        return snapshots.stream().map(s -> CompanySnapshotView.from(s, freshness)).toList();
     }
 
     @Transactional(readOnly = true)
     public CompanySnapshotView getByIsin(String isin) {
         String normalizedIsin = normalizeIsin(isin);
         return repository.findByIsin(normalizedIsin)
-                .map(CompanySnapshotView::from)
+                .map(s -> CompanySnapshotView.from(s, freshness))
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(isin));
     }
 

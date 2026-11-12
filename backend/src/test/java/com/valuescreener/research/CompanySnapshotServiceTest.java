@@ -8,7 +8,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Period;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,11 +34,14 @@ class CompanySnapshotServiceTest {
     @Mock
     private StockGroupService groups;
 
+    private final ResearchFreshness freshness = new ResearchFreshness(
+            Clock.fixed(Instant.parse("2026-11-12T10:00:00Z"), ZoneOffset.UTC), Period.ofMonths(9));
+
     private CompanySnapshotService service;
 
     @BeforeEach
     void setUp() {
-        service = new CompanySnapshotService(repository, groups);
+        service = new CompanySnapshotService(repository, groups, freshness);
     }
 
     private static FindingRequest peRatioFinding(String value) {
@@ -237,7 +244,35 @@ class CompanySnapshotServiceTest {
 
         CompanySnapshotView imported = service.upsert(exported, exported.groupSource());
 
-        assertThat(imported).isEqualTo(CompanySnapshotView.from(stored));
+        assertThat(imported).isEqualTo(CompanySnapshotView.from(stored, freshness));
+    }
+
+    @Test
+    void viewReportsLastResearchedDateAndStaleFlags() {
+        CompanySnapshot stored = existing();
+        stored.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("20"), null, "Old.", null,
+                LocalDate.of(2026, 1, 10));
+        stored.upsertFinding(ResearchCriterion.MOAT_ASSESSMENT, null, true, "Fresh.", null, LocalDate.of(2026, 6, 1));
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(stored));
+
+        CompanySnapshotView view = service.getByIsin("US0378331005");
+
+        assertThat(view.lastResearchedAt()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(view.stale()).isFalse();
+        assertThat(view.findings()).filteredOn(f -> f.asOfDate().equals(LocalDate.of(2026, 1, 10)))
+                .singleElement().satisfies(f -> assertThat(f.stale()).isTrue());
+        assertThat(view.findings()).filteredOn(f -> f.asOfDate().equals(LocalDate.of(2026, 6, 1)))
+                .singleElement().satisfies(f -> assertThat(f.stale()).isFalse());
+    }
+
+    @Test
+    void viewWithoutFindingsHasNoDateAndIsStale() {
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing()));
+
+        CompanySnapshotView view = service.getByIsin("US0378331005");
+
+        assertThat(view.lastResearchedAt()).isNull();
+        assertThat(view.stale()).isTrue();
     }
 
     @Test

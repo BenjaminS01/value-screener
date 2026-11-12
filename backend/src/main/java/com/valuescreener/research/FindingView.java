@@ -9,11 +9,12 @@ public record FindingView(
         Boolean booleanValue,
         String claim,
         String sourceUrl,
-        LocalDate asOfDate
+        LocalDate asOfDate,
+        boolean stale
 ) {
-    public static FindingView from(ResearchFinding finding) {
+    public static FindingView from(ResearchFinding finding, ResearchFreshness freshness) {
         return new FindingView(finding.getCriterionKey(), finding.getNumericValue(),
                 finding.getBooleanValue(), finding.getClaim(), finding.getSourceUrl(),
-                finding.getAsOfDate());
+                finding.getAsOfDate(), freshness.isStale(finding.getAsOfDate()));
     }
 }

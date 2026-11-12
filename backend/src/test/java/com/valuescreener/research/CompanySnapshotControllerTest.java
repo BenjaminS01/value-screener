@@ -32,11 +32,12 @@ class CompanySnapshotControllerTest {
 
     private static CompanySnapshotView sampleView() {
         FindingView peRatio = new FindingView(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
-                "Trailing P/E of 28.0.", "https://example.com/aapl-key-stats", LocalDate.of(2026, 8, 1));
+                "Trailing P/E of 28.0.", "https://example.com/aapl-key-stats", LocalDate.of(2026, 8, 1), false);
         return new CompanySnapshotView(
                 1L, "AAPL", "US0378331005", "Apple Inc.", "USA",
                 "Designs and sells consumer electronics.",
-                new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.AI), List.of(peRatio));
+                new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.AI), List.of(peRatio),
+                LocalDate.of(2026, 8, 1), false);
     }
 
     @Test
@@ -64,6 +65,16 @@ class CompanySnapshotControllerTest {
         mockMvc.perform(get("/api/research/snapshots/US0378331005"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isin").value("US0378331005"));
+    }
+
+    @Test
+    void viewExposesDataAgeFields() throws Exception {
+        when(service.getByIsin("US0378331005")).thenReturn(sampleView());
+
+        mockMvc.perform(get("/api/research/snapshots/US0378331005"))
+                .andExpect(jsonPath("$.lastResearchedAt").value("2026-08-01"))
+                .andExpect(jsonPath("$.stale").value(false))
+                .andExpect(jsonPath("$.findings[0].stale").value(false));
     }
 
     @Test

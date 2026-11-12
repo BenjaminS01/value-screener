@@ -59,8 +59,9 @@ class ResearchIngestControllerTest {
 
     private static CompanySnapshotView sampleView() {
         FindingView pe = new FindingView(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
-                "Trailing P/E of 28.0.", "https://example.com/x", LocalDate.of(2026, 8, 1));
-        return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of(pe));
+                "Trailing P/E of 28.0.", "https://example.com/x", LocalDate.of(2026, 8, 1), false);
+        return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of(pe),
+                LocalDate.of(2026, 8, 1), false);
     }
 
     @Test

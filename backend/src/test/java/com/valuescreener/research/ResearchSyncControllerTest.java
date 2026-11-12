@@ -45,7 +45,7 @@ class ResearchSyncControllerTest {
 
     private static CompanySnapshotView sampleView() {
         return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x",
-                new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.MANUAL), List.of());
+                new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.MANUAL), List.of(), null, true);
     }
 
     @Test

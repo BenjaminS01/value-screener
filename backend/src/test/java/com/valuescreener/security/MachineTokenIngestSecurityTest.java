@@ -54,7 +54,7 @@ class MachineTokenIngestSecurityTest {
     @Test
     void validTokenCanPostSnapshot() throws Exception {
         when(snapshotService.upsert(any(), any())).thenReturn(new CompanySnapshotView(
-                1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of()));
+                1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of(), null, true));
         mockMvc.perform(post("/api/research/ingest/snapshots")
                         .header("Authorization", "Bearer " + TOKEN)
                         .contentType("application/json").content(BODY))
