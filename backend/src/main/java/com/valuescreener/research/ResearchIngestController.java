@@ -34,7 +34,7 @@ public class ResearchIngestController {
     /** The server always records the group as an AI proposal; groupSource in the body is ignored. */
     @PostMapping("/snapshots")
     public CompanySnapshotView upsert(@Valid @RequestBody UpsertCompanySnapshotRequest request) {
-        return service.upsert(request, GroupSource.AI);
+        return service.upsert(request, GroupSource.AI, HistoryOrigin.INGEST);
     }
 
     /** Reviewed snapshot in import format, for the host-side push script. */

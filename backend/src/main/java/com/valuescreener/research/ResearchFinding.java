@@ -76,6 +76,20 @@ public class ResearchFinding {
         this.asOfDate = Objects.requireNonNull(asOfDate, "asOfDate must not be null");
     }
 
+    /** Content comparison as stored: BigDecimal by value (scale-insensitive), claim as it would be trimmed on write. */
+    boolean differsFrom(BigDecimal numericValue, Boolean booleanValue, String claim, String sourceUrl,
+                        LocalDate asOfDate) {
+        boolean sameNumber = this.numericValue == null || numericValue == null
+                ? this.numericValue == numericValue
+                : this.numericValue.compareTo(numericValue) == 0;
+        String incomingClaim = claim == null ? null : claim.trim();
+        return !(sameNumber
+                && Objects.equals(this.booleanValue, booleanValue)
+                && Objects.equals(this.claim, incomingClaim)
+                && Objects.equals(this.sourceUrl, sourceUrl)
+                && Objects.equals(this.asOfDate, asOfDate));
+    }
+
     void setCompanySnapshot(CompanySnapshot companySnapshot) {
         this.companySnapshot = companySnapshot;
     }

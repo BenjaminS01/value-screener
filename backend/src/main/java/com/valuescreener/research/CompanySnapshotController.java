@@ -31,6 +31,11 @@ public class CompanySnapshotController {
         return service.getByIsin(isin);
     }
 
+    @GetMapping("/{isin}/history")
+    public SnapshotHistoryView history(@PathVariable String isin) {
+        return service.history(isin);
+    }
+
     @PutMapping("/{isin}/group")
     public CompanySnapshotView assignGroup(@PathVariable String isin, @Valid @RequestBody AssignGroupRequest request) {
         return service.assignGroupManually(isin, request.groupKey());

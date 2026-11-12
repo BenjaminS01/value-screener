@@ -50,29 +50,29 @@ class ResearchSyncControllerTest {
 
     @Test
     void syncAppliesManualSourceFromBody() throws Exception {
-        when(service.upsert(any(), any())).thenReturn(sampleView());
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
 
         mockMvc.perform(post(URL).contentType("application/json")
                         .content(body("\"groupSource\":\"MANUAL\",")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.group.source").value("MANUAL"));
 
-        verify(service).upsert(any(), eq(GroupSource.MANUAL));
+        verify(service).upsert(any(), eq(GroupSource.MANUAL), eq(HistoryOrigin.SYNC));
     }
 
     @Test
     void syncDefaultsMissingSourceToAi() throws Exception {
-        when(service.upsert(any(), any())).thenReturn(sampleView());
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
 
         mockMvc.perform(post(URL).contentType("application/json").content(body("")))
                 .andExpect(status().isOk());
 
-        verify(service).upsert(any(), eq(GroupSource.AI));
+        verify(service).upsert(any(), eq(GroupSource.AI), eq(HistoryOrigin.SYNC));
     }
 
     @Test
     void syncUnknownGroupIs422() throws Exception {
-        when(service.upsert(any(), any())).thenThrow(new UnknownGroupException("NOPE"));
+        when(service.upsert(any(), any(), any())).thenThrow(new UnknownGroupException("NOPE"));
 
         mockMvc.perform(post(URL).contentType("application/json").content(body("")))
                 .andExpect(status().isUnprocessableEntity())

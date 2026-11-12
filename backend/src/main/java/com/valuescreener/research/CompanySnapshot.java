@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Entity
@@ -99,18 +100,28 @@ public class CompanySnapshot {
         return true;
     }
 
-    public void upsertFinding(ResearchCriterion criterionKey, BigDecimal numericValue, Boolean booleanValue,
-                               String claim, String sourceUrl, LocalDate asOfDate) {
+    /**
+     * Adds or updates the finding for a criterion.
+     * @return the previous content if an existing finding was changed; empty for a new criterion or identical content
+     */
+    public Optional<ReplacedFinding> upsertFinding(ResearchCriterion criterionKey, BigDecimal numericValue,
+                                                   Boolean booleanValue, String claim, String sourceUrl,
+                                                   LocalDate asOfDate) {
         for (ResearchFinding finding : findings) {
             if (finding.getCriterionKey() == criterionKey) {
+                boolean changed = finding.differsFrom(numericValue, booleanValue, claim, sourceUrl, asOfDate);
+                ReplacedFinding previous = changed ? new ReplacedFinding(criterionKey, finding.getNumericValue(),
+                        finding.getBooleanValue(), finding.getClaim(), finding.getSourceUrl(),
+                        finding.getAsOfDate()) : null;
                 finding.applyUpdate(numericValue, booleanValue, claim, sourceUrl, asOfDate);
-                return;
+                return Optional.ofNullable(previous);
             }
         }
         ResearchFinding finding = new ResearchFinding(criterionKey, numericValue, booleanValue, claim,
                 sourceUrl, asOfDate);
         finding.setCompanySnapshot(this);
         findings.add(finding);
+        return Optional.empty();
     }
 
     private static String requireValidTicker(String ticker) {
