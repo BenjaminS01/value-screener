@@ -11,6 +11,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.valuescreener.research.ThesisTooLongException;
+import org.mockito.ArgumentCaptor;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -149,6 +152,45 @@ class PortfolioControllerTest {
                                 {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15"}
                                 """))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void buyPassesPurchaseReasonToService() throws Exception {
+        mockMvc.perform(post("/api/portfolio")
+                        .contentType("application/json")
+                        .content("""
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15","purchaseReason":"Moat intact"}
+                                """))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<BuyPositionRequest> captor = ArgumentCaptor.forClass(BuyPositionRequest.class);
+        verify(portfolioService).buy(captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().purchaseReason()).isEqualTo("Moat intact");
+    }
+
+    @Test
+    void buyWithTooLongThesisAppendIs422() throws Exception {
+        doThrow(new ThesisTooLongException()).when(portfolioService).buy(any(BuyPositionRequest.class));
+
+        mockMvc.perform(post("/api/portfolio")
+                        .contentType("application/json")
+                        .content("""
+                                {"ticker":"AAPL","isin":"US0378331005","companyName":"Apple Inc.","quantity":10,"entryPrice":150.00,"purchaseDate":"2026-01-15","purchaseReason":"x"}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("Thesis text too long"));
+    }
+
+    @Test
+    void buyWithOverlongPurchaseReasonIs400() throws Exception {
+        String reason = "x".repeat(2001);
+
+        mockMvc.perform(post("/api/portfolio")
+                        .contentType("application/json")
+                        .content("{\"ticker\":\"AAPL\",\"isin\":\"US0378331005\",\"companyName\":\"Apple Inc.\","
+                                + "\"quantity\":10,\"entryPrice\":150.00,\"purchaseDate\":\"2026-01-15\",\"purchaseReason\":\"" + reason + "\"}"))
+                .andExpect(status().isBadRequest());
+        verify(portfolioService, never()).buy(any());
     }
 
     @Test
