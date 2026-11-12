@@ -7,6 +7,7 @@ export interface Finding {
   claim: string
   sourceUrl: string
   asOfDate: string
+  stale: boolean
 }
 
 export type GroupSource = 'AI' | 'MANUAL'
@@ -33,6 +34,8 @@ export interface CompanySnapshot {
   businessDescription: string
   group: SnapshotGroup | null
   findings: Finding[]
+  lastResearchedAt: string | null
+  stale: boolean
 }
 
 export function fetchAllSnapshots(): Promise<CompanySnapshot[]> {
@@ -57,4 +60,35 @@ export function assignGroup(isin: string, groupKey: string): Promise<CompanySnap
     method: 'PUT',
     body: { groupKey },
   })
+}
+
+export type HistoryOrigin = 'INGEST' | 'SYNC' | 'MANUAL'
+
+export interface FindingHistoryEntry {
+  criterionKey: string
+  numericValue: number | null
+  booleanValue: boolean | null
+  claim: string
+  sourceUrl: string
+  asOfDate: string
+  replacedAt: string
+  origin: HistoryOrigin
+}
+
+export interface GroupHistoryEntry {
+  previousGroup: { key: string; name: string } | null
+  previousSource: GroupSource | null
+  newGroup: { key: string; name: string }
+  newSource: GroupSource
+  changedAt: string
+  origin: HistoryOrigin
+}
+
+export interface SnapshotHistory {
+  findings: FindingHistoryEntry[]
+  groups: GroupHistoryEntry[]
+}
+
+export function fetchHistory(isin: string): Promise<SnapshotHistory> {
+  return apiFetch<SnapshotHistory>(`/api/research/snapshots/${encodeURIComponent(isin)}/history`)
 }

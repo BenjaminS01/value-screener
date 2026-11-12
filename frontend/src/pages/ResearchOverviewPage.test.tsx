@@ -6,7 +6,7 @@ import type { AuthUser } from '../api/authApi'
 const user: AuthUser = { username: 'guest', role: 'USER' }
 
 const snapshots = [
-  { id: 1, ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'AI' }, findings: [] },
+  { id: 1, ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'AI' }, findings: [], lastResearchedAt: '2025-01-01', stale: true },
   { id: 2, ticker: 'SAP', isin: 'DE0007164600', companyName: 'SAP SE', country: 'DE', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'MANUAL' }, findings: [] },
   { id: 3, ticker: 'XOM', isin: 'US30231G1022', companyName: 'Exxon Mobil', country: 'US', businessDescription: '', group: null, findings: [] },
 ]
@@ -33,6 +33,13 @@ describe('ResearchOverviewPage', () => {
     expect(await screen.findByRole('heading', { name: 'Technologie' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ohne Gruppe' })).toBeInTheDocument()
+  })
+
+  it('marks stale snapshots as veraltet', async () => {
+    render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
+    await screen.findByText('Apple Inc.')
+    expect(screen.getAllByText('veraltet')).toHaveLength(1)
+    expect(within(screen.getByText('Apple Inc.').closest('li')!).getByText('veraltet')).toBeInTheDocument()
   })
 
   it('switches to country sections', async () => {

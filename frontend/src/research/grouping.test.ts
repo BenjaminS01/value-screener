@@ -5,7 +5,7 @@ import { groupByCountry, groupByStockGroup, matchesSearch } from './grouping'
 function snap(over: Partial<CompanySnapshot>): CompanySnapshot {
   return {
     id: 1, ticker: 'T', isin: 'I', companyName: 'N', country: 'US',
-    businessDescription: '', group: null, findings: [], ...over,
+    businessDescription: '', group: null, findings: [], lastResearchedAt: null, stale: false, ...over,
   }
 }
 const g = (key: string, name: string) => ({ key, name, source: 'AI' as const })

@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react'
 import { fetchPortfolio } from '../api/portfolioApi'
-import { assignGroup, CompanySnapshot, Finding, fetchGroups, fetchSnapshot, StockGroup } from '../api/researchApi'
+import {
+  assignGroup,
+  CompanySnapshot,
+  Finding,
+  FindingHistoryEntry,
+  fetchGroups,
+  fetchHistory,
+  fetchSnapshot,
+  GroupHistoryEntry,
+  StockGroup,
+} from '../api/researchApi'
 import type { AuthUser } from '../api/authApi'
 import { writeErrorText } from '../api/errorText'
 import type { Navigate } from '../navigation'
+import { FindingHistory } from '../components/FindingHistory'
+import { formatDate, formatValue } from '../research/format'
 import { DeepResearchPlaceholder } from '../components/DeepResearchPlaceholder'
 import {
   CRITERION_LABELS,
@@ -20,18 +32,15 @@ interface Props {
 
 const PLACEHOLDER = 'Folgt in einer späteren Phase'
 
-function formatValue(f: Finding): string | null {
-  if (f.numericValue !== null) return f.numericValue.toLocaleString('de-DE', { maximumFractionDigits: 2 })
-  if (f.booleanValue !== null) return f.booleanValue ? 'ja' : 'nein'
-  return null
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('de-DE', { timeZone: 'UTC' })
-}
-
-function CriteriaList({ keys, findings }: { keys: readonly string[]; findings: Finding[] }) {
+function CriteriaList({
+  keys,
+  findings,
+  history,
+}: {
+  keys: readonly string[]
+  findings: Finding[]
+  history: FindingHistoryEntry[]
+}) {
   return (
     <dl>
       {keys.map((key) => {
@@ -46,6 +55,7 @@ function CriteriaList({ keys, findings }: { keys: readonly string[]; findings: F
                 <>
                   {formatValue(finding) !== null && <strong>{formatValue(finding)}</strong>}{' '}
                   <span>{finding.claim}</span> <span>{formatDate(finding.asOfDate)}</span>{' '}
+                  {finding.stale && <span>veraltet</span>}{' '}
                   {isSafeHttpUrl(finding.sourceUrl) ? (
                     <a href={finding.sourceUrl} target="_blank" rel="noopener noreferrer">
                       Quelle
@@ -55,6 +65,7 @@ function CriteriaList({ keys, findings }: { keys: readonly string[]; findings: F
                   )}
                 </>
               )}
+              <FindingHistory entries={history.filter((h) => h.criterionKey === key)} />
             </dd>
           </div>
         )
@@ -66,6 +77,9 @@ function CriteriaList({ keys, findings }: { keys: readonly string[]; findings: F
 export function ResearchDetailPage({ user, isin, navigate }: Props) {
   const [snapshot, setSnapshot] = useState<CompanySnapshot | null>(null)
   const [groups, setGroups] = useState<StockGroup[]>([])
+  const [findingHistory, setFindingHistory] = useState<FindingHistoryEntry[]>([])
+  const [groupHistory, setGroupHistory] = useState<GroupHistoryEntry[]>([])
+  const [historyError, setHistoryError] = useState(false)
   const [held, setHeld] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -87,6 +101,18 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
         setGroups(g)
         setHeld(h)
         setSelectedGroup(s?.group?.key ?? g[0]?.key ?? '')
+        if (s === null) return
+        // History is optional: a failing call must not block the page.
+        fetchHistory(isin).then(
+          (hist) => {
+            if (cancelled) return
+            setFindingHistory(hist.findings)
+            setGroupHistory(hist.groups)
+          },
+          () => {
+            if (!cancelled) setHistoryError(true)
+          },
+        )
       })
       .catch((e) => {
         if (!cancelled) setError(writeErrorText(e))
@@ -106,6 +132,15 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
       const updated = await assignGroup(isin, selectedGroup)
       setSnapshot(updated)
       setSelectedGroup(updated.group?.key ?? selectedGroup)
+      // The save succeeded; a failing history reload must not undo that.
+      try {
+        const hist = await fetchHistory(isin)
+        setFindingHistory(hist.findings)
+        setGroupHistory(hist.groups)
+        setHistoryError(false)
+      } catch {
+        setHistoryError(true)
+      }
     } catch (e) {
       setSaveError(writeErrorText(e))
     } finally {
@@ -141,6 +176,12 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
     <section>
       {back}
       <h1>{snapshot.companyName}</h1>
+      <p>
+        {snapshot.lastResearchedAt === null
+          ? 'Noch keine Befunde'
+          : `Zuletzt recherchiert ${formatDate(snapshot.lastResearchedAt)}${snapshot.stale ? ' – Neu-Recherche erwägen' : ''}`}
+      </p>
+      {historyError && <p>Verlauf konnte nicht geladen werden</p>}
       {held && <p>Der Betreiber hält diese Position</p>}
 
       <h2>A. Überblick</h2>
@@ -166,6 +207,19 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
           </span>
         )}
       </p>
+      {groupHistory.length > 0 && (
+        <div>
+          <h3>Gruppenverlauf</h3>
+          <ul>
+            {groupHistory.map((g, i) => (
+              <li key={i}>
+                {g.previousGroup?.name ?? '—'} → {g.newGroup.name} ({g.newSource === 'AI' ? 'KI-Vorschlag' : 'manuell'}) am{' '}
+                {formatDate(g.changedAt)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {user.role === 'ADMIN' && (
         <div>
           <label>
@@ -186,10 +240,10 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
       )}
 
       <h2>B. Kennzahlen</h2>
-      <CriteriaList keys={FUNDAMENTAL_CRITERIA} findings={snapshot.findings} />
+      <CriteriaList keys={FUNDAMENTAL_CRITERIA} findings={snapshot.findings} history={findingHistory} />
 
       <h2>C. Qualitative Befunde</h2>
-      <CriteriaList keys={QUALITATIVE_CRITERIA} findings={snapshot.findings} />
+      <CriteriaList keys={QUALITATIVE_CRITERIA} findings={snapshot.findings} history={findingHistory} />
 
       <h2>D. Quartalsberichte</h2>
       <button type="button" disabled title="Noch nicht verfügbar">

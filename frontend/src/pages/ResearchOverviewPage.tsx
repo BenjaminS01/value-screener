@@ -78,6 +78,7 @@ export function ResearchOverviewPage({ navigate }: Props) {
                 <button type="button" onClick={() => navigate({ name: 'researchDetail', isin: s.isin })}>
                   <span>{s.companyName}</span> <span>{s.ticker}</span> <span>{s.isin}</span>{' '}
                   <span>{grouping === 'country' ? (s.group?.name ?? '–') : (s.country?.trim() || '–')}</span>
+                  {s.stale && <> <span>veraltet</span></>}
                   {held.has(s.isin) && <> <span>im Portfolio</span></>}
                 </button>
               </li>
