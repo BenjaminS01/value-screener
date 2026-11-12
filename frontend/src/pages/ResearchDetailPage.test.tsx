@@ -26,7 +26,7 @@ const groups = [
 ]
 
 function res(status: number, body?: unknown) {
-  return { ok: status < 400, status, headers: new Headers(), json: async () => body }
+  return { ok: status < 400, status, headers: new Headers(), json: async () => body , text: async () => JSON.stringify(body )}
 }
 
 let putResponse: () => ReturnType<typeof res>
@@ -104,14 +104,18 @@ describe('ResearchDetailPage', () => {
     expect(await screen.findByText('Der Betreiber hält diese Position')).toBeInTheDocument()
   })
 
-  it('omits badge when not held or portfolio fails', async () => {
+  it('omits badge when not held', async () => {
     mockBackend({ portfolio: () => res(200, []) })
     renderPage()
     await screen.findByRole('heading', { level: 1 })
     expect(screen.queryByText('Der Betreiber hält diese Position')).not.toBeInTheDocument()
+  })
+
+  it('omits badge when the portfolio request fails (500)', async () => {
     mockBackend({ portfolio: () => res(500, { error: 'x' }) })
     renderPage()
-    expect(await screen.findAllByRole('heading', { level: 1 })).not.toHaveLength(0)
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByText('Der Betreiber hält diese Position')).not.toBeInTheDocument()
   })
 
   it('lets ADMIN change the group', async () => {
@@ -150,6 +154,7 @@ describe('ResearchDetailPage', () => {
     expect(upload).toHaveAttribute('title', 'Noch nicht verfügbar')
     expect(screen.getByRole('button', { name: 'Quartalsberichte zusammenfassen' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Tiefenanalyse starten' })).toBeDisabled()
+    expect(screen.getByLabelText('Frage zur Aktie')).toBeDisabled()
     expect(screen.getAllByText('Folgt in einer späteren Phase').length).toBeGreaterThan(0)
   })
 

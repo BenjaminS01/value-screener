@@ -94,6 +94,39 @@ describe('PositionActions', () => {
     expect(portfolioApi.sellPosition).not.toHaveBeenCalled()
   })
 
+  it('does not sell for quantity 0', async () => {
+    render(<PositionActions position={position} onChanged={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Verkaufen' }))
+    fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '0' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verkauf bestätigen' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
+    expect(portfolioApi.sellPosition).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['Stückzahl', '0'],
+    ['Einstandskurs', '-1'],
+  ])('does not correct for %s %s', async (label, value) => {
+    render(<PositionActions position={position} onChanged={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
+    fireEvent.change(screen.getByLabelText(label), { target: { value } })
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
+    expect(portfolioApi.correctPosition).not.toHaveBeenCalled()
+  })
+
+  it('resets the sell quantity when sell mode is opened again', async () => {
+    vi.mocked(portfolioApi.sellPosition).mockResolvedValue(undefined)
+    render(<PositionActions position={position} onChanged={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Verkaufen' }))
+    fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verkauf bestätigen' }))
+    await waitFor(() => expect(portfolioApi.sellPosition).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByLabelText('Verkaufsmenge')).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Verkaufen' }))
+    expect(screen.getByLabelText('Verkaufsmenge')).toHaveValue('')
+  })
+
   it('does not correct for an invalid number', async () => {
     render(<PositionActions position={position} onChanged={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))

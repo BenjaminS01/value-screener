@@ -104,6 +104,16 @@ describe('apiFetch', () => {
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
+  it('returns undefined for 201 with an empty body', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 201 })))
+    expect(await apiFetch('/api/x', { method: 'POST' })).toBeUndefined()
+  })
+
+  it('returns undefined for 200 with an empty body', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 200 })))
+    expect(await apiFetch('/api/x')).toBeUndefined()
+  })
+
   it('returns undefined for 204', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })))
     expect(await apiFetch('/api/x')).toBeUndefined()

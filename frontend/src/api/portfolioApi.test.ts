@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buyPosition, correctPosition, deletePosition, fetchPortfolio, sellPosition } from './portfolioApi'
 
 function okResponse(body: unknown = {}, status = 200) {
-  return { ok: true, status, headers: new Headers(), json: async () => body }
+  return { ok: true, status, headers: new Headers(), json: async () => body , text: async () => JSON.stringify(body )}
 }
 
 describe('portfolioApi', () => {
@@ -30,7 +30,8 @@ describe('portfolioApi', () => {
 
   it('buyPosition POSTs the body with the csrf header', async () => {
     const input = { ticker: 'AAPL', isin: 'US1', companyName: 'Apple', quantity: 2, entryPrice: 10.5, purchaseDate: '2026-01-15' }
-    await buyPosition(input)
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(null, { status: 201 }))
+    await expect(buyPosition(input)).resolves.toBeUndefined()
     const { path, options } = lastCall()
     expect(path).toBe('/api/portfolio')
     expect(options.method).toBe('POST')

@@ -25,7 +25,7 @@ function res(status: number, body?: unknown) {
     ok: status >= 200 && status < 300,
     status,
     headers: new Headers(),
-    json: async () => body,
+    json: async () => body, text: async () => JSON.stringify(body),
   }
 }
 

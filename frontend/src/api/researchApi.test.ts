@@ -30,7 +30,7 @@ describe('researchApi', () => {
       ok: true,
       status: 200,
       headers: new Headers(),
-      json: async () => [snapshot],
+      json: async () => [snapshot], text: async () => JSON.stringify([snapshot]),
     })
 
     const result = await fetchAllSnapshots()
@@ -44,7 +44,7 @@ describe('researchApi', () => {
       ok: false,
       status: 500,
       headers: new Headers(),
-      json: async () => [],
+      json: async () => [], text: async () => JSON.stringify([]),
     })
 
     await expect(fetchAllSnapshots()).rejects.toThrow('HTTP 500')
@@ -65,7 +65,7 @@ describe('researchApi', () => {
       ok: true,
       status: 200,
       headers: new Headers(),
-      json: async () => snapshot,
+      json: async () => snapshot, text: async () => JSON.stringify(snapshot),
     })
 
     const result = await fetchSnapshot('US0378331005')
@@ -79,7 +79,7 @@ describe('researchApi', () => {
       ok: false,
       status: 404,
       headers: new Headers(),
-      json: async () => ({}),
+      json: async () => ({}), text: async () => JSON.stringify(({})),
     })
 
     const result = await fetchSnapshot('US9999999999')
@@ -90,7 +90,7 @@ describe('researchApi', () => {
   it('fetchGroups returns the group catalog', async () => {
     const groups = [{ key: 'tech', name: 'Technologie', sortOrder: 1, stockCount: 2 }]
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true, status: 200, headers: new Headers(), json: async () => groups,
+      ok: true, status: 200, headers: new Headers(), json: async () => groups, text: async () => JSON.stringify(groups),
     })
     expect(await fetchGroups()).toEqual(groups)
     expect(fetch).toHaveBeenCalledWith('/api/research/groups', expect.objectContaining({ method: 'GET' }))
@@ -100,7 +100,7 @@ describe('researchApi', () => {
     document.cookie = 'XSRF-TOKEN=tok'
     const updated = { id: 1, isin: 'US0378331005' }
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true, status: 200, headers: new Headers(), json: async () => updated,
+      ok: true, status: 200, headers: new Headers(), json: async () => updated, text: async () => JSON.stringify(updated),
     })
     expect(await assignGroup('US0378331005', 'tech')).toEqual(updated)
     expect(fetch).toHaveBeenCalledWith(

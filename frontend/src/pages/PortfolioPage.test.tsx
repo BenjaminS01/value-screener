@@ -16,7 +16,7 @@ const adminRows = [
 ]
 
 function res(status: number, body?: unknown) {
-  return { ok: status < 400, status, headers: new Headers(), json: async () => body }
+  return { ok: status < 400, status, headers: new Headers(), json: async () => body , text: async () => JSON.stringify(body )}
 }
 
 function mockBackend(rows: unknown[], write?: (url: string, method: string) => ReturnType<typeof res>) {

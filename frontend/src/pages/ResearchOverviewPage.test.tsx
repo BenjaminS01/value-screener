@@ -13,7 +13,7 @@ const snapshots = [
 const groups = [{ key: 'tech', name: 'Technologie', sortOrder: 1, stockCount: 2 }]
 
 function res(status: number, body?: unknown) {
-  return { ok: status < 400, status, headers: new Headers(), json: async () => body }
+  return { ok: status < 400, status, headers: new Headers(), json: async () => body , text: async () => JSON.stringify(body )}
 }
 
 function mockBackend(portfolio: () => ReturnType<typeof res> = () => res(200, [{ isin: 'US0378331005' }])) {

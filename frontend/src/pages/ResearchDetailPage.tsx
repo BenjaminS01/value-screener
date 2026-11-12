@@ -201,6 +201,7 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
       <button type="button" disabled>
         Quartalsberichte zusammenfassen
       </button>
+      <input disabled aria-label="Frage zur Aktie" />
       <p>{PLACEHOLDER}</p>
 
       <h2>F. Tiefenanalyse</h2>

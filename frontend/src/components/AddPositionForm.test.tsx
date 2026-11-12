@@ -74,6 +74,18 @@ describe('AddPositionForm', () => {
     expect(vi.mocked(portfolioApi.buyPosition).mock.calls[0][0].entryPrice).toBe(150.5)
   })
 
+  it.each([
+    ['Stückzahl', '0'],
+    ['Einstandskurs', '-5'],
+  ])('does not send for %s %s', async (label, value) => {
+    render(<AddPositionForm onAdded={vi.fn()} />)
+    fill()
+    fireEvent.change(screen.getByLabelText(label), { target: { value } })
+    fireEvent.click(screen.getByRole('button', { name: 'Kaufen' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
+    expect(portfolioApi.buyPosition).not.toHaveBeenCalled()
+  })
+
   it('does not send and shows a message for an invalid number', async () => {
     render(<AddPositionForm onAdded={vi.fn()} />)
     fill()

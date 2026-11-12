@@ -44,6 +44,12 @@ export function PositionActions({ position, onChanged }: PositionActionsProps) {
     }
   }
 
+  function openSell() {
+    setSellQuantity('')
+    setError(null)
+    setMode('sell')
+  }
+
   function openCorrect() {
     setTicker(position.ticker)
     setCompanyName(position.companyName)
@@ -57,7 +63,7 @@ export function PositionActions({ position, onChanged }: PositionActionsProps) {
   function handleSell(event: FormEvent) {
     event.preventDefault()
     const parsed = parseDecimal(sellQuantity)
-    if (parsed === null) {
+    if (parsed === null || parsed <= 0) {
       setError(INVALID_NUMBER)
       return
     }
@@ -68,7 +74,7 @@ export function PositionActions({ position, onChanged }: PositionActionsProps) {
     event.preventDefault()
     const parsedQuantity = parseDecimal(quantity)
     const parsedPrice = parseDecimal(entryPrice)
-    if (parsedQuantity === null || parsedPrice === null) {
+    if (parsedQuantity === null || parsedPrice === null || parsedQuantity <= 0 || parsedPrice <= 0) {
       setError(INVALID_NUMBER)
       return
     }
@@ -90,7 +96,7 @@ export function PositionActions({ position, onChanged }: PositionActionsProps) {
 
   return (
     <div>
-      <button type="button" disabled={pending} onClick={() => { setError(null); setMode('sell') }}>
+      <button type="button" disabled={pending} onClick={openSell}>
         Verkaufen
       </button>
       <button type="button" disabled={pending} onClick={openCorrect}>

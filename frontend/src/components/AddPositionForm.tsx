@@ -24,7 +24,7 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
     setError(null)
     const parsedQuantity = parseDecimal(quantity)
     const parsedPrice = parseDecimal(entryPrice)
-    if (parsedQuantity === null || parsedPrice === null) {
+    if (parsedQuantity === null || parsedPrice === null || parsedQuantity <= 0 || parsedPrice <= 0) {
       setError(INVALID_NUMBER)
       return
     }

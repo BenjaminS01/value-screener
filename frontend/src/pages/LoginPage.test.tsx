@@ -7,7 +7,7 @@ function res(status: number, body?: unknown, headers: Record<string, string> = {
     ok: status >= 200 && status < 300,
     status,
     headers: new Headers(headers),
-    json: async () => body,
+    json: async () => body, text: async () => JSON.stringify(body),
   }
 }
 
