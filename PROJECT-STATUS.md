@@ -1,8 +1,34 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-08
+Letztes Update: 2026-11-12
 
-## v2 Phase 1 Backend (2026-11-08): aktueller Einstiegspunkt
+## v2 Phase 2a Frontend (2026-11-12): aktueller Einstiegspunkt
+
+**Phase 2a ist fertig.** Branch `feature/v2-phase2-frontend` (abgezweigt nach dem Merge von Phase 1, PR #2).
+- **Spec:** [`docs/superpowers/specs/2026-11-08-v2-phase2a-frontend-design.md`](docs/superpowers/specs/2026-11-08-v2-phase2a-frontend-design.md)
+- **Plan:** [`docs/superpowers/plans/2026-11-08-v2-phase2a-frontend.md`](docs/superpowers/plans/2026-11-08-v2-phase2a-frontend.md)
+- **Umgesetzt:**
+  - Das Frontend nutzt das Phase-1-Backend: Login-Sperre, Header, Startseite „Unsere Anwendung“,
+    Impressum und Datenschutz ohne Login.
+  - Portfolio je nach Rolle mit Kaufen, Verkaufen, Korrigieren und Löschen (nur ADMIN).
+  - Research-Übersicht nach Gruppe oder Land, mit Suche.
+  - Research-Detail mit allen 18 Kriterien; der ADMIN kann die Gruppe ändern.
+  - Platzhalter für Quartalsberichte, KI-Chat und Tiefenanalyse.
+  - Keine neuen npm-Pakete, kein Router, Aussehen schlicht und funktional.
+- **Commits:** `95be5ba`…`472c2d0` (5 Tasks) und `d786dfa` (Korrekturen aus der Schlussprüfung; u. a.
+  lieferte „Kaufen“ gegen das echte Backend einen Fehler, weil die 201-Antwort leer ist).
+- **Prüfung:** `npm test` 119 Tests grün, `npm run build` grün. Manueller Test durch den Nutzer als
+  ADMIN und USER am 2026-11-12 bestanden.
+- **Bewusst offen gelassen (klein):**
+  - Läuft beim Abmelden noch eine Anfrage und kommt mit 401 zurück, erscheint kurz „Sitzung
+    abgelaufen“.
+  - Kein Text „Keine Treffer“ bei leerer Suche.
+  - Auf der Login-Seite stehen die Rechtslinks doppelt (auf der Seite und im Footer).
+- **Nächster Schritt: Phase 2b** mit eigener Spec und eigenem Plan: Daten-Alter, Investment-These (nur
+  ADMIN), Recherche-Historie (Scope-v2-Spec Abschnitt 4a). Neue Tabellen und Endpunkte im Backend plus
+  Anzeige im Frontend. Phase 2 ist fertig, wenn 2a und 2b stehen.
+
+## v2 Phase 1 Backend (2026-11-08): abgeschlossen, nach `main` gemergt
 
 **Für eine neue Session zuerst lesen:
 [`docs/superpowers/plans/2026-11-08-v2-phase1-handoff.md`](docs/superpowers/plans/2026-11-08-v2-phase1-handoff.md).**

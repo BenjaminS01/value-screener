@@ -258,5 +258,5 @@ export type Navigate = (view: View) => void
 
 ## Finish
 
-- [ ] User checks manually against `./dev-up.sh` with an ADMIN and a USER account: login/logout, wrong password, portfolio actions (ADMIN) and read-only view (USER), research overview both groupings + search, detail with group change (ADMIN), placeholders, Impressum/Datenschutz without login.
-- [ ] Final whole-branch review, then update `PROJECT-STATUS.md` (phase 2a done, 2b next).
+- [x] User checks manually against `./dev-up.sh` with an ADMIN and a USER account: login/logout, wrong password, portfolio actions (ADMIN) and read-only view (USER), research overview both groupings + search, detail with group change (ADMIN), placeholders, Impressum/Datenschutz without login.
+- [x] Final whole-branch review, then update `PROJECT-STATUS.md` (phase 2a done, 2b next).
