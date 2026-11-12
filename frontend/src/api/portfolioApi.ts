@@ -29,6 +29,7 @@ export interface BuyPositionInput {
   quantity: number
   entryPrice: number
   purchaseDate: string
+  purchaseReason?: string
 }
 
 export async function buyPosition(input: BuyPositionInput): Promise<void> {

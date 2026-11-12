@@ -36,6 +36,7 @@ function mockBackend(opts: { snap?: unknown; status?: number; portfolio?: () => 
     if (url.endsWith('/history')) return Promise.resolve((opts.history ?? (() => res(200, { findings: [], groups: [] })))())
     if (url.startsWith('/api/research/snapshots/') && init?.method === 'PUT') return Promise.resolve(putResponse())
     if (url.startsWith('/api/research/snapshots/')) return Promise.resolve(res(opts.status ?? 200, opts.snap ?? snapshot()))
+    if (url.startsWith('/api/research/theses/')) return Promise.resolve(res(404, { error: 'Thesis not found' }))
     if (url === '/api/research/groups') return Promise.resolve(res(200, groups))
     if (url === '/api/portfolio') return Promise.resolve((opts.portfolio ?? (() => res(200, [{ isin: 'US0378331005' }])))())
     if (url === '/api/auth/csrf') return Promise.resolve(res(200, {}))
@@ -267,5 +268,13 @@ describe('ResearchDetailPage', () => {
     await screen.findByRole('heading', { level: 1 })
     fireEvent.click(screen.getByRole('button', { name: 'Zurück zur Übersicht' }))
     expect(navigate).toHaveBeenCalledWith({ name: 'research' })
+  })
+
+  it('places the thesis section right after the overview', async () => {
+    renderPage()
+    const thesisHeading = await screen.findByRole('heading', { name: 'Investment-These' })
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(headings.slice(0, 3)).toEqual(['A. Überblick', 'Investment-These', 'B. Kennzahlen'])
+    expect(thesisHeading).toBeInTheDocument()
   })
 })

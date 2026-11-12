@@ -14,6 +14,7 @@ import {
 import type { AuthUser } from '../api/authApi'
 import { writeErrorText } from '../api/errorText'
 import type { Navigate } from '../navigation'
+import { InvestmentThesisSection } from '../components/InvestmentThesisSection'
 import { FindingHistory } from '../components/FindingHistory'
 import { formatDate, formatValue } from '../research/format'
 import { DeepResearchPlaceholder } from '../components/DeepResearchPlaceholder'
@@ -238,6 +239,8 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
           {saveError !== null && <p role="alert">{saveError}</p>}
         </div>
       )}
+
+      <InvestmentThesisSection user={user} isin={isin} />
 
       <h2>B. Kennzahlen</h2>
       <CriteriaList keys={FUNDAMENTAL_CRITERIA} findings={snapshot.findings} history={findingHistory} />

@@ -16,6 +16,7 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
   const [quantity, setQuantity] = useState('')
   const [entryPrice, setEntryPrice] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
+  const [purchaseReason, setPurchaseReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -37,6 +38,7 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
         quantity: parsedQuantity,
         entryPrice: parsedPrice,
         purchaseDate,
+        ...(purchaseReason.trim() !== '' && { purchaseReason: purchaseReason.trim() }),
       })
       setTicker('')
       setIsin('')
@@ -44,6 +46,7 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
       setQuantity('')
       setEntryPrice('')
       setPurchaseDate('')
+      setPurchaseReason('')
       onAdded()
     } catch (err) {
       setError(writeErrorText(err))
@@ -77,6 +80,10 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
       <label>
         Kaufdatum
         <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
+      </label>
+      <label>
+        Warum kaufst du? (optional, wird an die Investment-These angehängt)
+        <textarea value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} />
       </label>
       <button type="submit" disabled={pending}>
         Kaufen

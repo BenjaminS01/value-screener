@@ -94,4 +94,40 @@ describe('AddPositionForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
     expect(portfolioApi.buyPosition).not.toHaveBeenCalled()
   })
+
+  it('sends a filled purchase reason', async () => {
+    vi.mocked(portfolioApi.buyPosition).mockResolvedValue(undefined)
+    const onAdded = vi.fn()
+    render(<AddPositionForm onAdded={onAdded} />)
+    fill()
+    fireEvent.change(screen.getByLabelText('Warum kaufst du? (optional, wird an die Investment-These angehängt)'), {
+      target: { value: 'Günstig bewertet' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Kaufen' }))
+    await waitFor(() => expect(onAdded).toHaveBeenCalled())
+    expect(portfolioApi.buyPosition).toHaveBeenCalledWith(
+      expect.objectContaining({ purchaseReason: 'Günstig bewertet' }),
+    )
+  })
+
+  it('omits an empty purchase reason', async () => {
+    vi.mocked(portfolioApi.buyPosition).mockResolvedValue(undefined)
+    const onAdded = vi.fn()
+    render(<AddPositionForm onAdded={onAdded} />)
+    fill()
+    fireEvent.change(screen.getByLabelText('Warum kaufst du? (optional, wird an die Investment-These angehängt)'), {
+      target: { value: '   ' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Kaufen' }))
+    await waitFor(() => expect(onAdded).toHaveBeenCalled())
+    expect(vi.mocked(portfolioApi.buyPosition).mock.calls[0][0]).not.toHaveProperty('purchaseReason')
+  })
+
+  it('shows the 422 message for a too long thesis', async () => {
+    vi.mocked(portfolioApi.buyPosition).mockRejectedValue(new ApiError('Thesis text too long', 422))
+    render(<AddPositionForm onAdded={vi.fn()} />)
+    fill()
+    fireEvent.click(screen.getByRole('button', { name: 'Kaufen' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Thesis text too long')
+  })
 })
