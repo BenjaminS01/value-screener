@@ -32,6 +32,10 @@ app:
     enabled: false
   research-sync:
     enabled: false
+  limits:
+    deep-analysis-per-user: 5
+    deep-analysis-per-admin: 20
+    global-per-day: 100
 
 research:
   stale-after: P9M
