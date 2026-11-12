@@ -89,10 +89,11 @@ export function InvestmentThesisSection({ user, isin }: Props) {
         setSaveError(CONFLICT)
         try {
           const fresh = await fetchThesis(isin)
+          // Only the stored thesis is refreshed (so the next save carries the new version);
+          // the typed values stay in the open form.
           setThesis(fresh)
-          setForm(toForm(fresh))
         } catch {
-          // keep the form as is; the conflict message already tells the user to reload
+          // keep everything as is; the conflict message already tells the user to reload
         }
       } else {
         setSaveError(writeErrorText(e))

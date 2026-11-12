@@ -10,4 +10,6 @@ public interface StockGroupHistoryRepository extends Repository<StockGroupHistor
     StockGroupHistory save(StockGroupHistory entry);
 
     List<StockGroupHistory> findByCompanySnapshotIdOrderByChangedAtDescIdDesc(Long companySnapshotId);
+
+    boolean existsByPreviousGroup_KeyOrNewGroup_Key(String previousKey, String newKey);
 }

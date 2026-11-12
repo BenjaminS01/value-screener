@@ -14,6 +14,7 @@ import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -60,7 +61,7 @@ public class ResearchFinding {
     public ResearchFinding(ResearchCriterion criterionKey, BigDecimal numericValue, Boolean booleanValue,
                             String claim, String sourceUrl, LocalDate asOfDate) {
         this.criterionKey = Objects.requireNonNull(criterionKey, "criterionKey must not be null");
-        this.numericValue = numericValue;
+        this.numericValue = normalize(numericValue);
         this.booleanValue = booleanValue;
         this.claim = requireNonBlank(claim, "claim");
         this.sourceUrl = sourceUrl;
@@ -69,7 +70,7 @@ public class ResearchFinding {
 
     void applyUpdate(BigDecimal numericValue, Boolean booleanValue, String claim, String sourceUrl,
                       LocalDate asOfDate) {
-        this.numericValue = numericValue;
+        this.numericValue = normalize(numericValue);
         this.booleanValue = booleanValue;
         this.claim = requireNonBlank(claim, "claim");
         this.sourceUrl = sourceUrl;
@@ -81,13 +82,18 @@ public class ResearchFinding {
                         LocalDate asOfDate) {
         boolean sameNumber = this.numericValue == null || numericValue == null
                 ? this.numericValue == numericValue
-                : this.numericValue.compareTo(numericValue) == 0;
+                : this.numericValue.compareTo(normalize(numericValue)) == 0;
         String incomingClaim = claim == null ? null : claim.trim();
         return !(sameNumber
                 && Objects.equals(this.booleanValue, booleanValue)
                 && Objects.equals(this.claim, incomingClaim)
                 && Objects.equals(this.sourceUrl, sourceUrl)
                 && Objects.equals(this.asOfDate, asOfDate));
+    }
+
+    /** Matches the NUMERIC(12,4) column so the in-memory value equals what the database stores. */
+    private static BigDecimal normalize(BigDecimal value) {
+        return value == null ? null : value.setScale(4, RoundingMode.HALF_UP);
     }
 
     void setCompanySnapshot(CompanySnapshot companySnapshot) {

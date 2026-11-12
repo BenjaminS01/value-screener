@@ -25,11 +25,14 @@ class StockGroupServiceTest {
     @Mock
     private CompanySnapshotRepository snapshots;
 
+    @Mock
+    private StockGroupHistoryRepository groupHistory;
+
     private StockGroupService service;
 
     @BeforeEach
     void setUp() {
-        service = new StockGroupService(groups, snapshots);
+        service = new StockGroupService(groups, snapshots, groupHistory);
     }
 
     @Test
@@ -114,6 +117,19 @@ class StockGroupServiceTest {
         when(snapshots.countByStockGroup_Key("BANKS")).thenReturn(1L);
 
         assertThatThrownBy(() -> service.delete("BANKS")).isInstanceOf(StockGroupConflictException.class);
+        verify(groups, never()).delete(any());
+    }
+
+    @Test
+    void deleteGroupInHistoryIsConflict() {
+        StockGroup banks = new StockGroup("BANKS", "Banks", 10);
+        when(groups.findById("BANKS")).thenReturn(Optional.of(banks));
+        when(snapshots.countByStockGroup_Key("BANKS")).thenReturn(0L);
+        when(groupHistory.existsByPreviousGroup_KeyOrNewGroup_Key("BANKS", "BANKS")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.delete("BANKS"))
+                .isInstanceOf(StockGroupConflictException.class)
+                .hasMessage("Group BANKS appears in the group history and cannot be deleted");
         verify(groups, never()).delete(any());
     }
 

@@ -11,10 +11,13 @@ public class StockGroupService {
 
     private final StockGroupRepository groups;
     private final CompanySnapshotRepository snapshots;
+    private final StockGroupHistoryRepository groupHistory;
 
-    public StockGroupService(StockGroupRepository groups, CompanySnapshotRepository snapshots) {
+    public StockGroupService(StockGroupRepository groups, CompanySnapshotRepository snapshots,
+                             StockGroupHistoryRepository groupHistory) {
         this.groups = groups;
         this.snapshots = snapshots;
+        this.groupHistory = groupHistory;
     }
 
     @Transactional(readOnly = true)
@@ -62,6 +65,10 @@ public class StockGroupService {
         if (used > 0) {
             throw new StockGroupConflictException(
                     "Group " + group.getKey() + " still has " + used + " stock(s) assigned");
+        }
+        if (groupHistory.existsByPreviousGroup_KeyOrNewGroup_Key(group.getKey(), group.getKey())) {
+            throw new StockGroupConflictException(
+                    "Group " + group.getKey() + " appears in the group history and cannot be deleted");
         }
         groups.delete(group);
     }

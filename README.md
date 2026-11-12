@@ -301,7 +301,7 @@ Die Auswahl lässt sich nach Gruppe filtern.
   eine Aktie gemeint, die nur billig aussieht, weil das Geschäft Probleme hat.
 - Jede Angabe hat **Quelle und Datum**. Fehlendes wird als „not researched“ angezeigt, damit Lücken
   sichtbar bleiben.
-- **Alter der Daten:** Angaben älter als 6 Monate werden als veraltet markiert. Pro Aktie steht
+- **Alter der Daten:** Angaben älter als 9 Monate (einstellbar über `research.stale-after`) werden als veraltet markiert. Pro Aktie steht
   „Last researched …“, damit niemand mit alten Zahlen entscheidet, die aktuell aussehen.
 - **Verlauf:** Neue Recherchen überschreiben alte Werte nicht spurlos. Ältere Stände sind
   aufklappbar, z. B. wie sich das KGV oder die Einschätzung des Burggrabens verändert hat.

@@ -182,7 +182,8 @@ New table `stock_group_history`:
 - `origin`: the ingest controller passes `INGEST`, the sync controller `SYNC`, the manual group
   assignment `MANUAL`.
 - No update or delete methods on the history repositories; no cascade deletes from snapshots
-  (snapshots are never deleted today).
+  (snapshots are never deleted today). A group that appears in the group history cannot be deleted
+  (409 with an explanation), so history stays intact.
 
 ### 8.3 API and frontend
 

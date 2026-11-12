@@ -394,7 +394,7 @@ Deliberately not used: Cognito (more setup than a handful of fixed accounts need
 | Phase | Content | Needs AWS? |
 |---|---|---|
 | 1 | **Login-only + roles:** account list (ADMIN + USER accounts) from configuration, session login, brute-force protection, `SecurityConfig`, role-dependent portfolio API incl. correct/delete, frontend login gate, header Portfolio/Research, legal pages public | no |
-| 2 | **Research page:** stock selector, overview/fundamentals/qualitative sections, portfolio badge, report list and chat as placeholders, greyed-out upload with tooltip; **data age, investment thesis (ADMIN), research history** (Section 4a) | no |
+| 2 | **Research page:** stock selector, overview/fundamentals/qualitative sections, portfolio badge, report list and chat as placeholders, greyed-out upload with tooltip; **data age, investment thesis (USER reads, ADMIN edits), research history** (Section 4a) | no |
 | 3 | **Job table + deep-analysis dummy:** DynamoDB table, gateway endpoint, stream, `deep-analysis-demo` Lambda, polling UI, usage limits — first AWS building block | yes (≈ 0 $) |
 | 4 | **Quarterly reports:** `report-intelligence/` skeleton, upload/list/read/delete, validation, indexing (RAG design phases 0–2) | yes |
 | 5 | **"Evaluate quarterly reports" button**, stored and reused, incl. thesis check, read by all roles (RAG design phase 3, Section 4a) | yes + Anthropic |

@@ -136,15 +136,35 @@ describe('InvestmentThesisSection', () => {
     expect(screen.getByText('Status gilt nicht, solange die Position gehalten wird')).toBeInTheDocument()
   })
 
-  it('409 shows the conflict message and reloads', async () => {
+  it('409 keeps the typed values, shows the conflict message and sends the fresh version next', async () => {
     putResponse = () => json(409, { error: 'Conflict, please reload' })
     render(<InvestmentThesisSection user={admin} isin={ISIN} />)
     await screen.findByText('Starker Burggraben')
     fireEvent.click(screen.getByRole('button', { name: 'These bearbeiten' }))
+    fireEvent.change(screen.getByLabelText('Warum interessant'), { target: { value: 'Mein Text' } })
     getResponse = () => json(200, thesis({ whyInteresting: 'Von jemand anderem', version: 4 }))
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Die These wurde inzwischen geändert, bitte neu laden')
-    await waitFor(() => expect(screen.getByLabelText('Warum interessant')).toHaveValue('Von jemand anderem'))
+    await waitFor(() => expect(putBodies).toHaveLength(1))
+    expect(screen.getByLabelText('Warum interessant')).toHaveValue('Mein Text')
+    expect(screen.getByRole('alert')).toHaveTextContent('Die These wurde inzwischen geändert, bitte neu laden')
+    putResponse = () => json(200, thesis({ version: 5 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await waitFor(() => expect(putBodies).toHaveLength(2))
+    expect(putBodies[1]).toMatchObject({ whyInteresting: 'Mein Text', version: 4 })
+  })
+
+  it('keeps the stored status and reason when holding and only a text field is edited', async () => {
+    getResponse = () => json(200, thesis({ holding: true, status: 'WATCHING', statusReason: 'Bewertung zu hoch' }))
+    render(<InvestmentThesisSection user={admin} isin={ISIN} />)
+    await screen.findByText('Halte ich')
+    fireEvent.click(screen.getByRole('button', { name: 'These bearbeiten' }))
+    fireEvent.change(screen.getByLabelText('Warum interessant'), { target: { value: 'Neu' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    await waitFor(() => expect(putBodies).toHaveLength(1))
+    expect(putBodies[0]).toMatchObject({
+      whyInteresting: 'Neu', status: 'WATCHING', statusReason: 'Bewertung zu hoch',
+    })
   })
 
   it('422 shows the backend message', async () => {
