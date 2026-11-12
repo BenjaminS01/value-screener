@@ -35,3 +35,16 @@ jobs:
       - name: Run frontend tests
         working-directory: frontend
         run: npm test
+
+  deep-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run deep-analysis tests
+        working-directory: deep-analysis
+        run: mvn -B test
