@@ -61,7 +61,7 @@ class ConflictResponseTest {
 
     @Test
     void ingestDataIntegrityViolationReturns409() throws Exception {
-        when(snapshotService.upsert(any(), any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+        when(snapshotService.upsert(any(), any(), any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
         mockMvc.perform(post("/api/research/ingest/snapshots").contentType("application/json").content(INGEST_BODY))
                 .andExpect(status().isConflict())
@@ -70,7 +70,7 @@ class ConflictResponseTest {
 
     @Test
     void ingestOptimisticLockReturns409() throws Exception {
-        when(snapshotService.upsert(any(), any()))
+        when(snapshotService.upsert(any(), any(), any()))
                 .thenThrow(new ObjectOptimisticLockingFailureException(CompanySnapshot.class, 1L));
 
         mockMvc.perform(post("/api/research/ingest/snapshots").contentType("application/json").content(INGEST_BODY))

@@ -1,3 +1,5 @@
+import { ApiError, apiFetch } from './apiClient'
+
 export interface Finding {
   criterionKey: string
   numericValue: number | null
@@ -5,6 +7,22 @@ export interface Finding {
   claim: string
   sourceUrl: string
   asOfDate: string
+  stale: boolean
+}
+
+export type GroupSource = 'AI' | 'MANUAL'
+
+export interface SnapshotGroup {
+  key: string
+  name: string
+  source: GroupSource
+}
+
+export interface StockGroup {
+  key: string
+  name: string
+  sortOrder: number
+  stockCount: number
 }
 
 export interface CompanySnapshot {
@@ -12,27 +30,65 @@ export interface CompanySnapshot {
   ticker: string
   isin: string
   companyName: string
-  sector: string
-  country: string
+  country: string | null
   businessDescription: string
+  group: SnapshotGroup | null
   findings: Finding[]
+  lastResearchedAt: string | null
+  stale: boolean
 }
 
-export async function fetchAllSnapshots(): Promise<CompanySnapshot[]> {
-  const response = await fetch('/api/research/snapshots')
-  if (!response.ok) {
-    throw new Error(`Failed to load research snapshots: ${response.status}`)
-  }
-  return response.json()
+export function fetchAllSnapshots(): Promise<CompanySnapshot[]> {
+  return apiFetch<CompanySnapshot[]>('/api/research/snapshots')
 }
 
 export async function fetchSnapshot(isin: string): Promise<CompanySnapshot | null> {
-  const response = await fetch(`/api/research/snapshots/${isin}`)
-  if (response.status === 404) {
-    return null
+  try {
+    return await apiFetch<CompanySnapshot>(`/api/research/snapshots/${encodeURIComponent(isin)}`)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null
+    throw e
   }
-  if (!response.ok) {
-    throw new Error(`Failed to load research snapshot: ${response.status}`)
-  }
-  return response.json()
+}
+
+export function fetchGroups(): Promise<StockGroup[]> {
+  return apiFetch<StockGroup[]>('/api/research/groups')
+}
+
+export function assignGroup(isin: string, groupKey: string): Promise<CompanySnapshot> {
+  return apiFetch<CompanySnapshot>(`/api/research/snapshots/${encodeURIComponent(isin)}/group`, {
+    method: 'PUT',
+    body: { groupKey },
+  })
+}
+
+export type HistoryOrigin = 'INGEST' | 'SYNC' | 'MANUAL'
+
+export interface FindingHistoryEntry {
+  criterionKey: string
+  numericValue: number | null
+  booleanValue: boolean | null
+  claim: string
+  sourceUrl: string
+  asOfDate: string
+  replacedAt: string
+  origin: HistoryOrigin
+}
+
+export interface GroupHistoryEntry {
+  previousGroup: { key: string; name: string } | null
+  previousSource: GroupSource | null
+  newGroup: { key: string; name: string }
+  newSource: GroupSource
+  changedAt: string
+  origin: HistoryOrigin
+}
+
+export interface SnapshotHistory {
+  findings: FindingHistoryEntry[]
+  groups: GroupHistoryEntry[]
+}
+
+export function fetchHistory(isin: string): Promise<SnapshotHistory> {
+  return apiFetch<SnapshotHistory>(`/api/research/snapshots/${encodeURIComponent(isin)}/history`)
 }

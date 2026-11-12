@@ -45,34 +45,34 @@ class ResearchSyncControllerTest {
 
     private static CompanySnapshotView sampleView() {
         return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x",
-                new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.MANUAL), List.of());
+                new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.MANUAL), List.of(), null, true);
     }
 
     @Test
     void syncAppliesManualSourceFromBody() throws Exception {
-        when(service.upsert(any(), any())).thenReturn(sampleView());
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
 
         mockMvc.perform(post(URL).contentType("application/json")
                         .content(body("\"groupSource\":\"MANUAL\",")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.group.source").value("MANUAL"));
 
-        verify(service).upsert(any(), eq(GroupSource.MANUAL));
+        verify(service).upsert(any(), eq(GroupSource.MANUAL), eq(HistoryOrigin.SYNC));
     }
 
     @Test
     void syncDefaultsMissingSourceToAi() throws Exception {
-        when(service.upsert(any(), any())).thenReturn(sampleView());
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
 
         mockMvc.perform(post(URL).contentType("application/json").content(body("")))
                 .andExpect(status().isOk());
 
-        verify(service).upsert(any(), eq(GroupSource.AI));
+        verify(service).upsert(any(), eq(GroupSource.AI), eq(HistoryOrigin.SYNC));
     }
 
     @Test
     void syncUnknownGroupIs422() throws Exception {
-        when(service.upsert(any(), any())).thenThrow(new UnknownGroupException("NOPE"));
+        when(service.upsert(any(), any(), any())).thenThrow(new UnknownGroupException("NOPE"));
 
         mockMvc.perform(post(URL).contentType("application/json").content(body("")))
                 .andExpect(status().isUnprocessableEntity())

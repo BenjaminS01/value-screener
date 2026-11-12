@@ -32,3 +32,6 @@ app:
     enabled: false
   research-sync:
     enabled: false
+
+research:
+  stale-after: P9M

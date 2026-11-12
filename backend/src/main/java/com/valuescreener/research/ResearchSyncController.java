@@ -27,7 +27,7 @@ public class ResearchSyncController {
     @PostMapping("/snapshots")
     public CompanySnapshotView sync(@Valid @RequestBody UpsertCompanySnapshotRequest request) {
         GroupSource source = request.groupSource() == null ? GroupSource.AI : request.groupSource();
-        CompanySnapshotView view = service.upsert(request, source);
+        CompanySnapshotView view = service.upsert(request, source, HistoryOrigin.SYNC);
         SnapshotGroupView group = view.group();
         log.info("research import isin={} group={} source={} findings={} via=sync-token",
                 view.isin(), group == null ? "-" : group.key(), group == null ? "-" : group.source(),

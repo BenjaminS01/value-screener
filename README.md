@@ -169,9 +169,9 @@ Investment-These der Aktie:
 
 ### Research
 
-Eine Seite pro Aktie, hier aus Sicht des ADMIN. Ein USER sieht dieselbe Seite **ohne** Investment-These
-und ohne den Abschnitt „Thesis check“ in der Auswertung. Gruppe ändern und Berichte hochladen kann er
-nicht, der Upload-Button ist für ihn ausgegraut.
+Eine Seite pro Aktie, hier aus Sicht des ADMIN. Ein USER sieht dieselbe Seite, **auch** mit Investment-These
+und Abschnitt „Thesis check“ (mit dem Hinweis „Persönliche Einschätzung des Betreibers, keine Anlageempfehlung.“).
+Die These bearbeiten, die Gruppe ändern und Berichte hochladen kann er nicht, der Upload-Button ist für ihn ausgegraut.
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -189,7 +189,7 @@ nicht, der Upload-Button ist für ihn ausgegraut.
 ║  │ Search, YouTube, Android and Google Cloud; revenue mainly from advertising.            │  ║
 ║  │ Last researched 2026-10-31 · Status: Holding (from portfolio)                          │  ║
 ║  ╰────────────────────────────────────────────────────────────────────────────────────────╯  ║
-║  ╭─ Investment thesis · ADMIN only ───────────────────────────────────────────────────────╮  ║
+║  ╭─ Investment thesis · edit: ADMIN ──────────────────────────────────────────────────────╮  ║
 ║  │ Status        Holding  (from portfolio)                                                │  ║
 ║  │ Why           Dominant search/ads business funds Cloud and AI; strong net cash.        │  ║
 ║  │ Expected      Cloud margin keeps rising; buybacks continue at today's pace.            │  ║
@@ -221,7 +221,7 @@ nicht, der Upload-Button ist für ihn ausgegraut.
 ║  │ [ Evaluate quarterly reports ]                              Questions left today: 7/10 │  ║
 ║  │ ╭─ Evaluation · 2026-11-10 · reports Q1 + Q3 2026 ───────────────────────────────────╮ │  ║
 ║  │ │ Margins stable to rising, free cash flow clearly positive, low debt …              │ │  ║
-║  │ │ Thesis check (ADMIN only): Cloud margin assumption supported [Q3 2026, p. 31];     │ │  ║
+║  │ │ Thesis check (all roles):  Cloud margin assumption supported [Q3 2026, p. 31];     │ │  ║
 ║  │ │   capex rising faster than expected [Q3 2026, p. 44].                              │ │  ║
 ║  │ │ No new quarterly reports — evaluation already available.                           │ │  ║
 ║  │ ╰────────────────────────────────────────────────────────────────────────────────────╯ │  ║
@@ -246,7 +246,7 @@ auch für eine, die nicht im Portfolio ist. „Holding“ setzt das System selbs
 Portfolio ist. Sonst wählt der ADMIN `Watching` oder `Rejected` mit Begründung:
 
 ```text
-╭─ Edit investment thesis · Intel Corp. · ADMIN only ──────────────────────╮
+╭─ Edit investment thesis · Intel Corp. · ADMIN ───────────────────────────╮
 │ Status                                                                   │
 │ ( ) Holding   - set automatically while the stock is in the portfolio    │
 │ (•) Watching   ( ) Rejected                                              │
@@ -301,14 +301,14 @@ Die Auswahl lässt sich nach Gruppe filtern.
   eine Aktie gemeint, die nur billig aussieht, weil das Geschäft Probleme hat.
 - Jede Angabe hat **Quelle und Datum**. Fehlendes wird als „not researched“ angezeigt, damit Lücken
   sichtbar bleiben.
-- **Alter der Daten:** Angaben älter als 6 Monate werden als veraltet markiert. Pro Aktie steht
+- **Alter der Daten:** Angaben älter als 9 Monate (einstellbar über `research.stale-after`) werden als veraltet markiert. Pro Aktie steht
   „Last researched …“, damit niemand mit alten Zahlen entscheidet, die aktuell aussehen.
 - **Verlauf:** Neue Recherchen überschreiben alte Werte nicht spurlos. Ältere Stände sind
   aufklappbar, z. B. wie sich das KGV oder die Einschätzung des Burggrabens verändert hat.
 - **Interessenkonflikt:** Hält der Betreiber die Aktie, wird das deutlich markiert
   („Owner holds this position“).
 
-### Investment-These (nur ADMIN)
+### Investment-These (lesen: alle, bearbeiten: nur ADMIN)
 
 Value Investing heißt auch, vorher aufzuschreiben, *warum* man eine Aktie hält und *was* einen zum
 Verkauf bringen würde. Der ADMIN hält pro Aktie fest:
@@ -320,7 +320,9 @@ Verkauf bringen würde. Der ADMIN hält pro Aktie fest:
 
 „Holding“ ergibt sich automatisch aus dem Portfolio. Bei der Auswertung neuer Quartalsberichte
 prüft ein Abschnitt „Thesis check“, welche Aussagen die Annahmen stützen oder ihnen widersprechen,
-mit Seitenangabe. These, Status und Thesis check sind **nur für den ADMIN** sichtbar.
+mit Seitenangabe. These, Status und Thesis check dürfen **alle angemeldeten Nutzer lesen**, bearbeiten
+kann sie **nur der ADMIN**. Die These trägt immer den Hinweis „Persönliche Einschätzung des Betreibers,
+keine Anlageempfehlung.“
 
 ### Gruppen
 
@@ -370,7 +372,8 @@ Ablauf im Hintergrund funktioniert. Die eigentliche Analyse kommt später.
 | Berichte hochladen, ändern, löschen | ✅ | ❌ |
 | Chat und Berichtsauswertung | ✅ höheres Tageslimit | ✅ eigenes Tageslimit, eigener Verlauf |
 | Auswertung erzwingen | ✅ | ❌ |
-| Investment-These und Thesis check | ✅ | ❌ nicht sichtbar |
+| Investment-These und Thesis check lesen | ✅ | ✅ mit Hinweis „Persönliche Einschätzung des Betreibers, keine Anlageempfehlung.“ |
+| Investment-These bearbeiten | ✅ | ❌ |
 
 Alle Rechte prüft das Backend. Ausgegraute Buttons im Frontend sind nur ein Hinweis für den Nutzer,
 kein Schutz.

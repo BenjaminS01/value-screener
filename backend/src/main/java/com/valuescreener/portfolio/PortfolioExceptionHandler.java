@@ -1,5 +1,6 @@
 package com.valuescreener.portfolio;
 
+import com.valuescreener.research.ThesisTooLongException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -25,5 +26,10 @@ public class PortfolioExceptionHandler {
     public ResponseEntity<Map<String, String>> handleConcurrentModification(ObjectOptimisticLockingFailureException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", "Position was changed concurrently, please reload"));
+    }
+
+    @ExceptionHandler(ThesisTooLongException.class)
+    public ResponseEntity<Map<String, String>> handleThesisTooLong(ThesisTooLongException exception) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Map.of("error", exception.getMessage()));
     }
 }

@@ -68,4 +68,19 @@ class ResearchFindingTest {
         assertThat(finding.getAsOfDate()).isEqualTo(LocalDate.of(2026, 8, 5));
         assertThat(finding.getCriterionKey()).isEqualTo(ResearchCriterion.PE_RATIO);
     }
+
+    @Test
+    void numericValueIsRoundedToFourDecimalsLikeTheColumn() {
+        ResearchFinding finding = new ResearchFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.47123"),
+                null, "claim", null, LocalDate.of(2026, 8, 1));
+
+        assertThat(finding.getNumericValue()).isEqualTo(new BigDecimal("28.4712"));
+        assertThat(finding.differsFrom(new BigDecimal("28.47123"), null, "claim", null,
+                LocalDate.of(2026, 8, 1))).isFalse();
+
+        finding.applyUpdate(new BigDecimal("1.23456"), null, "claim", null, LocalDate.of(2026, 8, 1));
+        assertThat(finding.getNumericValue()).isEqualTo(new BigDecimal("1.2346"));
+        assertThat(finding.differsFrom(new BigDecimal("1.23456"), null, "claim", null,
+                LocalDate.of(2026, 8, 1))).isFalse();
+    }
 }

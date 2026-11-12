@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchAllSnapshots, fetchSnapshot } from './researchApi'
+import { assignGroup, fetchAllSnapshots, fetchGroups, fetchSnapshot } from './researchApi'
 
 describe('researchApi', () => {
   beforeEach(() => {
@@ -12,8 +12,8 @@ describe('researchApi', () => {
       ticker: 'AAPL',
       isin: 'US0378331005',
       companyName: 'Apple Inc.',
-      sector: 'Technology',
       country: 'US',
+      group: { key: 'tech', name: 'Technologie', source: 'AI' },
       businessDescription: 'Consumer electronics.',
       findings: [
         {
@@ -28,23 +28,26 @@ describe('researchApi', () => {
     }
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
-      json: async () => [snapshot],
+      status: 200,
+      headers: new Headers(),
+      json: async () => [snapshot], text: async () => JSON.stringify([snapshot]),
     })
 
     const result = await fetchAllSnapshots()
 
     expect(result).toEqual([snapshot])
-    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots')
+    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots', expect.objectContaining({ method: 'GET' }))
   })
 
   it('fetchAllSnapshots throws when the backend request fails', async () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 500,
-      json: async () => [],
+      headers: new Headers(),
+      json: async () => [], text: async () => JSON.stringify([]),
     })
 
-    await expect(fetchAllSnapshots()).rejects.toThrow('Failed to load research snapshots: 500')
+    await expect(fetchAllSnapshots()).rejects.toThrow('HTTP 500')
   })
 
   it('fetchSnapshot returns the snapshot for a known isin', async () => {
@@ -53,31 +56,56 @@ describe('researchApi', () => {
       ticker: 'AAPL',
       isin: 'US0378331005',
       companyName: 'Apple Inc.',
-      sector: 'Technology',
       country: 'US',
+      group: { key: 'tech', name: 'Technologie', source: 'AI' },
       businessDescription: 'Consumer electronics.',
       findings: [],
     }
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
-      json: async () => snapshot,
+      status: 200,
+      headers: new Headers(),
+      json: async () => snapshot, text: async () => JSON.stringify(snapshot),
     })
 
     const result = await fetchSnapshot('US0378331005')
 
     expect(result).toEqual(snapshot)
-    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots/US0378331005')
+    expect(fetch).toHaveBeenCalledWith('/api/research/snapshots/US0378331005', expect.objectContaining({ method: 'GET' }))
   })
 
   it('fetchSnapshot returns null for an unknown isin', async () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 404,
-      json: async () => ({}),
+      headers: new Headers(),
+      json: async () => ({}), text: async () => JSON.stringify(({})),
     })
 
     const result = await fetchSnapshot('US9999999999')
 
     expect(result).toBeNull()
+  })
+
+  it('fetchGroups returns the group catalog', async () => {
+    const groups = [{ key: 'tech', name: 'Technologie', sortOrder: 1, stockCount: 2 }]
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200, headers: new Headers(), json: async () => groups, text: async () => JSON.stringify(groups),
+    })
+    expect(await fetchGroups()).toEqual(groups)
+    expect(fetch).toHaveBeenCalledWith('/api/research/groups', expect.objectContaining({ method: 'GET' }))
+  })
+
+  it('assignGroup PUTs the group key and returns the updated snapshot', async () => {
+    document.cookie = 'XSRF-TOKEN=tok'
+    const updated = { id: 1, isin: 'US0378331005' }
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, status: 200, headers: new Headers(), json: async () => updated, text: async () => JSON.stringify(updated),
+    })
+    expect(await assignGroup('US0378331005', 'tech')).toEqual(updated)
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/research/snapshots/US0378331005/group',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ groupKey: 'tech' }) }),
+    )
   })
 })

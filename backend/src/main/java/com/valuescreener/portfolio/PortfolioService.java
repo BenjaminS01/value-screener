@@ -1,5 +1,6 @@
 package com.valuescreener.portfolio;
 
+import com.valuescreener.research.InvestmentThesisService;
 import com.valuescreener.research.StockGroupLookup;
 import com.valuescreener.research.StockGroupRef;
 import org.springframework.stereotype.Service;
@@ -13,15 +14,22 @@ public class PortfolioService {
 
     private final PortfolioPositionRepository repository;
     private final StockGroupLookup stockGroups;
+    private final InvestmentThesisService theses;
 
-    public PortfolioService(PortfolioPositionRepository repository, StockGroupLookup stockGroups) {
+    public PortfolioService(PortfolioPositionRepository repository, StockGroupLookup stockGroups,
+                            InvestmentThesisService theses) {
         this.repository = repository;
         this.stockGroups = stockGroups;
+        this.theses = theses;
     }
 
     @Transactional
     public void buy(BuyPositionRequest request) {
         String isin = normalizeIsin(request.isin());
+        // Before saving, inside the same transaction: a too-long thesis aborts the whole purchase.
+        if (request.purchaseReason() != null && !request.purchaseReason().isBlank()) {
+            theses.appendPurchaseReason(isin, request.purchaseReason());
+        }
         PortfolioPosition position = repository.findByIsin(isin).orElse(null);
 
         if (position == null) {

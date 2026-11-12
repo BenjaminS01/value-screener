@@ -140,4 +140,51 @@ class CompanySnapshotTest {
         assertThat(snapshot.getStockGroup()).isSameAs(SEMIS);
         assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.MANUAL);
     }
+
+    @Test
+    void upsertFindingForNewCriterionReportsNothingReplaced() {
+        CompanySnapshot snapshot = minimalSnapshot();
+
+        assertThat(snapshot.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
+                "Claim.", "https://example.com/a", LocalDate.of(2026, 8, 1))).isEmpty();
+    }
+
+    @Test
+    void upsertFindingWithIdenticalContentReportsNothingReplaced() {
+        CompanySnapshot snapshot = minimalSnapshot();
+        snapshot.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("12.5000"), null,
+                "Claim.", "https://example.com/a", LocalDate.of(2026, 8, 1));
+
+        assertThat(snapshot.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("12.5"), null,
+                "  Claim.  ", "https://example.com/a", LocalDate.of(2026, 8, 1))).isEmpty();
+    }
+
+    @Test
+    void upsertFindingWithChangedClaimReportsOldValues() {
+        CompanySnapshot snapshot = minimalSnapshot();
+        snapshot.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
+                "Old claim.", "https://example.com/old", LocalDate.of(2026, 8, 1));
+
+        var replaced = snapshot.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
+                "New claim.", "https://example.com/old", LocalDate.of(2026, 8, 1));
+
+        assertThat(replaced).isPresent();
+        assertThat(replaced.get().criterionKey()).isEqualTo(ResearchCriterion.PE_RATIO);
+        assertThat(replaced.get().claim()).isEqualTo("Old claim.");
+        assertThat(replaced.get().numericValue()).isEqualByComparingTo("28.0");
+        assertThat(replaced.get().sourceUrl()).isEqualTo("https://example.com/old");
+        assertThat(replaced.get().asOfDate()).isEqualTo(LocalDate.of(2026, 8, 1));
+        assertThat(snapshot.getFindings().get(0).getClaim()).isEqualTo("New claim.");
+    }
+
+    @Test
+    void upsertFindingWithChangedBooleanOrDateReportsReplaced() {
+        CompanySnapshot snapshot = minimalSnapshot();
+        snapshot.upsertFinding(ResearchCriterion.MOAT_ASSESSMENT, null, true, "C.", null, LocalDate.of(2026, 8, 1));
+
+        assertThat(snapshot.upsertFinding(ResearchCriterion.MOAT_ASSESSMENT, null, false, "C.", null,
+                LocalDate.of(2026, 8, 1))).isPresent();
+        assertThat(snapshot.upsertFinding(ResearchCriterion.MOAT_ASSESSMENT, null, false, "C.", null,
+                LocalDate.of(2026, 9, 1))).isPresent();
+    }
 }

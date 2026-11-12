@@ -59,13 +59,14 @@ class ResearchIngestControllerTest {
 
     private static CompanySnapshotView sampleView() {
         FindingView pe = new FindingView(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
-                "Trailing P/E of 28.0.", "https://example.com/x", LocalDate.of(2026, 8, 1));
-        return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of(pe));
+                "Trailing P/E of 28.0.", "https://example.com/x", LocalDate.of(2026, 8, 1), false);
+        return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of(pe),
+                LocalDate.of(2026, 8, 1), false);
     }
 
     @Test
     void upsertsSnapshotOnValidRequest() throws Exception {
-        when(service.upsert(any(), any())).thenReturn(sampleView());
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
         mockMvc.perform(post(URL).contentType("application/json")
                         .content(body("US0378331005", finding("https://example.com/x"))))
                 .andExpect(status().isOk())
@@ -91,7 +92,7 @@ class ResearchIngestControllerTest {
 
     @Test
     void acceptsLowercaseIsin() throws Exception {
-        when(service.upsert(any(), any())).thenReturn(sampleView());
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
         mockMvc.perform(post(URL).contentType("application/json").content(body(" us0378331005 ", "")))
                 .andExpect(status().isOk());
     }
@@ -125,7 +126,7 @@ class ResearchIngestControllerTest {
 
     @Test
     void ingestIgnoresGroupSourceManualFromBody() throws Exception {
-        when(service.upsert(any(), any())).thenReturn(sampleView());
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
         String json = body("US0378331005", "").replace("\"groupKey\"", "\"groupSource\":\"MANUAL\",\"groupKey\"");
 
         mockMvc.perform(post(URL).contentType("application/json").content(json))
@@ -133,9 +134,9 @@ class ResearchIngestControllerTest {
 
         org.mockito.ArgumentCaptor<UpsertCompanySnapshotRequest> captor =
                 org.mockito.ArgumentCaptor.forClass(UpsertCompanySnapshotRequest.class);
-        verify(service).upsert(captor.capture(), eq(GroupSource.AI));
+        verify(service).upsert(captor.capture(), eq(GroupSource.AI), eq(HistoryOrigin.INGEST));
         org.assertj.core.api.Assertions.assertThat(captor.getValue().groupSource()).isEqualTo(GroupSource.MANUAL);
-        verify(service, never()).upsert(any(), eq(GroupSource.MANUAL));
+        verify(service, never()).upsert(any(), eq(GroupSource.MANUAL), any());
     }
 
     @Test
@@ -151,7 +152,7 @@ class ResearchIngestControllerTest {
 
     @Test
     void ingestUnknownGroupIs422() throws Exception {
-        when(service.upsert(any(), any())).thenThrow(new UnknownGroupException("NOPE"));
+        when(service.upsert(any(), any(), any())).thenThrow(new UnknownGroupException("NOPE"));
         mockMvc.perform(post(URL).contentType("application/json").content(body("US0378331005", "")))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error").value("Unknown group key: NOPE"));

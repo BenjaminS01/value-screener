@@ -3,6 +3,7 @@ package com.valuescreener.portfolio;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,6 +14,7 @@ public record BuyPositionRequest(
         @NotBlank String companyName,
         @NotNull @Positive BigDecimal quantity,
         @NotNull @Positive BigDecimal entryPrice,
-        @NotNull LocalDate purchaseDate
+        @NotNull LocalDate purchaseDate,
+        @Size(max = 2000) String purchaseReason
 ) {
 }
