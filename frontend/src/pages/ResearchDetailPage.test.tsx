@@ -37,6 +37,7 @@ function mockBackend(opts: { snap?: unknown; status?: number; portfolio?: () => 
     if (url.startsWith('/api/research/snapshots/') && init?.method === 'PUT') return Promise.resolve(putResponse())
     if (url.startsWith('/api/research/snapshots/')) return Promise.resolve(res(opts.status ?? 200, opts.snap ?? snapshot()))
     if (url.startsWith('/api/research/theses/')) return Promise.resolve(res(404, { error: 'Thesis not found' }))
+    if (url === '/api/research/deep-analysis/quota') return Promise.resolve(res(200, { remainingToday: 5, limitPerDay: 5 }))
     if (url === '/api/research/groups') return Promise.resolve(res(200, groups))
     if (url === '/api/portfolio') return Promise.resolve((opts.portfolio ?? (() => res(200, [{ isin: 'US0378331005' }])))())
     if (url === '/api/auth/csrf') return Promise.resolve(res(200, {}))
@@ -252,9 +253,15 @@ describe('ResearchDetailPage', () => {
     expect(upload).toBeDisabled()
     expect(upload).toHaveAttribute('title', 'Noch nicht verfügbar')
     expect(screen.getByRole('button', { name: 'Quartalsberichte zusammenfassen' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Tiefenanalyse starten' })).toBeDisabled()
     expect(screen.getByLabelText('Frage zur Aktie')).toBeDisabled()
     expect(screen.getAllByText('Folgt in einer späteren Phase').length).toBeGreaterThan(0)
+  })
+
+  it('renders the deep analysis section with its quota', async () => {
+    renderPage()
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.getByRole('button', { name: 'Tiefenanalyse starten' })).toBeInTheDocument()
+    expect(await screen.findByText('Heute noch 5 von 5 Analysen')).toBeInTheDocument()
   })
 
   it('shows a message when there is no research', async () => {

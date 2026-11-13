@@ -17,7 +17,7 @@ import type { Navigate } from '../navigation'
 import { InvestmentThesisSection } from '../components/InvestmentThesisSection'
 import { FindingHistory } from '../components/FindingHistory'
 import { formatDate, formatValue } from '../research/format'
-import { DeepResearchPlaceholder } from '../components/DeepResearchPlaceholder'
+import { DeepAnalysisSection } from '../components/DeepAnalysisSection'
 import {
   CRITERION_LABELS,
   FUNDAMENTAL_CRITERIA,
@@ -262,7 +262,7 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
       <p>{PLACEHOLDER}</p>
 
       <h2>F. Tiefenanalyse</h2>
-      <DeepResearchPlaceholder />
+      <DeepAnalysisSection isin={isin} />
     </section>
   )
 }
