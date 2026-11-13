@@ -265,20 +265,24 @@ The real company research agent (`company-research-agent/`) is **frozen** and no
 for now. The button exists to show the wiring:
 
 1. Any logged-in user clicks "Run deep analysis" for the selected stock.
-2. Backend checks login and the daily limit, writes a job `DEEP_ANALYSIS_DEMO` (isin, account,
-   timestamp) into the DynamoDB job table.
-3. DynamoDB Stream → small Lambda `deep-analysis-demo` (no LLM call, no cost) writes the result into
-   the job: *"Lambda `deep-analysis-demo` was invoked at 2026-11-03T14:05:12Z for ISIN … (request id …).
-   The deep analysis itself is not available yet — this demonstrates the asynchronous pipeline that
-   will run it."*
-4. UI polls the job and shows the message with the server timestamp (proof that a real Lambda ran,
-   not a string from the frontend bundle).
+2. Backend checks login and the daily limit (counters in RDS), then **invokes the Lambda
+   `deep-analysis-demo` synchronously through the AWS SDK** (`LambdaClient.invoke`). No DynamoDB job
+   table in this step (decision 2026-11-12).
+3. The small Lambda (Quarkus, no LLM call, no cost) answers with a "not implemented yet" message plus
+   harmless Lambda metadata (function name/version, region, memory, request id, cold start, timestamp).
+4. The backend returns that answer plus the remaining daily quota; the UI shows it (proof that a real
+   Lambda ran, not a string from the frontend bundle). Locally a clearly labelled stub replaces the
+   Lambda.
+
+Details: [`2026-11-12-v2-phase3-deep-analysis-lambda-design.md`](2026-11-12-v2-phase3-deep-analysis-lambda-design.md).
+The job table and stream pattern (original plan: DynamoDB job, Stream → Lambda, polling UI) moves to
+the chat/summary phase.
 
 **Changed compared to the AWS design (Topic 5 part B):** the stub was planned as a *public* button
 behind a direct API-Gateway→Lambda route. Since the app is now login-only and the login lives in the
-backend, the trigger goes through the backend and the same job table as chat and summary. Benefits:
-the existing login protects it without a second auth mechanism, and it becomes the **first, simplest
-use of the job pattern** that chat and summary build on later. The EventBridge daily heartbeat from
+backend, the trigger goes through the backend, which invokes the Lambda directly via the AWS SDK
+(decision 2026-11-12; the job table follows with chat and summary). Benefit: the existing login and
+the daily limits protect it without a second auth mechanism. The EventBridge daily heartbeat from
 Topic 5 is not required by this scope; it stays an optional learning exercise.
 
 ## 7. Architecture (updated overview)
@@ -294,8 +298,12 @@ Browser ─► API Gateway ─► backend/ (Spring Boot, ECS, private VPC, no NA
  ┌ report-intelligence/ (Quarkus, Lambdas outside the VPC) ────────────────────────────────────┐
  │ ingest · cleanup · summarize · chat  (→ Titan V2, S3 Vectors, Anthropic API)                 │
  └──────────────────────────────────────────────────────────────────────────────────────────────┘
-   deep-analysis-demo Lambda (tiny, no LLM) — triggered by the same stream, filtered by job type
+   deep-analysis-demo Lambda (tiny, no LLM) — phase 3: invoked synchronously by the backend via the
+   AWS SDK (no job table/stream yet; job type DEEP_ANALYSIS_DEMO in DynamoDB is for later phases)
 ```
+
+Note (2026-11-12): in phase 3 the deep-analysis demo does not use DynamoDB or the stream; the backend
+calls the Lambda directly. The job pattern below applies to chat and summary.
 
 Event-source mappings filter by job type, so each Lambda only receives its own jobs. Everything else
 (security of the upload path, IAM per function, DLQs, SSM for the API key) as in the RAG design.
@@ -385,7 +393,7 @@ Deliberately not used: Cognito (more setup than a handful of fixed accounts need
 |---|---|
 | `2026-07-21-value-screener-design.md` | Purpose/scope (screening, alerts), Section 9 "read view without login" |
 | `2026-07-30-screening-cost-redesign-design.md` | whole scope (funnel/scheduler no longer planned) |
-| `2026-09-20-aws-deployment-design.md`, Section 7 | public stub button via direct Lambda route → via backend + job table; real agent Lambda frozen |
+| `2026-09-20-aws-deployment-design.md`, Section 7 | public stub button via direct Lambda route → via backend (synchronous AWS SDK invoke, 2026-11-12); real agent Lambda frozen |
 | `PROJECT-STATUS.md`, "Portfolio Research UI" (2026-08-20) | public snapshot endpoint, landing page as start view, research per portfolio position |
 | `2026-11-03-quarterly-report-rag-design.md` | visibility/roles, "evaluation" → summary, chat history and limits per account (updated in place) |
 
@@ -395,7 +403,7 @@ Deliberately not used: Cognito (more setup than a handful of fixed accounts need
 |---|---|---|
 | 1 | **Login-only + roles:** account list (ADMIN + USER accounts) from configuration, session login, brute-force protection, `SecurityConfig`, role-dependent portfolio API incl. correct/delete, frontend login gate, header Portfolio/Research, legal pages public | no |
 | 2 | **Research page:** stock selector, overview/fundamentals/qualitative sections, portfolio badge, report list and chat as placeholders, greyed-out upload with tooltip; **data age, investment thesis (USER reads, ADMIN edits), research history** (Section 4a) | no |
-| 3 | **Job table + deep-analysis dummy:** DynamoDB table, gateway endpoint, stream, `deep-analysis-demo` Lambda, polling UI, usage limits — first AWS building block | yes (≈ 0 $) |
+| 3 | **Deep-analysis dummy via Lambda (code only):** Quarkus Lambda `deep-analysis-demo`, backend invokes it synchronously via the AWS SDK, usage limits in RDS, local stub, button + quota in the UI. DynamoDB job table/stream/polling move to the chat/summary phase; creating the AWS resources (Terraform) and deployment come later | no (code only; ≈ 0 $ once deployed) |
 | 4 | **Quarterly reports:** `report-intelligence/` skeleton, upload/list/read/delete, validation, indexing (RAG design phases 0–2) | yes |
 | 5 | **"Evaluate quarterly reports" button**, stored and reused, incl. thesis check, read by all roles (RAG design phase 3, Section 4a) | yes + Anthropic |
 | 6 | **Chat with limits** (RAG design phase 4) | yes + Anthropic |
@@ -464,6 +472,11 @@ configuration, no Cognito, no user table), access for others (owner creates the 
   investment thesis and status (only the ADMIN edits), with the fixed note "Persönliche Einschätzung
   des Betreibers, keine Anlageempfehlung."; the later thesis check follows the same rule. Supersedes
   the ADMIN-only visibility of 2026-11-04. See Section 4a and the phase 2b design.
+- 2026-11-12: Phase 3 reduced to the code: the backend calls the `deep-analysis-demo` Lambda
+  **synchronously through the AWS SDK**; no DynamoDB job table, stream or polling yet (they come with
+  chat/summary). The Lambda is written with Quarkus. AWS resources and deployment follow later with
+  Terraform. Daily limits (per account plus global cap) are counted in Postgres. First USER-callable
+  write: `POST /api/research/snapshots/{isin}/deep-analysis`. See the phase 3 design.
 
 ---
 
@@ -512,16 +525,17 @@ Ausgabenlimit in der Anthropic Console und AWS-Budget-Alarme. Ob der Chat auch d
 nutzen soll, wird erst validiert: hinter einem Feature-Flag, mit ca. 10 Testfragen jeweils mit und
 ohne diese Daten.
 
-**Tiefenanalyse:** Der Research Agent bleibt eingefroren. Der Button erzeugt über das Backend einen
-Job in DynamoDB. Eine kleine Lambda ohne KI-Aufruf antwortet mit Zeitstempel und dem Hinweis, dass
-die Funktion noch nicht fertig ist. Damit ist das zugleich der erste, einfachste Einsatz des
-Job-Musters, auf dem Chat und Zusammenfassung später aufbauen.
+**Tiefenanalyse:** Der Research Agent bleibt eingefroren. Der Button ruft über das Backend per AWS SDK
+direkt eine kleine Quarkus-Lambda ohne KI-Aufruf auf (Tageslimits pro Konto und gesamt, lokal eine
+gekennzeichnete Simulation). Sie antwortet mit dem Hinweis, dass die Funktion noch nicht fertig ist,
+und harmlosen Lambda-Metadaten. DynamoDB und das Job-Muster kommen erst mit Chat und Zusammenfassung
+(Entscheidung 2026-11-12).
 
 **Gestrichen:** automatisches Screening, Recherche-Trichter, Scheduler, Änderungs-Alarme, öffentliche
 Leseansicht, echte Tiefenrecherche.
 
-**Phasen:** 1 Login mit Account-Liste und Rollen, 2 Research-Seite (beide lokal, ohne AWS-Kosten), 3 Job-Tabelle und
-Tiefenanalyse-Dummy, 4 Quartalsberichte, 5 Zusammenfassung, 6 Chat mit Limits, 7 Validierung der
+**Phasen:** 1 Login mit Account-Liste und Rollen, 2 Research-Seite (beide lokal, ohne AWS-Kosten), 3 Tiefenanalyse-Dummy
+per Lambda (erst nur Code), 4 Quartalsberichte, 5 Zusammenfassung, 6 Chat mit Limits, 7 Validierung der
 Websuche-Daten im Chat, 8 Gestaltung der Login-Seite.
 
 **Offene Punkte:** Hosting nach dem Free Plan: Teile dürfen aus AWS ausgelagert werden, wenn das

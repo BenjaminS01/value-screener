@@ -1,8 +1,51 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-12
+Letztes Update: 2026-11-13
 
-## v2 Phase 2 (2a + 2b) fertig (2026-11-12): aktueller Einstiegspunkt
+## v2 Phase 3 Tiefenanalyse-Demo per Lambda, nur Code (2026-11-13): aktueller Einstiegspunkt
+
+**Phase 3 (Code) ist fertig.** Branch `feature/v2-phase3-deep-analysis-job` wird nach `main` gemergt.
+- **Spec:** [`docs/superpowers/specs/2026-11-12-v2-phase3-deep-analysis-lambda-design.md`](docs/superpowers/specs/2026-11-12-v2-phase3-deep-analysis-lambda-design.md)
+- **Plan:** [`docs/superpowers/plans/2026-11-12-v2-phase3-deep-analysis-lambda.md`](docs/superpowers/plans/2026-11-12-v2-phase3-deep-analysis-lambda.md)
+- **Geänderte Entscheidung (2026-11-12):** kein DynamoDB-Job in Phase 3. Das Backend ruft die Lambda
+  synchron über das AWS SDK auf. Job-Tabelle, Stream und Polling kommen erst mit Chat und
+  Zusammenfassung. Die Scope-Spec ist angepasst.
+- **Umgesetzt:**
+  - **Lambda-Modul `deep-analysis/`** (Quarkus 3.33, `quarkus-amazon-lambda`, Handler
+    `deep-analysis-demo`): antwortet mit „Noch nicht implementiert …“, „Hallo von AWS Lambda“ und
+    harmlosen Metadaten (Funktion, Version, Region, Speicher, Request-ID, Kaltstart, Zeitpunkt).
+    Nie ARN, Account-ID oder Log-Namen. Eigener CI-Job.
+  - **Tageslimits in Postgres** (Migration V7 `usage_counter`): 5 pro USER, 20 pro ADMIN, 100
+    gesamt pro Tag (`app.limits.*`). Ein atomarer Upsert pro Zeile, Konto- und Gesamtzeile in einer
+    Transaktion. Bei Fehlern wird nichts erstattet.
+  - **Aufruf über das AWS SDK** (`LambdaClient`, SDK 2.58.0): Region fest, Timeout 10 s, keine
+    SDK-Wiederholungen (ein gezählter Klick = höchstens ein Lambda-Aufruf). Lokal (Profil `local`)
+    antwortet eine gekennzeichnete Simulation (`app.deep-analysis.mode: stub`).
+  - **Endpunkte:** `POST /api/research/snapshots/{isin}/deep-analysis` (404 → 429 → 502) und
+    `GET /api/research/deep-analysis/quota`. Einzige Security-Ausnahme: USER darf genau diesen POST.
+  - **Frontend:** Abschnitt „F. Tiefenanalyse“ mit „Heute noch n von m Analysen“, Button, Ergebnis
+    und „Quelle: AWS Lambda“ bzw. „Quelle: lokale Simulation“.
+- **Commits:** `e39cab7` (Spec und Plan), `ceb8dd7`, `da6393f`, `38a643e`, `d25e40d`, `8981316`
+  (5 Tasks) und `e73b0a6` (Korrekturen aus der Schlussprüfung).
+- **Prüfung:** Backend 382 Tests grün, `deep-analysis` 8 Tests grün, Frontend 170 Tests grün,
+  `npm run build` grün. Manueller Test durch den Nutzer am 2026-11-13 bestanden.
+- **Bekannte Punkte:**
+  - Spring Boot 3.3.5 bringt einen zu alten Apache HttpClient 5 für das SDK mit; die Versionen sind
+    in `backend/pom.xml` angehoben (TODO: beim nächsten Spring-Boot-Update entfernen).
+  - **Wird das Backend in ECS neu ausgerollt, bevor die Lambda existiert,** endet jeder Klick nach
+    ca. 10 s mit 502 und verbraucht trotzdem eine Analyse (keine Kosten). Bis dahin dort
+    `APP_DEEP_ANALYSIS_MODE=stub` setzen oder die Lambda zuerst anlegen.
+  - Der lokale Entwicklungsmodus der Lambda (`mvn quarkus:dev`, Port 8090) ist beschrieben, aber
+    noch nicht von Hand ausprobiert.
+- **Nächster Schritt:** Lambda und Rechte mit Terraform anlegen und deployen:
+  - Lambda `deep-analysis-demo` (Java 21, wenig Speicher, Funktions-Timeout ≤ 10 s, Reserved
+    Concurrency klein, z. B. 2).
+  - ECS-Task-Rolle bekommt nur `lambda:InvokeFunction` auf genau diese Funktion.
+  - Entscheidung zum Weg aus dem privaten VPC ohne NAT: Interface-VPC-Endpoint für Lambda
+    (ca. 7–8 $/Monat pro AZ) oder eine Alternative.
+  - Danach Live-Test als USER und ADMIN.
+
+## v2 Phase 2 (2a + 2b) fertig (2026-11-12): abgeschlossen, nach `main` gemergt
 
 **Phase 2 ist fertig.** Branch `feature/v2-phase2-frontend` wird nach `main` gemergt.
 - **2b-Spec:** [`docs/superpowers/specs/2026-11-12-v2-phase2b-data-age-thesis-history-design.md`](docs/superpowers/specs/2026-11-12-v2-phase2b-data-age-thesis-history-design.md)
@@ -33,7 +76,7 @@ Letztes Update: 2026-11-12
   - Keine Wertprüfung für die Gruppenquelle in V5.
   - Die Fehlermeldung bei ungültiger ISIN hängt davon ab, ob ein Kaufgrund mitgeschickt wird.
   - Dazu die kleinen Reste aus 2a (siehe unten).
-- **Nächster Schritt:** Phase 3 laut Scope-v2-Spec Abschnitt 12, „Job-Tabelle und
+- **Nächster Schritt (überholt, siehe Phase 3):** Phase 3 laut Scope-v2-Spec Abschnitt 12, „Job-Tabelle und
   Tiefenanalyse-Dummy“. Das ist der erste AWS-Baustein (DynamoDB, Gateway-Endpunkt, Lambda,
   Polling-Oberfläche, Nutzungslimits). Wie immer mit Spec und Plan.
 

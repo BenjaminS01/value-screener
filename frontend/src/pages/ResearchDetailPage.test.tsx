@@ -37,6 +37,7 @@ function mockBackend(opts: { snap?: unknown; status?: number; portfolio?: () => 
     if (url.startsWith('/api/research/snapshots/') && init?.method === 'PUT') return Promise.resolve(putResponse())
     if (url.startsWith('/api/research/snapshots/')) return Promise.resolve(res(opts.status ?? 200, opts.snap ?? snapshot()))
     if (url.startsWith('/api/research/theses/')) return Promise.resolve(res(404, { error: 'Thesis not found' }))
+    if (url === '/api/research/deep-analysis/quota') return Promise.resolve(res(200, { remainingToday: 5, limitPerDay: 5 }))
     if (url === '/api/research/groups') return Promise.resolve(res(200, groups))
     if (url === '/api/portfolio') return Promise.resolve((opts.portfolio ?? (() => res(200, [{ isin: 'US0378331005' }])))())
     if (url === '/api/auth/csrf') return Promise.resolve(res(200, {}))
@@ -252,9 +253,15 @@ describe('ResearchDetailPage', () => {
     expect(upload).toBeDisabled()
     expect(upload).toHaveAttribute('title', 'Noch nicht verfügbar')
     expect(screen.getByRole('button', { name: 'Quartalsberichte zusammenfassen' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Tiefenanalyse starten' })).toBeDisabled()
     expect(screen.getByLabelText('Frage zur Aktie')).toBeDisabled()
     expect(screen.getAllByText('Folgt in einer späteren Phase').length).toBeGreaterThan(0)
+  })
+
+  it('renders the deep analysis section with its quota', async () => {
+    renderPage()
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.getByRole('button', { name: 'Tiefenanalyse starten' })).toBeInTheDocument()
+    expect(await screen.findByText('Heute noch 5 von 5 Analysen')).toBeInTheDocument()
   })
 
   it('shows a message when there is no research', async () => {
@@ -276,5 +283,29 @@ describe('ResearchDetailPage', () => {
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
     expect(headings.slice(0, 3)).toEqual(['A. Überblick', 'Investment-These', 'B. Kennzahlen'])
     expect(thesisHeading).toBeInTheDocument()
+  })
+
+  it('does not show the previous ISIN result after switching to another ISIN', async () => {
+    const base = mockBackend()
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/deep-analysis') && init?.method === 'POST') {
+        return Promise.resolve(res(200, {
+          status: 'NOT_IMPLEMENTED', message: 'Alte Analyse', greeting: 'Hallo von AWS Lambda',
+          functionName: 'deep-analysis-demo', functionVersion: '7', region: 'eu-central-1',
+          memoryLimitMb: 256, awsRequestId: 'req-1', coldStart: false, invokedAt: '2026-11-12T13:45:30Z',
+          source: 'LAMBDA', remainingToday: 4, limitPerDay: 5,
+        }))
+      }
+      return base(url, init)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { rerender } = render(<ResearchDetailPage user={admin} isin="US0378331005" navigate={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Tiefenanalyse starten' }))
+    expect(await screen.findByText('Alte Analyse')).toBeInTheDocument()
+
+    rerender(<ResearchDetailPage user={admin} isin="DE0007164600" navigate={vi.fn()} />)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/research/snapshots/DE0007164600', expect.anything()))
+    await screen.findByRole('button', { name: 'Tiefenanalyse starten' })
+    expect(screen.queryByText('Alte Analyse')).not.toBeInTheDocument()
   })
 })

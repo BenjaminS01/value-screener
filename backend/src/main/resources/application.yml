@@ -32,6 +32,14 @@ app:
     enabled: false
   research-sync:
     enabled: false
+  deep-analysis:
+    mode: lambda
+    function-name: deep-analysis-demo
+    region: eu-central-1
+  limits:
+    deep-analysis-per-user: 5
+    deep-analysis-per-admin: 20
+    global-per-day: 100
 
 research:
   stale-after: P9M

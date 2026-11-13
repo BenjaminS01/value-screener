@@ -113,6 +113,24 @@ class EndpointAuthorizationTest {
     }
 
     @Test
+    void userPutSnapshotGroupIsStill403() throws Exception {
+        mockMvc.perform(put("/api/research/snapshots/US0378331005/group")
+                        .contentType("application/json").content("{\"groupKey\":\"BANKS\"}")
+                        .with(user("alice").roles("USER")).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void userPostToOtherSnapshotSubpathIsStill403() throws Exception {
+        mockMvc.perform(post("/api/research/snapshots/US0378331005/deep-analysis/extra")
+                        .with(user("alice").roles("USER")).with(csrf()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/research/snapshots/US0378331005/other")
+                        .with(user("alice").roles("USER")).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void oldPostSnapshotsEndpointIsGone() throws Exception {
         mockMvc.perform(write("/api/research/snapshots").with(user("admin").roles("ADMIN")).with(csrf()))
                 .andExpect(status().isMethodNotAllowed());
