@@ -5,5 +5,7 @@ server:
         secure: false
 
 app:
+  deep-analysis:
+    mode: stub
   research-ingest:
     enabled: true
