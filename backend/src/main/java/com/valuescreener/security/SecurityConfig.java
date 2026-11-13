@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
+                        // The only write a USER may do: trigger the deep-analysis demo (limited per account).
+                        .requestMatchers(HttpMethod.POST, "/api/research/snapshots/*/deep-analysis").authenticated()
                         .anyRequest().hasRole("ADMIN"));
         return http.build();
     }
