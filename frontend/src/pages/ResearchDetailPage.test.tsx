@@ -284,4 +284,28 @@ describe('ResearchDetailPage', () => {
     expect(headings.slice(0, 3)).toEqual(['A. Überblick', 'Investment-These', 'B. Kennzahlen'])
     expect(thesisHeading).toBeInTheDocument()
   })
+
+  it('does not show the previous ISIN result after switching to another ISIN', async () => {
+    const base = mockBackend()
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/deep-analysis') && init?.method === 'POST') {
+        return Promise.resolve(res(200, {
+          status: 'NOT_IMPLEMENTED', message: 'Alte Analyse', greeting: 'Hallo von AWS Lambda',
+          functionName: 'deep-analysis-demo', functionVersion: '7', region: 'eu-central-1',
+          memoryLimitMb: 256, awsRequestId: 'req-1', coldStart: false, invokedAt: '2026-11-12T13:45:30Z',
+          source: 'LAMBDA', remainingToday: 4, limitPerDay: 5,
+        }))
+      }
+      return base(url, init)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { rerender } = render(<ResearchDetailPage user={admin} isin="US0378331005" navigate={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Tiefenanalyse starten' }))
+    expect(await screen.findByText('Alte Analyse')).toBeInTheDocument()
+
+    rerender(<ResearchDetailPage user={admin} isin="DE0007164600" navigate={vi.fn()} />)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/research/snapshots/DE0007164600', expect.anything()))
+    await screen.findByRole('button', { name: 'Tiefenanalyse starten' })
+    expect(screen.queryByText('Alte Analyse')).not.toBeInTheDocument()
+  })
 })

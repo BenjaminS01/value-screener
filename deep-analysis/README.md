@@ -16,9 +16,11 @@ Invalid input returns `status: INVALID_REQUEST`, `message: Ungültige ISIN`.
 
     mvn quarkus:dev
 
-    curl -X POST http://localhost:8080/ -H 'Content-Type: application/json' -d '{"isin":"US0378331005"}'
+    curl -X POST http://localhost:8090/ -H 'Content-Type: application/json' -d '{"isin":"US0378331005"}'
 
-(In test mode the mock event server listens on port 8081.)
+The dev mock event server runs on port 8090 (8080 is used by the backend, dev-up.sh); set via
+`%dev.quarkus.lambda.mock-event-server.dev-port`. In test mode it listens on
+`quarkus.lambda.mock-event-server.test-port` (default 8081).
 
 ## Deployment
 

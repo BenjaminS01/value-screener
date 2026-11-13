@@ -48,4 +48,14 @@ class DeepAnalysisConfigTest {
                 assertThat(ctx.getBean(LambdaClient.class).serviceClientConfiguration().region().id())
                         .isEqualTo("us-east-1"));
     }
+
+    @Test
+    void lambdaClientHasTenSecondTimeoutAndNoSdkRetries() {
+        runner.run(ctx -> {
+            var override = ctx.getBean(LambdaClient.class).serviceClientConfiguration().overrideConfiguration();
+            assertThat(override.apiCallTimeout()).contains(java.time.Duration.ofSeconds(10));
+            assertThat(override.retryStrategy()).isPresent();
+            assertThat(override.retryStrategy().get().maxAttempts()).isEqualTo(1);
+        });
+    }
 }

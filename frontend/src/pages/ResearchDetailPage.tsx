@@ -262,7 +262,7 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
       <p>{PLACEHOLDER}</p>
 
       <h2>F. Tiefenanalyse</h2>
-      <DeepAnalysisSection isin={isin} />
+      <DeepAnalysisSection key={isin} isin={isin} />
     </section>
   )
 }

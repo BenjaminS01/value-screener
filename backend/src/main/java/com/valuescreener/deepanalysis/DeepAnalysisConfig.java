@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.awscore.retry.AwsRetryStrategy;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.lambda.LambdaClient;
@@ -27,6 +28,8 @@ public class DeepAnalysisConfig {
                 .region(Region.of(props.region()))
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
                         .apiCallTimeout(Duration.ofSeconds(10))
+                        // One consumed quota unit must cause at most one Lambda invocation: no SDK retries.
+                        .retryStrategy(AwsRetryStrategy.doNotRetry())
                         .build())
                 .build();
     }
