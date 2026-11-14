@@ -2,6 +2,38 @@
 
 Letztes Update: 2026-11-14
 
+## Serverless-Neuaufbau mit Terraform (2026-11-14): aktueller Einstiegspunkt
+
+**Für eine neue Session zuerst lesen:** Design
+[`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](docs/superpowers/specs/2026-11-14-serverless-terraform-design.md)
+und Plan Teil 1
+[`docs/superpowers/plans/2026-11-14-serverless-backend-rewrite.md`](docs/superpowers/plans/2026-11-14-serverless-backend-rewrite.md).
+
+- **Entschieden (2026-11-14, mit dem Nutzer):**
+  - Die alte, von Hand gebaute AWS-Umgebung ist komplett gelöscht. Alles entsteht neu mit Terraform,
+    nichts wird importiert.
+  - Kosten gehen vor dem Lernwert von ECS und VPC.
+  - Die Datenbank wechselt zu **DynamoDB** (provisioned, im kostenlosen Rahmen). Das Backend läuft als
+    **Lambda mit SnapStart**, das Frontend in **S3 hinter CloudFront** (eine Adresse, kein CORS).
+  - Es gibt kein VPC und keine Endpoints. Im Ruhezustand kostet das praktisch 0 $.
+  - Secrets liegen im SSM Parameter Store. Der Nutzer trägt die Werte in der Konsole ein.
+  - Terraform läuft lokal in WSL über `aws login` und die `Admin`-Rolle mit MFA. Claude führt nie
+    `terraform` oder `aws` mit diesen Zugangsdaten aus.
+  - Live gibt es zuerst nur einen Kurztest (Login, Portfolio, Gruppen). Der volle Live-Test kommt am
+    Projektende zusammen mit dem Research-Sync.
+  - Die lokalen Postgres-Daten sind Testdaten und werden verworfen.
+- **Reihenfolge:**
+  1. Backend-Umbau, lokal (Plan steht, 7 Tasks)
+  2. Terraform-Grundlagen
+  3. Terraform für die App
+- **Stand:** Design und Plan Teil 1 sind committet. Die Umsetzung hat **noch nicht begonnen**.
+- **Nächster Schritt:** Der Nutzer legt den Branch `feature/serverless-backend` an. Danach Task 1 per
+  Subagent-Driven Development, aber erst nach ausdrücklichem Go des Nutzers und mit vorheriger
+  deutscher Konzepterklärung.
+- **Überholt:** die Übergabedatei vom 2026-11-14 (ihre offenen Fragen sind im Design beantwortet), der
+  Abschnitt zu Terraform und VPC-Endpoint unten in Phase 3 sowie die handgebaute Architektur von
+  2026-09-20.
+
 ## v2 Phase 3 Tiefenanalyse-Demo per Lambda, nur Code (2026-11-13): aktueller Einstiegspunkt
 
 **Phase 3 (Code) ist fertig.** Branch `feature/v2-phase3-deep-analysis-job` ist nach `main` gemergt (PR #4).

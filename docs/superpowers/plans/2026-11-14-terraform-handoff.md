@@ -1,5 +1,11 @@
 # Handoff: start of the Terraform phase (2026-11-14)
 
+> **Superseded (2026-11-14, same day):** the open questions below were decided in
+> [`../specs/2026-11-14-serverless-terraform-design.md`](../specs/2026-11-14-serverless-terraform-design.md)
+> (DynamoDB + Lambda + CloudFront, everything new in Terraform). Next work:
+> [`2026-11-14-serverless-backend-rewrite.md`](2026-11-14-serverless-backend-rewrite.md). Section 4
+> (working mode) still applies.
+
 For a new Claude session. Read this file completely, then `PROJECT-STATUS.md` (top section, v2 phase 3).
 This file collects facts and open questions. **The user decides with the new session how to proceed**;
 nothing below is decided unless it says so.
