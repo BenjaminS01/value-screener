@@ -19,7 +19,7 @@ standing git convention.
 | 2 | VPC & Security Groups | ✅ done — `value-screener-vpc`, 2 private subnets, 2 security groups |
 | 3 | RDS | ✅ done — `value-screener-postgres` created |
 | 4 | Backend compute (ECS Fargate, classic — **not** App Runner, see below) | ✅ **done** (2026-10-17) — publicly reachable, fully automated tag-to-deploy pipeline verified end-to-end |
-| 5 | Lambda (Company Research Agent, **manual trigger only**, no EventBridge for the real agent) **+ public showcase demo** (DynamoDB, rate-limited Lambda button, EventBridge heartbeat shown in UI — added 2026-09-22) **+ SQS DLQ on every Lambda** (pulled forward from Topic 10, added 2026-09-22) | ⏳ not started |
+| 5 | Lambda (Company Research Agent, **manual trigger only**, no EventBridge for the real agent) **+ public showcase demo** (DynamoDB, rate-limited Lambda button, EventBridge heartbeat shown in UI — added 2026-09-22) **+ SQS DLQ on every Lambda** (pulled forward from Topic 10, added 2026-09-22) | ⏳ superseded for part B by v2 phase 3 (code done 2026-11-13, AWS via Terraform next, see `2026-11-14-terraform-handoff.md`); part A frozen |
 | 6 | S3, CloudFront, ACM, Route 53 (frontend) | ⏳ not started |
 | 7 | Secrets Manager & KMS | ⏳ not started (RDS's Secrets-Manager-managed credential already exists as a head start) |
 | 8 | Cognito (replace shared admin Basic Auth) | ⏳ not started |
@@ -145,6 +145,8 @@ Two things changed the plan, both explained in full in the design spec's Decisio
 
 ## Topic 5 — Lambda & EventBridge, plus the showcase demo (added 2026-09-22)
 
+> **Superseded 2026-11-12/14 (part B):** the showcase demo was rebuilt as v2 phase 3 (limits in RDS, call via backend + AWS SDK, Quarkus Lambda `deep-analysis-demo`, no DynamoDB, no public stub route, no EventBridge heartbeat). Current state and next steps (Terraform): [`2026-11-14-terraform-handoff.md`](2026-11-14-terraform-handoff.md). Part A (real agent) stays frozen. The text below is kept as history.
+
 **ORDER DECIDED 2026-10-19: build part B (showcase stub Lambdas) first, part A (real agent) later.**
 Part B uses small native Lambda handlers (no Spring Boot, no container, no Web Adapter), so it is not
 blocked by the open part-A packaging decision below, teaches the Lambda fundamentals (handler, execution
@@ -189,6 +191,8 @@ captured and inspectable instead of silently lost.
    API Gateway route instead of just showing fixed text.
 
 ## Deutsche Kurzfassung
+
+**Stand 2026-11-14:** Teil B von Thema 5 ist durch v2 Phase 3 ersetzt (Limits in RDS, Aufruf über Backend + AWS SDK, kein DynamoDB, keine öffentliche Stub-Route, kein EventBridge-Heartbeat). Weiter geht es mit Terraform, siehe `2026-11-14-terraform-handoff.md`. Der Text unten ist der frühere Stand.
 
 Verfolgt den Fortschritt der laufenden AWS-Schulung (Phase 4). Erledigt: Account-Setup, VPC, RDS,
 EC2-Exkurs (Lernübung, kein Teil der Architektur). **Kurskorrektur 2026-09-22:** App Runner nimmt seit

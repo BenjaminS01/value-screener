@@ -1,10 +1,10 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-13
+Letztes Update: 2026-11-14
 
 ## v2 Phase 3 Tiefenanalyse-Demo per Lambda, nur Code (2026-11-13): aktueller Einstiegspunkt
 
-**Phase 3 (Code) ist fertig.** Branch `feature/v2-phase3-deep-analysis-job` wird nach `main` gemergt.
+**Phase 3 (Code) ist fertig.** Branch `feature/v2-phase3-deep-analysis-job` ist nach `main` gemergt (PR #4).
 - **Spec:** [`docs/superpowers/specs/2026-11-12-v2-phase3-deep-analysis-lambda-design.md`](docs/superpowers/specs/2026-11-12-v2-phase3-deep-analysis-lambda-design.md)
 - **Plan:** [`docs/superpowers/plans/2026-11-12-v2-phase3-deep-analysis-lambda.md`](docs/superpowers/plans/2026-11-12-v2-phase3-deep-analysis-lambda.md)
 - **Geänderte Entscheidung (2026-11-12):** kein DynamoDB-Job in Phase 3. Das Backend ruft die Lambda
@@ -37,6 +37,7 @@ Letztes Update: 2026-11-13
     `APP_DEEP_ANALYSIS_MODE=stub` setzen oder die Lambda zuerst anlegen.
   - Der lokale Entwicklungsmodus der Lambda (`mvn quarkus:dev`, Port 8090) ist beschrieben, aber
     noch nicht von Hand ausprobiert.
+- **Übergabe für die Terraform-Session:** [`docs/superpowers/plans/2026-11-14-terraform-handoff.md`](docs/superpowers/plans/2026-11-14-terraform-handoff.md) (AWS-Ist-Stand, Stolperfallen, offene Fragen). Wie es genau weitergeht, entscheidet der Nutzer dort.
 - **Nächster Schritt:** Lambda und Rechte mit Terraform anlegen und deployen:
   - Lambda `deep-analysis-demo` (Java 21, wenig Speicher, Funktions-Timeout ≤ 10 s, Reserved
     Concurrency klein, z. B. 2).
