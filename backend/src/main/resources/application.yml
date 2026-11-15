@@ -17,6 +17,7 @@ server:
     session:
       timeout: 2h
       cookie:
+        name: JSESSIONID
         http-only: true
         same-site: strict
         secure: true

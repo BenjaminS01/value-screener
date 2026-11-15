@@ -18,6 +18,12 @@ import java.util.List;
         LoginThrottleWebConfig.class})
 public class SecuritySliceTestConfig {
 
+    /** In-memory throttle state; the guard in the cached context shares it. */
+    @Bean
+    InMemoryLoginAttemptStore testLoginAttemptStore() {
+        return new InMemoryLoginAttemptStore();
+    }
+
     /** Controllable time for throttling tests; the guard in the cached context shares it. */
     @Bean
     @Primary

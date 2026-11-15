@@ -16,7 +16,7 @@ class LoginThrottleWiringTest {
     void productionWiringRefreshesWithoutCircularDependency() {
         try (var context = new AnnotationConfigApplicationContext()) {
             context.register(PropertySourcesPlaceholderConfigurer.class, ClockConfig.class,
-                    LoginThrottleWebConfig.class, LoginAttemptGuard.class, ClientIpResolver.class);
+                    LoginThrottleWebConfig.class, LoginAttemptGuard.class, InMemoryLoginAttemptStore.class, ClientIpResolver.class);
             context.refresh();
             assertThat(context.getBean(Clock.class)).isNotNull();
             assertThat(context.getBean(LoginAttemptGuard.class)).isNotNull();

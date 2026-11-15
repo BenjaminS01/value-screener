@@ -5,14 +5,14 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
+import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Brute-force protection state: a per-IP attempt limit with growing block durations and a per-account
- * lock after consecutive failures. Requests are rejected, never delayed. Every update goes through
- * {@link ConcurrentHashMap#compute}, so concurrent requests cannot lose counts.
+ * lock after consecutive failures. Requests are rejected, never delayed. The state lives in a
+ * {@link LoginAttemptStore} shared by all instances; every change is an optimistic read-modify-write there,
+ * so concurrent requests cannot lose counts. Expired state is dropped by the store's TTL.
  */
 @Component
 public class LoginAttemptGuard {
@@ -23,43 +23,46 @@ public class LoginAttemptGuard {
     static final Duration VIOLATION_MEMORY = Duration.ofHours(1);
     static final int MAX_FAILURES = 10;
     static final Duration ACCOUNT_LOCK = Duration.ofMinutes(15);
-    static final int PURGE_THRESHOLD = 10_000;
 
-    private record IpState(Instant windowStart, int count, int violations, Instant lastViolation,
-                           Instant blockedUntil) {
+    record IpState(Instant windowStart, int count, int violations, Instant lastViolation,
+                   Instant blockedUntil) implements LoginAttemptStore.State {
         boolean expired(Instant now) {
             return !blockedUntil.isAfter(now)
                     && !windowStart.plus(WINDOW).isAfter(now)
                     && (violations == 0 || !lastViolation.plus(VIOLATION_MEMORY).isAfter(now));
         }
-    }
 
-    private record AccountState(int failures, Instant lockedUntil) {
-        boolean expired(Instant now) {
-            return lockedUntil != null && !lockedUntil.isAfter(now);
+        /** Later of block end and window end + violation memory; after that nothing of this state matters. */
+        @Override
+        public Instant expiresAt() {
+            Instant memoryEnd = windowStart.plus(WINDOW).plus(VIOLATION_MEMORY);
+            return blockedUntil.isAfter(memoryEnd) ? blockedUntil : memoryEnd;
         }
     }
 
-    private final Clock clock;
-    private final Map<String, IpState> ips = new ConcurrentHashMap<>();
-    private final Map<String, AccountState> accounts = new ConcurrentHashMap<>();
+    private static final String IP_PREFIX = "IP#";
+    private static final String ACCOUNT_PREFIX = "ACCOUNT#";
 
-    public LoginAttemptGuard(Clock clock) {
+    private final Clock clock;
+    private final LoginAttemptStore store;
+
+    public LoginAttemptGuard(Clock clock, LoginAttemptStore store) {
         this.clock = clock;
+        this.store = store;
     }
 
     public Optional<Duration> ipBlockRemaining(String ip) {
         Instant now = clock.instant();
-        IpState state = ips.get(ip);
-        if (state == null || !state.blockedUntil().isAfter(now)) {
+        Optional<IpState> state = store.get(IP_PREFIX + ip, IpState.class);
+        if (state.isEmpty() || !state.get().blockedUntil().isAfter(now)) {
             return Optional.empty();
         }
-        return Optional.of(Duration.between(now, state.blockedUntil()));
+        return Optional.of(Duration.between(now, state.get().blockedUntil()));
     }
 
     public void recordAttempt(String ip) {
         Instant now = clock.instant();
-        ips.compute(ip, (k, old) -> {
+        store.update(IP_PREFIX + ip, IpState.class, old -> {
             if (old == null) {
                 return new IpState(now, 1, 0, Instant.EPOCH, Instant.EPOCH);
             }
@@ -81,7 +84,6 @@ public class LoginAttemptGuard {
             }
             return new IpState(windowStart, count, violations, old.lastViolation(), old.blockedUntil());
         });
-        purgeIfLarge(ips, now);
     }
 
     private static Duration blockFor(int violations) {
@@ -91,46 +93,21 @@ public class LoginAttemptGuard {
     }
 
     public boolean isAccountLocked(String normalizedUsername) {
-        AccountState state = accounts.get(normalizedUsername);
-        return state != null && state.lockedUntil() != null && state.lockedUntil().isAfter(clock.instant());
+        return store.accountLockedUntil(accountKey(normalizedUsername))
+                .filter(lockedUntil -> lockedUntil.isAfter(clock.instant()))
+                .isPresent();
     }
 
+    /** Atomic in the store: a wrong password is always counted, however many requests race. */
     public void recordFailure(String normalizedUsername) {
-        Instant now = clock.instant();
-        accounts.compute(normalizedUsername, (k, old) -> {
-            int failures = (old == null || old.expired(now)) ? 0 : old.failures();
-            Instant lockedUntil = (old == null || old.expired(now)) ? null : old.lockedUntil();
-            failures++;
-            if (failures >= MAX_FAILURES) {
-                lockedUntil = now.plus(ACCOUNT_LOCK);
-            }
-            return new AccountState(failures, lockedUntil);
-        });
-        purgeIfLarge(accounts, now);
+        store.recordAccountFailure(accountKey(normalizedUsername), clock.instant(), MAX_FAILURES, ACCOUNT_LOCK);
     }
 
     public void recordSuccess(String normalizedUsername) {
-        accounts.remove(normalizedUsername);
+        store.delete(accountKey(normalizedUsername));
     }
 
-    int trackedAccountCount() {
-        return accounts.size();
-    }
-
-    int trackedIpCount() {
-        return ips.size();
-    }
-
-    private static <V> void purgeIfLarge(Map<String, V> map, Instant now) {
-        if (map.size() > PURGE_THRESHOLD) {
-            map.entrySet().removeIf(e -> isExpired(e.getValue(), now));
-        }
-    }
-
-    private static boolean isExpired(Object state, Instant now) {
-        if (state instanceof IpState ip) {
-            return ip.expired(now);
-        }
-        return state instanceof AccountState account && account.expired(now);
+    private static String accountKey(String normalizedUsername) {
+        return ACCOUNT_PREFIX + normalizedUsername.toLowerCase(Locale.ROOT);
     }
 }

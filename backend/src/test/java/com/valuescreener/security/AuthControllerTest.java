@@ -39,6 +39,9 @@ class AuthControllerTest {
     private LoginAttemptGuard guard;
 
     @org.springframework.boot.test.mock.mockito.SpyBean
+    private InMemoryLoginAttemptStore store;
+
+    @org.springframework.boot.test.mock.mockito.SpyBean
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -221,6 +224,31 @@ class AuthControllerTest {
     }
 
     @Test
+    void throttleStateConflictOnAttemptRefusesLoginWith503() throws Exception {
+        org.mockito.Mockito.doThrow(new com.valuescreener.persistence.ConcurrentUpdateException("busy", null))
+                .when(store).update(org.mockito.ArgumentMatchers.eq("IP#10.5.0.1"),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        try {
+            loginFrom("10.5.0.1", "admin", "admin-password-123456789")
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(header().string("Retry-After", "1"))
+                    .andExpect(header().doesNotExist("Set-Cookie"))
+                    .andExpect(content().json("{\"error\":\"Login temporarily unavailable\"}", true));
+        } finally {
+            org.mockito.Mockito.reset(store);
+        }
+    }
+
+    @Test
+    void wrongPasswordIsAlwaysCounted() throws Exception {
+        org.mockito.Mockito.clearInvocations(store);
+        loginFrom("10.5.1.1", "alice", "wrong").andExpect(status().isUnauthorized());
+        org.mockito.Mockito.verify(store).recordAccountFailure(org.mockito.ArgumentMatchers.eq("ACCOUNT#alice"),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(10),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void loginThrottleInterceptorIsRegisteredForLoginEndpoint() throws Exception {
         var request = new org.springframework.mock.web.MockHttpServletRequest("POST", "/api/auth/login");
         org.springframework.web.util.ServletRequestPathUtils.parseAndCache(request);
@@ -236,12 +264,12 @@ class AuthControllerTest {
 
     @Test
     void unknownUsernamesAreNotTracked() throws Exception {
-        int trackedBefore = guard.trackedAccountCount(); // the guard is shared across tests in the cached context
+        int trackedBefore = store.count("ACCOUNT#"); // the guard is shared across tests in the cached context
         for (int i = 0; i < 50; i++) {
             loginFrom("10.2.0." + i, UUID.randomUUID().toString(), "x")
                     .andExpect(status().isUnauthorized());
         }
-        assertThat(guard.trackedAccountCount()).isEqualTo(trackedBefore);
+        assertThat(store.count("ACCOUNT#")).isEqualTo(trackedBefore);
         loginFrom("10.2.9.9", "admin", "admin-password-123456789").andExpect(status().isOk());
     }
 
