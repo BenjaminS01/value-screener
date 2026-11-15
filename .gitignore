@@ -6,3 +6,4 @@
 .idea/
 .env
 logs/
+/.claude/settings.local.json
