@@ -1,17 +1,5 @@
 package com.valuescreener.research;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -19,51 +7,52 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-@Entity
-@Table(name = "company_snapshot")
+/** A researched company; stored in DynamoDB (see {@link SnapshotItem}), findings embedded in the item. */
 public class CompanySnapshot {
 
     private static final Pattern ISIN_PATTERN = Pattern.compile("[A-Z]{2}[A-Z0-9]{9}[0-9]");
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 10)
     private String ticker;
-
-    @Column(nullable = false, unique = true, length = 12)
     private String isin;
-
-    @Column(name = "company_name", nullable = false, length = 200)
     private String companyName;
-
-    @Column(length = 100)
-    private String sector;
-
-    /** Key of the assigned group (stock groups live in DynamoDB, so this is a plain column, not a relation). */
-    @Column(name = "group_key", length = 40)
+    /** Key of the assigned group (stock groups are separate items); null together with groupSource. */
     private String groupKey;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "group_source", length = 10)
     private GroupSource groupSource;
-
-    @Column(nullable = false, length = 100)
     private String country;
-
-    @Column(name = "business_description", nullable = false, columnDefinition = "TEXT")
     private String businessDescription;
-
-    @OneToMany(mappedBy = "companySnapshot", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ResearchFinding> findings = new ArrayList<>();
-
-    @Version
-    @Column(nullable = false)
+    private final List<ResearchFinding> findings = new ArrayList<>();
+    /** Optimistic-lock version; null until the snapshot was saved once. */
     private Long version;
 
-    protected CompanySnapshot() {
-        // JPA
+    private CompanySnapshot() {
+        // for restore()
+    }
+
+    /**
+     * Rebuilds a stored snapshot without re-validating the identity fields. The group pair rule (formerly a
+     * CHECK constraint) is still enforced: key and source are both set or both null.
+     */
+    static CompanySnapshot restore(String ticker, String isin, String companyName, String country,
+                                   String businessDescription, String groupKey, GroupSource groupSource,
+                                   List<ResearchFinding> findings, Long version) {
+        requireGroupPair(groupKey, groupSource);
+        CompanySnapshot snapshot = new CompanySnapshot();
+        snapshot.ticker = ticker;
+        snapshot.isin = isin;
+        snapshot.companyName = companyName;
+        snapshot.country = country;
+        snapshot.businessDescription = businessDescription;
+        snapshot.groupKey = groupKey;
+        snapshot.groupSource = groupSource;
+        snapshot.findings.addAll(findings);
+        snapshot.version = version;
+        return snapshot;
+    }
+
+    private static void requireGroupPair(String groupKey, GroupSource groupSource) {
+        if ((groupKey == null) != (groupSource == null)) {
+            throw new IllegalArgumentException("groupKey and groupSource must both be set or both be empty");
+        }
     }
 
     public CompanySnapshot(String ticker, String isin, String companyName, String country,
@@ -116,7 +105,6 @@ public class CompanySnapshot {
         }
         ResearchFinding finding = new ResearchFinding(criterionKey, numericValue, booleanValue, claim,
                 sourceUrl, asOfDate);
-        finding.setCompanySnapshot(this);
         findings.add(finding);
         return Optional.empty();
     }
@@ -150,7 +138,8 @@ public class CompanySnapshot {
         return value.trim();
     }
 
-    public Long getId() { return id; }
+    Long version() { return version; }
+    void version(Long version) { this.version = version; }
     public String getTicker() { return ticker; }
     public String getIsin() { return isin; }
     public String getCompanyName() { return companyName; }

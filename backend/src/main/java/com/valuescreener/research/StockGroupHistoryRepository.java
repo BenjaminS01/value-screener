@@ -1,15 +1,10 @@
 package com.valuescreener.research;
 
-import org.springframework.data.repository.Repository;
-
 import java.util.List;
 
-/** Insert-only on purpose: extends Repository, not JpaRepository, so no update or delete methods exist. */
-public interface StockGroupHistoryRepository extends Repository<StockGroupHistory, Long> {
+/** Read side only: group history is append-only and written together with its snapshot. */
+public interface StockGroupHistoryRepository {
 
-    StockGroupHistory save(StockGroupHistory entry);
-
-    List<StockGroupHistory> findByCompanySnapshotIdOrderByChangedAtDescIdDesc(Long companySnapshotId);
-
-    boolean existsByPreviousGroupKeyOrNewGroupKey(String previousKey, String newKey);
+    /** Newest first. */
+    List<StockGroupHistory> findBySnapshotIsin(String isin);
 }

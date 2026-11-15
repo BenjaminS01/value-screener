@@ -34,7 +34,7 @@ class CompanySnapshotControllerTest {
         FindingView peRatio = new FindingView(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
                 "Trailing P/E of 28.0.", "https://example.com/aapl-key-stats", LocalDate.of(2026, 8, 1), false);
         return new CompanySnapshotView(
-                1L, "AAPL", "US0378331005", "Apple Inc.", "USA",
+                "AAPL", "US0378331005", "Apple Inc.", "USA",
                 "Designs and sells consumer electronics.",
                 new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.AI), List.of(peRatio),
                 LocalDate.of(2026, 8, 1), false);

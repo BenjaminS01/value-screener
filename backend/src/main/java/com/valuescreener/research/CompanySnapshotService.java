@@ -3,7 +3,6 @@ package com.valuescreener.research;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -11,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class CompanySnapshotService {
@@ -36,7 +36,6 @@ public class CompanySnapshotService {
         this.clock = clock;
     }
 
-    @Transactional
     public CompanySnapshotView upsert(UpsertCompanySnapshotRequest request, GroupSource source,
                                       HistoryOrigin origin) {
         String normalizedIsin = request.isin().trim().toUpperCase();
@@ -61,23 +60,22 @@ public class CompanySnapshotService {
             snapshot.upsertFinding(finding.criterionKey(), finding.numericValue(), finding.booleanValue(),
                     finding.claim(), finding.sourceUrl(), finding.asOfDate()).ifPresent(replaced::add);
         }
-        CompanySnapshot saved = repository.save(snapshot);
         Instant now = clock.instant();
-        for (ReplacedFinding old : replaced) {
-            findingHistory.save(new ResearchFindingHistory(saved, old, now, origin));
-        }
-        recordGroupChange(saved, kept, keptSource, origin, now);
-        return toView(saved);
+        List<ResearchFindingHistory> findingEntries = replaced.stream()
+                .map(old -> new ResearchFindingHistory(normalizedIsin, old, now, origin)).toList();
+        Optional<StockGroupHistory> groupEntry = groupChange(snapshot, kept, keptSource, origin, now);
+        return toView(repository.save(snapshot, findingEntries, groupEntry));
     }
 
-    private void recordGroupChange(CompanySnapshot snapshot, String previous, GroupSource previousSource,
-                                   HistoryOrigin origin, Instant now) {
+    private static Optional<StockGroupHistory> groupChange(CompanySnapshot snapshot, String previous,
+                                                           GroupSource previousSource, HistoryOrigin origin,
+                                                           Instant now) {
         String current = snapshot.getGroupKey();
         boolean sameKey = previous != null && previous.equals(current);
         if (sameKey && previousSource == snapshot.getGroupSource()) {
-            return;
+            return Optional.empty();
         }
-        groupHistory.save(new StockGroupHistory(snapshot, previous, previousSource, current,
+        return Optional.of(new StockGroupHistory(snapshot.getIsin(), previous, previousSource, current,
                 snapshot.getGroupSource(), now, origin));
     }
 
@@ -94,20 +92,19 @@ public class CompanySnapshotService {
         return CompanySnapshotView.from(snapshot, freshness, names);
     }
 
-    @Transactional(readOnly = true)
     public SnapshotHistoryView history(String isin) {
         String normalizedIsin = normalizeIsin(isin);
         CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
         List<SnapshotHistoryView.FindingHistoryEntry> findings = findingHistory
-                .findByCompanySnapshotIdOrderByReplacedAtDescIdDesc(snapshot.getId()).stream()
+                .findBySnapshotIsin(snapshot.getIsin()).stream()
                 .map(h -> new SnapshotHistoryView.FindingHistoryEntry(h.getCriterionKey(), h.getNumericValue(),
                         h.getBooleanValue(), h.getClaim(), h.getSourceUrl(), h.getAsOfDate(), h.getReplacedAt(),
                         h.getOrigin()))
                 .toList();
         Map<String, String> names = groups.namesByKey();
         List<SnapshotHistoryView.GroupHistoryEntry> groupEntries = groupHistory
-                .findByCompanySnapshotIdOrderByChangedAtDescIdDesc(snapshot.getId()).stream()
+                .findBySnapshotIsin(snapshot.getIsin()).stream()
                 .map(h -> new SnapshotHistoryView.GroupHistoryEntry(ref(h.getPreviousGroupKey(), names),
                         h.getPreviousSource(), ref(h.getNewGroupKey(), names), h.getNewSource(), h.getChangedAt(),
                         h.getOrigin()))
@@ -120,7 +117,6 @@ public class CompanySnapshotService {
     }
 
     /** Snapshot in import format (stored group and group source); requires a group so the live import is valid. */
-    @Transactional(readOnly = true)
     public UpsertCompanySnapshotRequest export(String isin) {
         String normalizedIsin = normalizeIsin(isin);
         CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
@@ -138,7 +134,6 @@ public class CompanySnapshotService {
                 groupKey, snapshot.getGroupSource(), findings);
     }
 
-    @Transactional
     public CompanySnapshotView assignGroupManually(String isin, String groupKey) {
         String normalizedIsin = normalizeIsin(isin);
         CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
@@ -146,19 +141,18 @@ public class CompanySnapshotService {
         String previous = snapshot.getGroupKey();
         GroupSource previousSource = snapshot.getGroupSource();
         snapshot.assignGroup(groups.require(StockGroup.trimUpper(groupKey)), GroupSource.MANUAL);
-        CompanySnapshot saved = repository.save(snapshot);
-        recordGroupChange(saved, previous, previousSource, HistoryOrigin.MANUAL, clock.instant());
-        return toView(saved);
+        Optional<StockGroupHistory> groupEntry = groupChange(snapshot, previous, previousSource,
+                HistoryOrigin.MANUAL, clock.instant());
+        return toView(repository.save(snapshot, List.of(), groupEntry));
     }
 
     /** null = all, "none" = ungrouped, otherwise a (normalized) group key; an unknown key yields an empty list. */
-    @Transactional(readOnly = true)
     public List<CompanySnapshotView> list(String groupFilter) {
         List<CompanySnapshot> snapshots;
         if (groupFilter == null) {
             snapshots = repository.findAll();
         } else if (NO_GROUP_FILTER.equalsIgnoreCase(groupFilter.trim())) {
-            snapshots = repository.findAllByGroupKeyIsNull();
+            snapshots = repository.findAllWithoutGroup();
         } else {
             snapshots = repository.findAllByGroupKey(StockGroup.trimUpper(groupFilter));
         }
@@ -166,7 +160,6 @@ public class CompanySnapshotService {
         return snapshots.stream().map(s -> CompanySnapshotView.from(s, freshness, names)).toList();
     }
 
-    @Transactional(readOnly = true)
     public CompanySnapshotView getByIsin(String isin) {
         String normalizedIsin = normalizeIsin(isin);
         return repository.findByIsin(normalizedIsin)

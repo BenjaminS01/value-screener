@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 public record CompanySnapshotView(
-        Long id,
         String ticker,
         String isin,
         String companyName,
@@ -27,7 +26,7 @@ public record CompanySnapshotView(
         LocalDate lastResearchedAt = snapshot.getFindings().stream().map(ResearchFinding::getAsOfDate)
                 .max(Comparator.naturalOrder()).orElse(null);
         return new CompanySnapshotView(
-                snapshot.getId(), snapshot.getTicker(), snapshot.getIsin(), snapshot.getCompanyName(),
+                snapshot.getTicker(), snapshot.getIsin(), snapshot.getCompanyName(),
                 snapshot.getCountry(), snapshot.getBusinessDescription(), group,
                 snapshot.getFindings().stream().map(f -> FindingView.from(f, freshness)).toList(),
                 lastResearchedAt, freshness.isStale(lastResearchedAt));

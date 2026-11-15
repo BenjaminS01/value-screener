@@ -1,7 +1,6 @@
 package com.valuescreener.research;
 
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -21,7 +20,6 @@ public class StockGroupLookup {
     }
 
     /** ISIN -> group; ISINs without a snapshot or without a group are absent. One query plus one group read. */
-    @Transactional(readOnly = true)
     public Map<String, StockGroupRef> groupsByIsin(Collection<String> isins) {
         Map<String, StockGroupRef> result = new HashMap<>();
         if (isins == null || isins.isEmpty()) {

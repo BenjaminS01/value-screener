@@ -9,11 +9,11 @@ import java.util.List;
 
 /** groupSource is only honored on the sync path (reviewed export); the ingest path ignores it and always records AI. */
 public record UpsertCompanySnapshotRequest(
-        @NotBlank String ticker,
+        @NotBlank @Size(max = 10) String ticker,
         @NotBlank @Pattern(regexp = "\\s*[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]\\s*") String isin,
-        @NotBlank String companyName,
-        @NotBlank String country,
-        @NotBlank String businessDescription,
+        @NotBlank @Size(max = 200) String companyName,
+        @NotBlank @Size(max = 100) String country,
+        @NotBlank @Size(max = 50000) String businessDescription,
         @NotBlank String groupKey,
         GroupSource groupSource,
         @Size(max = 50) List<@Valid FindingRequest> findings

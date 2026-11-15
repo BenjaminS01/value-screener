@@ -44,7 +44,7 @@ class ResearchSyncControllerTest {
     }
 
     private static CompanySnapshotView sampleView() {
-        return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x",
+        return new CompanySnapshotView("AAPL", "US0378331005", "Apple Inc.", "USA", "x",
                 new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.MANUAL), List.of(), null, true);
     }
 
@@ -82,6 +82,19 @@ class ResearchSyncControllerTest {
     @Test
     void syncRejectsInvalidBodyWithJsonError() throws Exception {
         mockMvc.perform(post(URL).contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid request"));
+    }
+
+    @Test
+    void syncRejectsOversizeCompanyNameAndNumericValue() throws Exception {
+        mockMvc.perform(post(URL).contentType("application/json")
+                        .content(body("").replace("Apple Inc.", "a".repeat(201))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid request"));
+        mockMvc.perform(post(URL).contentType("application/json")
+                        .content(body("").replace("\"findings\":[]", "\"findings\":[{\"criterionKey\":\"PE_RATIO\","
+                                + "\"numericValue\":123456789,\"claim\":\"c\",\"asOfDate\":\"2026-08-01\"}]")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Invalid request"));
     }

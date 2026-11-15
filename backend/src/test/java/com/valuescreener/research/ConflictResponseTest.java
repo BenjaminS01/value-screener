@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.TestPropertySource;
@@ -76,5 +77,24 @@ class ConflictResponseTest {
         mockMvc.perform(post("/api/research/ingest/snapshots").contentType("application/json").content(INGEST_BODY))
                 .andExpect(status().isConflict())
                 .andExpect(content().json(CONFLICT_BODY, true));
+    }
+
+    @Test
+    void ingestConcurrentUpdateReturns409WithSameBody() throws Exception {
+        when(snapshotService.upsert(any(), any(), any()))
+                .thenThrow(new ConcurrentUpdateException("Snapshot US0378331005 was changed concurrently", null));
+
+        mockMvc.perform(post("/api/research/ingest/snapshots").contentType("application/json").content(INGEST_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(content().json(CONFLICT_BODY, true));
+    }
+
+    @Test
+    void ingestGroupDeletedMeanwhileReturns422() throws Exception {
+        when(snapshotService.upsert(any(), any(), any())).thenThrow(new UnknownGroupException("SEMICONDUCTORS"));
+
+        mockMvc.perform(post("/api/research/ingest/snapshots").contentType("application/json").content(INGEST_BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().json("{\"error\":\"Unknown group key: SEMICONDUCTORS\"}", true));
     }
 }

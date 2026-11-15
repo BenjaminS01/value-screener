@@ -8,7 +8,6 @@ describe('researchApi', () => {
 
   it('fetchAllSnapshots returns snapshots from the backend', async () => {
     const snapshot = {
-      id: 1,
       ticker: 'AAPL',
       isin: 'US0378331005',
       companyName: 'Apple Inc.',
@@ -52,7 +51,6 @@ describe('researchApi', () => {
 
   it('fetchSnapshot returns the snapshot for a known isin', async () => {
     const snapshot = {
-      id: 1,
       ticker: 'AAPL',
       isin: 'US0378331005',
       companyName: 'Apple Inc.',
@@ -98,7 +96,7 @@ describe('researchApi', () => {
 
   it('assignGroup PUTs the group key and returns the updated snapshot', async () => {
     document.cookie = 'XSRF-TOKEN=tok'
-    const updated = { id: 1, isin: 'US0378331005' }
+    const updated = { isin: 'US0378331005' }
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true, status: 200, headers: new Headers(), json: async () => updated, text: async () => JSON.stringify(updated),
     })

@@ -1,7 +1,6 @@
 package com.valuescreener.research;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -13,24 +12,26 @@ public class StockGroupService {
 
     private final StockGroupRepository groups;
     private final CompanySnapshotRepository snapshots;
-    private final StockGroupHistoryRepository groupHistory;
 
-    public StockGroupService(StockGroupRepository groups, CompanySnapshotRepository snapshots,
-                             StockGroupHistoryRepository groupHistory) {
+    public StockGroupService(StockGroupRepository groups, CompanySnapshotRepository snapshots) {
         this.groups = groups;
         this.snapshots = snapshots;
-        this.groupHistory = groupHistory;
     }
 
-    @Transactional(readOnly = true)
     public List<StockGroupView> list() {
+        // one read of the snapshot partition, counted in memory (a count query per group would read it N times)
+        Map<String, Long> counts = new HashMap<>();
+        snapshots.findAll().forEach(s -> {
+            if (s.getGroupKey() != null) {
+                counts.merge(s.getGroupKey(), 1L, Long::sum);
+            }
+        });
         return groups.findAll().stream()
                 .sorted(Comparator.comparingInt(StockGroup::getSortOrder).thenComparing(StockGroup::getName))
-                .map(this::toView)
+                .map(g -> toView(g, counts.getOrDefault(g.getKey(), 0L)))
                 .toList();
     }
 
-    @Transactional
     public StockGroupView create(CreateStockGroupRequest request) {
         String key = StockGroup.trimUpper(request.key());
         // validate first: invalid key or blank name is a 400, never a catalog lookup
@@ -43,10 +44,9 @@ public class StockGroupService {
             throw new StockGroupConflictException("Group name already exists: " + name);
         }
         group.moveTo(groups.maxSortOrder() + 10);
-        return toView(groups.create(group));
+        return toView(groups.create(group), 0);
     }
 
-    @Transactional
     public StockGroupView update(String key, UpdateStockGroupRequest request) {
         StockGroup group = find(key);
         String previousName = group.getName();
@@ -67,17 +67,12 @@ public class StockGroupService {
         return toView(group);
     }
 
-    @Transactional
     public void delete(String key) {
         StockGroup group = find(key);
         long used = snapshots.countByGroupKey(group.getKey());
         if (used > 0) {
             throw new StockGroupConflictException(
                     "Group " + group.getKey() + " still has " + used + " stock(s) assigned");
-        }
-        if (groupHistory.existsByPreviousGroupKeyOrNewGroupKey(group.getKey(), group.getKey())) {
-            throw new StockGroupConflictException(
-                    "Group " + group.getKey() + " appears in the group history and cannot be deleted");
         }
         groups.delete(group);
     }
@@ -95,7 +90,6 @@ public class StockGroupService {
     }
 
     /** Resolves a group by (normalized) key; used when assigning groups to stocks. */
-    @Transactional(readOnly = true)
     public StockGroup require(String key) {
         String normalized = StockGroup.trimUpper(key);
         return groups.findById(normalized).orElseThrow(() -> new UnknownGroupException(normalized));
@@ -106,8 +100,12 @@ public class StockGroupService {
         return groups.findById(normalized).orElseThrow(() -> new StockGroupNotFoundException(normalized));
     }
 
+    /** Single group (update): one count is fine here. */
     private StockGroupView toView(StockGroup group) {
-        return new StockGroupView(group.getKey(), group.getName(), group.getSortOrder(),
-                snapshots.countByGroupKey(group.getKey()));
+        return toView(group, snapshots.countByGroupKey(group.getKey()));
+    }
+
+    private StockGroupView toView(StockGroup group, long stockCount) {
+        return new StockGroupView(group.getKey(), group.getName(), group.getSortOrder(), stockCount);
     }
 }
