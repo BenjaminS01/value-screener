@@ -49,14 +49,14 @@ class ResearchHistoryMigrationTest {
     }
 
     @Test
-    void groupHistoryRequiresExistingGroupKey() {
+    void groupHistoryAcceptsAnyGroupKeyBecauseGroupsLiveInDynamoDb() {
         jdbc.update("""
                 INSERT INTO company_snapshot (id, ticker, isin, company_name, country, business_description)
                 VALUES (1, 'AAPL', 'US0378331005', 'Apple', 'USA', 'x')""");
 
-        assertThatThrownBy(() -> jdbc.update("""
+        // V8 dropped the foreign keys to stock_group
+        assertThat(jdbc.update("""
                 INSERT INTO stock_group_history (company_snapshot_id, new_group_key, new_group_source, changed_at, origin)
-                VALUES (1, 'NOPE', 'AI', now(), 'INGEST')"""))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                VALUES (1, 'NOT_IN_POSTGRES', 'AI', now(), 'INGEST')""")).isEqualTo(1);
     }
 }

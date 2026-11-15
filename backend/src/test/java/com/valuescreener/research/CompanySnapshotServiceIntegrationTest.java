@@ -34,6 +34,25 @@ class CompanySnapshotServiceIntegrationTest {
 
     @TestConfiguration
     static class ClockConfig {
+        /** Groups live in DynamoDB; this test is about Postgres, so a map stands in for the catalog. */
+        @Bean
+        StockGroupRepository stockGroupRepository() {
+            Map<String, StockGroup> store = new java.util.LinkedHashMap<>();
+            store.put("BANKS", new StockGroup("BANKS", "Banks", 10));
+            store.put("INSURANCE", new StockGroup("INSURANCE", "Insurance", 20));
+            return new StockGroupRepository() {
+                public java.util.Optional<StockGroup> findById(String key) {
+                    return java.util.Optional.ofNullable(store.get(key));
+                }
+                public List<StockGroup> findAll() { return List.copyOf(store.values()); }
+                public boolean existsByNameIgnoreCase(String name) { return false; }
+                public int maxSortOrder() { return 20; }
+                public StockGroup create(StockGroup g) { store.put(g.getKey(), g); return g; }
+                public StockGroup update(StockGroup g, String previousName) { return g; }
+                public void delete(StockGroup g) { store.remove(g.getKey()); }
+            };
+        }
+
         @Bean
         Clock clock() {
             return Clock.fixed(Instant.parse("2026-11-12T10:00:00Z"), ZoneOffset.UTC);
@@ -128,6 +147,8 @@ class CompanySnapshotServiceIntegrationTest {
         assertThat(history.groups().get(0).origin()).isEqualTo(HistoryOrigin.MANUAL);
         assertThat(history.groups().get(0).newSource()).isEqualTo(GroupSource.MANUAL);
         assertThat(history.groups().get(0).newGroup().key()).isEqualTo("INSURANCE");
+        assertThat(history.groups().get(0).newGroup().name()).isEqualTo("Insurance");
+        assertThat(history.groups().get(0).previousGroup().name()).isEqualTo("Banks");
         assertThat(history.groups().get(1).origin()).isEqualTo(HistoryOrigin.INGEST);
         assertThat(history.findings()).hasSize((int) afterFirst + 1);
 

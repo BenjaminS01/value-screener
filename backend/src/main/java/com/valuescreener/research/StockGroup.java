@@ -1,37 +1,32 @@
 package com.valuescreener.research;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
-
 import java.util.regex.Pattern;
 
-@Entity
-@Table(name = "stock_group")
+/** A stock group of the owner's catalog; stored in DynamoDB (see {@link StockGroupItem}). */
 public class StockGroup {
 
     private static final Pattern KEY_PATTERN = Pattern.compile("[A-Z][A-Z0-9_]{1,39}");
     /** Reserved: "?group=none" filters ungrouped stocks. */
     private static final String RESERVED_NONE = "NONE";
 
-    @Id
-    @Column(name = "key", length = 40)
     private String key;
-
-    @Column(nullable = false, unique = true, length = 100)
     private String name;
-
-    @Column(name = "sort_order", nullable = false)
     private int sortOrder;
-
-    @Version
-    @Column(nullable = false)
+    /** Optimistic-lock version; null until the group was saved once. */
     private Long version;
 
-    protected StockGroup() {
-        // JPA
+    private StockGroup() {
+        // for restore()
+    }
+
+    /** Rebuilds a stored group without re-validating it. */
+    static StockGroup restore(String key, String name, int sortOrder, Long version) {
+        StockGroup group = new StockGroup();
+        group.key = key;
+        group.name = name;
+        group.sortOrder = sortOrder;
+        group.version = version;
+        return group;
     }
 
     public StockGroup(String key, String name, int sortOrder) {
@@ -73,6 +68,14 @@ public class StockGroup {
 
     public void moveTo(int newSortOrder) {
         this.sortOrder = newSortOrder;
+    }
+
+    Long version() {
+        return version;
+    }
+
+    void version(Long version) {
+        this.version = version;
     }
 
     public String getKey() { return key; }

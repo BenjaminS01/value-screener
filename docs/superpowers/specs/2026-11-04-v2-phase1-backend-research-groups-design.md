@@ -219,6 +219,10 @@ name in the RAG design is a placeholder, not a reservation **(builder's call)**.
 
 ### 6.2 Seed list (35 groups, agreed 2026-11-04)
 
+> **Superseded (2026-11-15):** the seed list was revised with the user for the DynamoDB rewrite. The
+> current list is in [`2026-11-14-serverless-terraform-design.md`](2026-11-14-serverless-terraform-design.md)
+> Section 6.5 (code: `StockGroupSeed.java`). The fallback key is now `OTHER`. The table below is history.
+
 | Area | Groups (key → name) |
 |---|---|
 | Financials | `BANKS` Banks · `INSURANCE` Insurance · `ASSET_MANAGEMENT_EXCHANGES` Asset Management & Exchanges · `PAYMENTS_FINTECH` Payments & Fintech |

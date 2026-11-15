@@ -161,12 +161,12 @@ class ResearchIngestControllerTest {
     @Test
     void ingestGroupsListsCatalog() throws Exception {
         when(groupService.list()).thenReturn(List.of(
-                new StockGroupView("BANKS", "Banks", 10, 2), new StockGroupView("DIVERSIFIED_OTHER", "Other", 20, 0)));
+                new StockGroupView("BANKS", "Banks", 10, 2), new StockGroupView("OTHER", "Other", 20, 0)));
 
         mockMvc.perform(get("/api/research/ingest/groups"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("BANKS"))
-                .andExpect(jsonPath("$[1].key").value("DIVERSIFIED_OTHER"));
+                .andExpect(jsonPath("$[1].key").value("OTHER"));
     }
 
     @Test

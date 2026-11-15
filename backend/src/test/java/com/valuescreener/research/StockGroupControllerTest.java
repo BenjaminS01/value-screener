@@ -97,6 +97,17 @@ class StockGroupControllerTest {
     }
 
     @Test
+    void patchWithBlankNameReturns400WithErrorBody() throws Exception {
+        when(service.update("BANKS", new UpdateStockGroupRequest("   ", null)))
+                .thenThrow(new IllegalArgumentException("name must not be blank"));
+
+        mockMvc.perform(patch("/api/research/groups/BANKS").contentType("application/json")
+                        .content("{\"name\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("name must not be blank"));
+    }
+
+    @Test
     void patchUnknownReturns404() throws Exception {
         when(service.update("NOPE", new UpdateStockGroupRequest("x", null)))
                 .thenThrow(new StockGroupNotFoundException("NOPE"));

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.DescribeTableRequest;
@@ -16,7 +17,11 @@ import software.amazon.awssdk.services.dynamodb.model.UpdateTimeToLiveRequest;
 
 /** Creates the table (with TTL) at startup when {@code app.dynamodb.create-table=true}. Idempotent. */
 @Component
+@Order(DynamoTableInitializer.ORDER)
 public class DynamoTableInitializer implements ApplicationRunner {
+
+    /** Runs before the data seeders (StockGroupSeeder). */
+    public static final int ORDER = 10;
 
     private static final Logger log = LoggerFactory.getLogger(DynamoTableInitializer.class);
 

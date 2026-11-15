@@ -150,7 +150,8 @@ Concept: replacing a foreign key with a "referenced" flag written in the same tr
 
 **Files:**
 - Modify: `research/StockGroup.java`, `research/StockGroupRepository.java`, `research/StockGroupService.java`
-- Create: `research/DynamoStockGroupRepository.java`, `research/StockGroupItem.java`, `research/StockGroupSeeder.java`, `research/StockGroupSeed.java` (the 35 groups from `V4__create_stock_group.sql`, same keys, names, sort orders)
+- Create: `research/DynamoStockGroupRepository.java`, `research/StockGroupItem.java`, `research/StockGroupSeeder.java`, `research/StockGroupSeed.java` (the 35 groups of the **revised catalog in spec Section 6.5**, exact keys, names, sort orders — not the old `V4__create_stock_group.sql` list)
+- Modify: `.claude/skills/research-company/SKILL.md` (fallback key `DIVERSIFIED_OTHER` → `OTHER`, mention `HOLDING_COMPANIES` for conglomerates/holdings), `research/ResearchIngestControllerTest.java` (test data uses `OTHER` instead of `DIVERSIFIED_OTHER`)
 - Tests: `research/StockGroupRepositoryTest.java` (new), `research/StockGroupSeederTest.java` (new), `research/StockGroupServiceTest.java`, delete `research/StockGroupMigrationTest.java`
 
 **Interfaces:**
@@ -161,10 +162,10 @@ Concept: replacing a foreign key with a "referenced" flag written in the same tr
   - `create`: transaction Put group (`attribute_not_exists(pk)`) + Put name guard (`attribute_not_exists(pk)`). `update` with a changed name: transaction Update group (version) + Delete old guard + Put new guard. Conflicts → `ConcurrentUpdateException`; a name clash keeps today's `StockGroupConflictException` message (check `existsByNameIgnoreCase` first, transaction protects the race).
   - `delete`: transaction Delete group with condition `attribute_not_exists(referenced) AND version = :v` + Delete name guard. Condition failure → `StockGroupConflictException("Group <KEY> appears in the group history and cannot be deleted")`.
   - Static helper for Task 4: `static TransactWriteItem markReferenced(String tableName, String groupKey)` → Update `SET referenced = :true` with condition `attribute_exists(pk)`.
-  - `StockGroupSeeder`: on startup, Put marker `pk="META"`, `sk="SEED#stock-groups-v1"` with `attribute_not_exists(pk)`; only if that succeeds, create the 35 groups (skip any that exist). Runs after `DynamoTableInitializer`.
+  - `StockGroupSeeder`: on startup, consistent read of marker `pk="META"`, `sk="SEED#stock-groups-v1"`; if it exists, do nothing. Otherwise create the 35 groups (skip any that exist; each create is conditional), and write the marker **last** (revised 2026-11-15 after review: marker-first could leave a partial catalog forever after one transient error). Runs after `DynamoTableInitializer`.
   - `StockGroupService.delete` keeps the "still has n stock(s) assigned" check first (count via `CompanySnapshotRepository.countByGroupKey`, see Task 4; until Task 4 lands, keep calling the existing snapshot repository).
 
-- [ ] **Step 1: Write tests**: `StockGroupSeederTest`: `seedsThirtyFiveGroupsWithKeysNamesAndOrder` (spot-check `BANKS`/`Banks`/10 and `DIVERSIFIED_OTHER`/`Diversified / Other`/350), `secondStartDoesNotReseedDeletedGroup`. `StockGroupRepositoryTest`: `createRejectsDuplicateNameIgnoringCase`, `renameFreesOldName`, `staleSaveIsRejected`, `deleteSucceedsForUnreferencedGroup`, `deleteFailsOnceGroupWasEverReferenced` (apply `markReferenced` in a transaction, then delete → `StockGroupConflictException`), `maxSortOrderIsZeroWhenEmpty`.
+- [ ] **Step 1: Write tests**: `StockGroupSeederTest`: `seedsThirtyFiveGroupsWithKeysNamesAndOrder` (exactly 35 groups, all keys unique, all names unique ignoring case, sort orders 10..350 step 10; spot-check `BANKS`/`Banks`/10, `CONSUMER_SERVICES`/`Consumer Services`/190, `HEALTHCARE_SERVICES`/`Healthcare Services`/250 and `OTHER`/`Other`/350), `secondStartDoesNotReseedDeletedGroup`. `StockGroupRepositoryTest`: `createRejectsDuplicateNameIgnoringCase`, `renameFreesOldName`, `staleSaveIsRejected`, `deleteSucceedsForUnreferencedGroup`, `deleteFailsOnceGroupWasEverReferenced` (apply `markReferenced` in a transaction, then delete → `StockGroupConflictException`), `maxSortOrderIsZeroWhenEmpty`.
 - [ ] **Step 2: Run, expect FAIL.**
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Update `StockGroupServiceTest`** to the new repository interface; messages and statuses unchanged.

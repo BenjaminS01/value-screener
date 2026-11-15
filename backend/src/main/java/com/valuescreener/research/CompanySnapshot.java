@@ -5,12 +5,9 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -44,9 +41,9 @@ public class CompanySnapshot {
     @Column(length = 100)
     private String sector;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_key")
-    private StockGroup stockGroup;
+    /** Key of the assigned group (stock groups live in DynamoDB, so this is a plain column, not a relation). */
+    @Column(name = "group_key", length = 40)
+    private String groupKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "group_source", length = 10)
@@ -95,7 +92,7 @@ public class CompanySnapshot {
         if (this.groupSource == GroupSource.MANUAL && source == GroupSource.AI) {
             return false;
         }
-        this.stockGroup = group;
+        this.groupKey = group.getKey();
         this.groupSource = source;
         return true;
     }
@@ -157,7 +154,7 @@ public class CompanySnapshot {
     public String getTicker() { return ticker; }
     public String getIsin() { return isin; }
     public String getCompanyName() { return companyName; }
-    public StockGroup getStockGroup() { return stockGroup; }
+    public String getGroupKey() { return groupKey; }
     public GroupSource getGroupSource() { return groupSource; }
     public String getCountry() { return country; }
     public String getBusinessDescription() { return businessDescription; }

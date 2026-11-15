@@ -28,17 +28,15 @@ public class StockGroupHistory {
     @JoinColumn(name = "company_snapshot_id", nullable = false, updatable = false)
     private CompanySnapshot companySnapshot;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "previous_group_key", updatable = false)
-    private StockGroup previousGroup;
+    @Column(name = "previous_group_key", length = 40, updatable = false)
+    private String previousGroupKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "previous_group_source", length = 10, updatable = false)
     private GroupSource previousSource;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "new_group_key", nullable = false, updatable = false)
-    private StockGroup newGroup;
+    @Column(name = "new_group_key", nullable = false, length = 40, updatable = false)
+    private String newGroupKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "new_group_source", nullable = false, length = 10, updatable = false)
@@ -55,21 +53,21 @@ public class StockGroupHistory {
         // JPA
     }
 
-    public StockGroupHistory(CompanySnapshot companySnapshot, StockGroup previousGroup, GroupSource previousSource,
-                             StockGroup newGroup, GroupSource newSource, Instant changedAt, HistoryOrigin origin) {
+    public StockGroupHistory(CompanySnapshot companySnapshot, String previousGroupKey, GroupSource previousSource,
+                             String newGroupKey, GroupSource newSource, Instant changedAt, HistoryOrigin origin) {
         this.companySnapshot = Objects.requireNonNull(companySnapshot, "companySnapshot must not be null");
-        this.previousGroup = previousGroup;
+        this.previousGroupKey = previousGroupKey;
         this.previousSource = previousSource;
-        this.newGroup = Objects.requireNonNull(newGroup, "newGroup must not be null");
+        this.newGroupKey = Objects.requireNonNull(newGroupKey, "newGroupKey must not be null");
         this.newSource = Objects.requireNonNull(newSource, "newSource must not be null");
         this.changedAt = Objects.requireNonNull(changedAt, "changedAt must not be null");
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
     }
 
     public Long getId() { return id; }
-    public StockGroup getPreviousGroup() { return previousGroup; }
+    public String getPreviousGroupKey() { return previousGroupKey; }
     public GroupSource getPreviousSource() { return previousSource; }
-    public StockGroup getNewGroup() { return newGroup; }
+    public String getNewGroupKey() { return newGroupKey; }
     public GroupSource getNewSource() { return newSource; }
     public Instant getChangedAt() { return changedAt; }
     public HistoryOrigin getOrigin() { return origin; }

@@ -114,7 +114,7 @@ class CompanySnapshotTest {
         assertThat(snapshot.assignGroup(SEMIS, GroupSource.AI)).isTrue();
         assertThat(snapshot.assignGroup(BANKS, GroupSource.AI)).isTrue();
 
-        assertThat(snapshot.getStockGroup()).isSameAs(BANKS);
+        assertThat(snapshot.getGroupKey()).isEqualTo("BANKS");
         assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.AI);
     }
 
@@ -125,7 +125,7 @@ class CompanySnapshotTest {
 
         assertThat(snapshot.assignGroup(BANKS, GroupSource.AI)).isFalse();
 
-        assertThat(snapshot.getStockGroup()).isSameAs(SEMIS);
+        assertThat(snapshot.getGroupKey()).isEqualTo("SEMICONDUCTORS");
         assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.MANUAL);
     }
 
@@ -137,7 +137,7 @@ class CompanySnapshotTest {
         assertThat(snapshot.assignGroup(BANKS, GroupSource.MANUAL)).isTrue();
         assertThat(snapshot.assignGroup(SEMIS, GroupSource.MANUAL)).isTrue();
 
-        assertThat(snapshot.getStockGroup()).isSameAs(SEMIS);
+        assertThat(snapshot.getGroupKey()).isEqualTo("SEMICONDUCTORS");
         assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.MANUAL);
     }
 

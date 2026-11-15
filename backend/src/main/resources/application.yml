@@ -37,6 +37,7 @@ app:
     function-name: deep-analysis-demo
     region: eu-central-1
   dynamodb:
+    seed-groups: ${APP_DYNAMODB_SEED_GROUPS:false}
     table-name: ${APP_DYNAMODB_TABLE_NAME:value-screener}
     endpoint: ${APP_DYNAMODB_ENDPOINT:}
     region: eu-central-1
