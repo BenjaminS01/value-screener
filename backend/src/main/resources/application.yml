@@ -36,6 +36,11 @@ app:
     mode: lambda
     function-name: deep-analysis-demo
     region: eu-central-1
+  dynamodb:
+    table-name: ${APP_DYNAMODB_TABLE_NAME:value-screener}
+    endpoint: ${APP_DYNAMODB_ENDPOINT:}
+    region: eu-central-1
+    create-table: ${APP_DYNAMODB_CREATE_TABLE:false}
   limits:
     deep-analysis-per-user: 5
     deep-analysis-per-admin: 20

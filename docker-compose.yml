@@ -10,5 +10,16 @@ services:
     volumes:
       - value-screener-postgres-data:/var/lib/postgresql/data
 
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.5.4
+    # the image runs as uid 1000 but a fresh named volume is root-owned; root lets it write its data dir
+    user: root
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/home/dynamodblocal/data"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - value-screener-dynamodb-data:/home/dynamodblocal/data
+
 volumes:
   value-screener-postgres-data:
+  value-screener-dynamodb-data:
