@@ -1,9 +1,8 @@
 package com.valuescreener.research;
 
-import org.springframework.dao.DataIntegrityViolationException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -28,8 +27,8 @@ public class InvestmentThesisExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", message));
     }
 
-    /** Stale version or a race on creation. Never expose the exception message (may contain SQL). */
-    @ExceptionHandler({DataIntegrityViolationException.class, ObjectOptimisticLockingFailureException.class})
+    /** Stale version or a race on creation. Never expose the exception message. */
+    @ExceptionHandler(ConcurrentUpdateException.class)
     public ResponseEntity<Map<String, String>> handleConflict() {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Conflict, please reload"));
     }

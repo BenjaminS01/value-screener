@@ -6,9 +6,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.valuescreener.research.InvestmentThesis;
 import com.valuescreener.research.InvestmentThesisService;
 import com.valuescreener.research.ThesisTooLongException;
-import org.mockito.InOrder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,8 +18,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
@@ -37,9 +35,12 @@ class PortfolioServiceTest {
     @Mock
     private InvestmentThesisService theses;
 
+    @Mock
+    private PurchaseWriter purchaseWriter;
+
     @Test
     void buyCreatesNewPositionWhenIsinUnknown() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
         BuyPositionRequest request = new BuyPositionRequest(
                 "aapl", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15), null);
@@ -55,7 +56,7 @@ class PortfolioServiceTest {
 
     @Test
     void buyMergesIntoExistingPositionWhenIsinKnown() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -72,7 +73,7 @@ class PortfolioServiceTest {
 
     @Test
     void sellReducesExistingPosition() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -86,7 +87,7 @@ class PortfolioServiceTest {
 
     @Test
     void sellDeletesPositionWhenFullyClosed() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -99,7 +100,7 @@ class PortfolioServiceTest {
 
     @Test
     void sellRejectsUnknownIsin() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.sell(new SellPositionRequest("US0378331005", new BigDecimal("1"))))
@@ -108,7 +109,7 @@ class PortfolioServiceTest {
 
     @Test
     void listForUserExposesOnlyTickerIsinAndCompanyName() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition position = new PortfolioPosition(
                 "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
         when(repository.findAll()).thenReturn(List.of(position));
@@ -119,7 +120,7 @@ class PortfolioServiceTest {
 
     @Test
     void listForAdminIncludesHoldings() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition position = new PortfolioPosition(
                 "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
         when(repository.findAll()).thenReturn(List.of(position));
@@ -130,7 +131,7 @@ class PortfolioServiceTest {
 
     @Test
     void positionsCarryGroupFromSnapshotOrNull() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition msft = new PortfolioPosition(
                 "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
         PortfolioPosition aapl = new PortfolioPosition(
@@ -153,7 +154,7 @@ class PortfolioServiceTest {
 
     @Test
     void correctUnknownIsinThrowsNotFound() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.correct("US0378331005", correction()))
@@ -162,7 +163,7 @@ class PortfolioServiceTest {
 
     @Test
     void correctUpdatesPositionAndSaves() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -176,7 +177,7 @@ class PortfolioServiceTest {
 
     @Test
     void deleteRemovesPosition() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -188,7 +189,7 @@ class PortfolioServiceTest {
 
     @Test
     void deleteUnknownIsinThrowsNotFound() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete("US0378331005"))
@@ -197,7 +198,7 @@ class PortfolioServiceTest {
 
     @Test
     void correctAndDeleteNormalizeIsin() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -211,7 +212,7 @@ class PortfolioServiceTest {
 
     @Test
     void buyNormalizesIsinForLookupAndMergesIntoExisting() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -225,7 +226,7 @@ class PortfolioServiceTest {
 
     @Test
     void buyStoresNormalizedIsinOnNewPosition() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
 
         service.buy(new BuyPositionRequest("aapl", " us0378331005 ", "Apple Inc.",
@@ -238,7 +239,7 @@ class PortfolioServiceTest {
 
     @Test
     void sellNormalizesIsinForLookup() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         PortfolioPosition existing = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
@@ -248,22 +249,29 @@ class PortfolioServiceTest {
         assertThat(existing.getQuantity()).isEqualByComparingTo("6");
     }
 
+    private static InvestmentThesis preparedThesis() {
+        return new InvestmentThesis("US0378331005", java.time.Instant.parse("2026-11-12T10:00:00Z"));
+    }
+
     @Test
-    void buyWithPurchaseReasonAppendsToThesisWithNormalizedIsinBeforeSaving() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+    void buyWithPurchaseReasonWritesPositionAndPreparedThesisTogetherWithNormalizedIsin() {
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
+        InvestmentThesis thesis = preparedThesis();
+        when(theses.prepareAppendPurchaseReason("US0378331005", "Moat intact")).thenReturn(thesis);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
 
         service.buy(new BuyPositionRequest("aapl", " us0378331005 ", "Apple Inc.",
                 new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15), "Moat intact"));
 
-        InOrder order = inOrder(theses, repository);
-        order.verify(theses).appendPurchaseReason("US0378331005", "Moat intact");
-        order.verify(repository).save(any(PortfolioPosition.class));
+        ArgumentCaptor<PortfolioPosition> captor = ArgumentCaptor.forClass(PortfolioPosition.class);
+        verify(purchaseWriter).save(captor.capture(), org.mockito.ArgumentMatchers.same(thesis));
+        assertThat(captor.getValue().getIsin()).isEqualTo("US0378331005");
+        verify(repository, never()).save(any());
     }
 
     @Test
     void buyWithoutOrBlankPurchaseReasonDoesNotTouchThesis() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
 
         service.buy(new BuyPositionRequest("aapl", "US0378331005", "Apple Inc.",
@@ -271,18 +279,33 @@ class PortfolioServiceTest {
         service.buy(new BuyPositionRequest("aapl", "US0378331005", "Apple Inc.",
                 new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15), null));
 
-        verifyNoInteractions(theses);
+        verifyNoInteractions(theses, purchaseWriter);
     }
 
     @Test
-    void buyFailsWithoutSavingWhenThesisAppendIsTooLong() {
-        PortfolioService service = new PortfolioService(repository, lookup, theses);
-        doThrow(new ThesisTooLongException()).when(theses).appendPurchaseReason("US0378331005", "x");
+    void buyFailsWithoutWritingWhenThesisAppendIsTooLong() {
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
+        when(theses.prepareAppendPurchaseReason("US0378331005", "x")).thenThrow(new ThesisTooLongException());
 
         assertThatThrownBy(() -> service.buy(new BuyPositionRequest("aapl", "US0378331005", "Apple Inc.",
                 new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15), "x")))
                 .isInstanceOf(ThesisTooLongException.class);
 
         verify(repository, never()).save(any());
+        verifyNoInteractions(purchaseWriter);
+    }
+
+    @Test
+    void buyWithInvalidInputAndReasonWritesNothing() {
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
+        when(theses.prepareAppendPurchaseReason("US0378331005", "why")).thenReturn(preparedThesis());
+        when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.buy(new BuyPositionRequest("aapl", "US0378331005", "Apple Inc.",
+                new BigDecimal("-1"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15), "why")))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(repository, never()).save(any());
+        verifyNoInteractions(purchaseWriter);
     }
 }

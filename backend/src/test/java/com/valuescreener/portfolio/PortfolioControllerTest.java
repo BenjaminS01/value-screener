@@ -5,7 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -121,7 +121,7 @@ class PortfolioControllerTest {
 
     @Test
     void putOnConcurrentModificationReturns409() throws Exception {
-        doThrow(new ObjectOptimisticLockingFailureException(PortfolioPosition.class, 1L))
+        doThrow(new ConcurrentUpdateException("conflict", null))
                 .when(portfolioService).correct(any(), any());
 
         mockMvc.perform(put("/api/portfolio/US0378331005").contentType("application/json").content(CORRECTION))

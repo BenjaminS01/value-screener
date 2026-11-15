@@ -1,10 +1,10 @@
 package com.valuescreener.portfolio;
 
+import com.valuescreener.research.InvestmentThesis;
 import com.valuescreener.research.InvestmentThesisService;
 import com.valuescreener.research.StockGroupLookup;
 import com.valuescreener.research.StockGroupRef;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -15,35 +15,41 @@ public class PortfolioService {
     private final PortfolioPositionRepository repository;
     private final StockGroupLookup stockGroups;
     private final InvestmentThesisService theses;
+    private final PurchaseWriter purchaseWriter;
 
     public PortfolioService(PortfolioPositionRepository repository, StockGroupLookup stockGroups,
-                            InvestmentThesisService theses) {
+                            InvestmentThesisService theses, PurchaseWriter purchaseWriter) {
         this.repository = repository;
         this.stockGroups = stockGroups;
         this.theses = theses;
+        this.purchaseWriter = purchaseWriter;
     }
 
-    @Transactional
     public void buy(BuyPositionRequest request) {
         String isin = normalizeIsin(request.isin());
-        // Before saving, inside the same transaction: a too-long thesis aborts the whole purchase.
+        // Everything is prepared and validated in memory first (a too-long thesis or invalid input
+        // aborts before anything is written); then position and thesis are written in one transaction.
+        InvestmentThesis thesis = null;
         if (request.purchaseReason() != null && !request.purchaseReason().isBlank()) {
-            theses.appendPurchaseReason(isin, request.purchaseReason());
+            thesis = theses.prepareAppendPurchaseReason(isin, request.purchaseReason());
         }
         PortfolioPosition position = repository.findByIsin(isin).orElse(null);
 
         if (position == null) {
-            repository.save(new PortfolioPosition(
+            position = new PortfolioPosition(
                     request.ticker(), isin, request.companyName(),
-                    request.quantity(), request.entryPrice(), request.purchaseDate()));
-            return;
+                    request.quantity(), request.entryPrice(), request.purchaseDate());
+        } else {
+            position.recordPurchase(request.quantity(), request.entryPrice());
         }
 
-        position.recordPurchase(request.quantity(), request.entryPrice());
-        repository.save(position);
+        if (thesis == null) {
+            repository.save(position);
+        } else {
+            purchaseWriter.save(position, thesis);
+        }
     }
 
-    @Transactional
     public void sell(SellPositionRequest request) {
         PortfolioPosition position = find(request.isin());
 
@@ -56,7 +62,6 @@ public class PortfolioService {
         }
     }
 
-    @Transactional
     public void correct(String isin, CorrectPositionRequest request) {
         PortfolioPosition position = find(isin);
         position.correct(request.ticker(), request.companyName(), request.quantity(),
@@ -64,12 +69,10 @@ public class PortfolioService {
         repository.save(position);
     }
 
-    @Transactional
     public void delete(String isin) {
         repository.delete(find(isin));
     }
 
-    @Transactional(readOnly = true)
     public List<PortfolioPositionView> listForUser() {
         List<PortfolioPosition> positions = repository.findAll();
         Map<String, StockGroupRef> groups = groupsFor(positions);
@@ -79,7 +82,6 @@ public class PortfolioService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public List<AdminPortfolioPositionView> listForAdmin() {
         List<PortfolioPosition> positions = repository.findAll();
         Map<String, StockGroupRef> groups = groupsFor(positions);

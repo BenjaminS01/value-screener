@@ -1,9 +1,8 @@
 package com.valuescreener.research;
 
 import com.valuescreener.portfolio.PortfolioPositionRepository;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -26,7 +25,6 @@ public class InvestmentThesisService {
         this.clock = clock;
     }
 
-    @Transactional(readOnly = true)
     public InvestmentThesisView get(String isin) {
         String normalized = normalizeIsin(isin);
         InvestmentThesis thesis = repository.findById(normalized)
@@ -34,7 +32,6 @@ public class InvestmentThesisService {
         return toView(thesis);
     }
 
-    @Transactional
     public InvestmentThesisView save(String isin, SaveThesisRequest request) {
         String normalized = normalizeIsin(isin);
         Instant now = clock.instant();
@@ -53,18 +50,20 @@ public class InvestmentThesisService {
         }
         thesis.replace(request.whyInteresting(), request.expectedDevelopment(), request.exitCriteria(),
                 request.status(), request.statusReason(), now);
-        return toView(repository.saveAndFlush(thesis));
+        return toView(repository.save(thesis));
     }
 
-    /** Called from the buy transaction: a failure here must abort the purchase too. */
-    @Transactional
-    public void appendPurchaseReason(String isin, String reason) {
+    /**
+     * Loads (or creates) the thesis and appends the purchase reason in memory only; nothing is written.
+     * The caller writes it together with the position. Throws ThesisTooLongException if it no longer fits.
+     */
+    public InvestmentThesis prepareAppendPurchaseReason(String isin, String reason) {
         String normalized = normalizeIsin(isin);
         Instant now = clock.instant();
         InvestmentThesis thesis = repository.findById(normalized)
                 .orElseGet(() -> new InvestmentThesis(normalized, now));
         thesis.appendPurchaseReason(reason, LocalDate.now(clock), now);
-        repository.save(thesis);
+        return thesis;
     }
 
     private InvestmentThesisView toView(InvestmentThesis thesis) {
@@ -74,8 +73,8 @@ public class InvestmentThesisService {
                 positions.findByIsin(thesis.getIsin()).isPresent());
     }
 
-    private static ObjectOptimisticLockingFailureException conflict(String isin) {
-        return new ObjectOptimisticLockingFailureException(InvestmentThesis.class, isin);
+    private static ConcurrentUpdateException conflict(String isin) {
+        return new ConcurrentUpdateException("Thesis " + isin + " was changed concurrently", null);
     }
 
     private static String normalizeIsin(String isin) {

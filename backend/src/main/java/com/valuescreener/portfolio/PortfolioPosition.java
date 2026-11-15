@@ -1,12 +1,5 @@
 package com.valuescreener.portfolio;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -14,38 +7,38 @@ import java.time.LocalDate;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-@Entity
-@Table(name = "portfolio_position")
 public class PortfolioPosition {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 10)
     private String ticker;
 
-    @Column(nullable = false, unique = true, length = 12)
     private String isin;
 
-    @Column(name = "company_name", nullable = false, length = 200)
     private String companyName;
 
-    @Column(nullable = false)
     private BigDecimal quantity;
 
-    @Column(name = "entry_price", nullable = false)
     private BigDecimal entryPrice;
 
-    @Column(name = "purchase_date", nullable = false)
     private LocalDate purchaseDate;
 
-    @Version
-    @Column(nullable = false)
     private Long version;
 
-    protected PortfolioPosition() {
-        // JPA
+    private PortfolioPosition() {
+        // for restore()
+    }
+
+    /** Rebuilds a stored position without re-validating; only the persistence layer uses this. */
+    static PortfolioPosition restore(String ticker, String isin, String companyName, BigDecimal quantity,
+                                     BigDecimal entryPrice, LocalDate purchaseDate, Long version) {
+        PortfolioPosition position = new PortfolioPosition();
+        position.ticker = ticker;
+        position.isin = isin;
+        position.companyName = companyName;
+        position.quantity = quantity;
+        position.entryPrice = entryPrice;
+        position.purchaseDate = purchaseDate;
+        position.version = version;
+        return position;
     }
 
     private static final Pattern ISIN_PATTERN = Pattern.compile("[A-Z]{2}[A-Z0-9]{9}[0-9]");
@@ -109,8 +102,13 @@ public class PortfolioPosition {
         return value;
     }
 
-    public Long getId() {
-        return id;
+    /** Optimistic-lock version; null until the position was saved once. */
+    Long version() {
+        return version;
+    }
+
+    void version(Long version) {
+        this.version = version;
     }
 
     public String getTicker() {

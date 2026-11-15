@@ -1,53 +1,49 @@
 package com.valuescreener.research;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
 
 /** The owner's thesis for one stock, keyed by ISIN. Independent of research data (no FK to a snapshot). */
-@Entity
-@Table(name = "investment_thesis")
 public class InvestmentThesis {
 
     static final int MAX_TEXT = 4000;
     static final int MAX_STATUS_REASON = 500;
 
-    @Id
-    @Column(length = 12, updatable = false)
     private String isin;
 
-    @Column(name = "why_interesting", columnDefinition = "TEXT")
     private String whyInteresting;
 
-    @Column(name = "expected_development", columnDefinition = "TEXT")
     private String expectedDevelopment;
 
-    @Column(name = "exit_criteria", columnDefinition = "TEXT")
     private String exitCriteria;
 
-    @Enumerated(EnumType.STRING)
-    @Column(length = 10)
     private ThesisStatus status;
 
-    @Column(name = "status_reason", length = MAX_STATUS_REASON)
     private String statusReason;
 
-    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Version
     private Long version;
 
-    protected InvestmentThesis() {
-        // JPA
+    private InvestmentThesis() {
+        // for restore()
+    }
+
+    /** Rebuilds a stored thesis without re-validating; only the persistence layer uses this. */
+    static InvestmentThesis restore(String isin, String why, String expected, String exit, ThesisStatus status,
+                                    String statusReason, Instant updatedAt, Long version) {
+        InvestmentThesis thesis = new InvestmentThesis();
+        thesis.isin = isin;
+        thesis.whyInteresting = why;
+        thesis.expectedDevelopment = expected;
+        thesis.exitCriteria = exit;
+        thesis.status = status;
+        thesis.statusReason = statusReason;
+        thesis.updatedAt = updatedAt;
+        thesis.version = version;
+        return thesis;
     }
 
     public InvestmentThesis(String isin, Instant now) {
@@ -107,4 +103,5 @@ public class InvestmentThesis {
     public String getStatusReason() { return statusReason; }
     public Instant getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }
+    void setVersion(Long version) { this.version = version; }
 }

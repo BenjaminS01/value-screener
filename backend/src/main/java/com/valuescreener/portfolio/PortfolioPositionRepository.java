@@ -1,9 +1,16 @@
 package com.valuescreener.portfolio;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
+import java.util.List;
 import java.util.Optional;
 
-public interface PortfolioPositionRepository extends JpaRepository<PortfolioPosition, Long> {
+public interface PortfolioPositionRepository {
     Optional<PortfolioPosition> findByIsin(String isin);
+
+    List<PortfolioPosition> findAll();
+
+    /** Creates (version null) or updates (version must match); a lost race throws ConcurrentUpdateException. */
+    PortfolioPosition save(PortfolioPosition position);
+
+    /** Deletes exactly the loaded version; a lost race throws ConcurrentUpdateException. */
+    void delete(PortfolioPosition position);
 }
