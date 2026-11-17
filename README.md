@@ -419,6 +419,8 @@ wird in Kauf genommen, weil es nur eine Handvoll persönlich vergebener Konten g
 
 ## AWS-Infrastruktur (Zielbild, grob)
 
+> **Überholt:** Dieses Zielbild mit RDS und ECS ist durch das Serverless-Design ersetzt (DynamoDB, Lambda, CloudFront): [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](docs/superpowers/specs/2026-11-14-serverless-terraform-design.md). Der Text unten bleibt als Historie stehen.
+
 Region `eu-central-1`.
 
 ```
@@ -706,6 +708,20 @@ Backend läuft auf http://localhost:8080.
 cd backend
 mvn test
 ```
+
+### Lambda-Zip bauen
+
+Für die spätere Bereitstellung als AWS Lambda baut Maven neben dem normalen Spring-Boot-Jar ein zweites Paket:
+
+```bash
+cd backend
+mvn -B package -DskipTests
+```
+
+Ergebnis: `backend/target/value-screener-backend-lambda.zip` (Klassen im Wurzelverzeichnis, Laufzeit-Jars unter
+`lib/`, rund 46 MB). Handler: `com.valuescreener.lambda.StreamLambdaHandler::handleRequest`. Lokal ändert sich nichts:
+`mvn spring-boot:run` und `dev-up.sh` laufen wie bisher. Die AWS-Einstellungen stehen im Profil `aws`
+(`application-aws.yml`, Secrets aus SSM); ohne dieses Profil ist Spring Cloud AWS abgeschaltet.
 
 ### Frontend starten
 

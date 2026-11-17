@@ -1,5 +1,7 @@
 # AWS Architecture Overview
 
+> **Superseded:** this ECS/RDS architecture is replaced by the serverless design (DynamoDB, Lambda with SnapStart, CloudFront, Terraform): [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](../superpowers/specs/2026-11-14-serverless-terraform-design.md). This file is rewritten in part 3 of the rewrite; until then it is kept for history only.
+
 Quick-reference sketch of the value-screener AWS deployment (Phase 4). For full reasoning and the
 Decision Log, see [`docs/superpowers/specs/2026-09-20-aws-deployment-design.md`](../superpowers/specs/2026-09-20-aws-deployment-design.md)
 and [`docs/superpowers/plans/2026-09-20-aws-deployment-plan.md`](../superpowers/plans/2026-09-20-aws-deployment-plan.md).

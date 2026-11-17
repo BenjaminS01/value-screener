@@ -1,6 +1,12 @@
 spring:
   application:
     name: value-screener-backend
+  cloud:
+    aws:
+      # Spring Cloud AWS (SSM) is only used with profile "aws"; off elsewhere so local runs and tests
+      # never build AWS clients or need credentials.
+      parameterstore:
+        enabled: false
 
 server:
   servlet:

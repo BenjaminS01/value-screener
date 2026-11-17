@@ -16,13 +16,13 @@ import software.amazon.awssdk.services.dynamodb.model.ReturnValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.UnaryOperator;
 
 /**
@@ -160,10 +160,17 @@ public class DynamoLoginAttemptStore implements LoginAttemptStore {
         dynamo.putItem(request.build());
     }
 
+    /**
+     * SecureRandom, not ThreadLocalRandom: with Lambda SnapStart the state of ThreadLocalRandom is part of the
+     * snapshot, so every restored instance would replay the same jitter. The Lambda Java runtime reseeds
+     * SecureRandom after a restore.
+     */
+    private static final SecureRandom JITTER = new SecureRandom();
+
     /** Short random pause, so writers that collided do not collide again in lock step. */
     private static void pause(int attempt) {
         try {
-            Thread.sleep(ThreadLocalRandom.current().nextLong(1, 50L << attempt));
+            Thread.sleep(JITTER.nextLong(1, 50L << attempt));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

@@ -1,8 +1,46 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-14
+Letztes Update: 2026-11-16
 
-## Serverless-Neuaufbau mit Terraform (2026-11-14): aktueller Einstiegspunkt
+## Serverless rewrite part 1 done (2026-11-16)
+
+**Part 1 (local backend rewrite) is finished on branch `feature/serverless-backend`; the user commits Task 7 and
+merges after the whole-branch review.** Nothing touched real AWS.
+
+- **Built (commits):**
+  - `4061c90` DynamoDB foundation (one table `pk`/`sk`/`ttl`), daily limits via transactions
+  - `60a3f89` portfolio and theses
+  - `814b691` stock groups with seeder, revised group catalog
+  - `cafc1fb` research snapshots with embedded findings and history
+  - `371eb38` sessions and login throttling in DynamoDB
+  - `4026e79` Postgres, JPA and Flyway removed
+  - `e1d3eeb` sandbox reaches the backend with rootless Docker
+  - Task 7 (this commit): `StreamLambdaHandler` (SnapStart-ready), `OriginVerifyFilter` (`X-Origin-Verify`),
+    CloudFront viewer address in `ClientIpResolver`, SSM via Spring Cloud AWS (profile `aws` only),
+    deep-analysis alias qualifier, Lambda zip via `maven-assembly-plugin`.
+- **Decisions made during the work:**
+  - Revised group catalog (spec 6.5), 35 seeded groups.
+  - Buying a position and its purchase reason are one atomic transaction.
+  - Request size limits added.
+  - Sessions use conditional writes (optimistic versioning).
+  - `app.dynamodb.seed-groups` flag: off by default, `true` in `application-aws.yml` (Terraform creates the table).
+  - Node 20 is needed for the frontend tests.
+  - Rootless Docker sandbox fix (`e1d3eeb`).
+  - Retry jitter uses `SecureRandom` (ThreadLocalRandom state would be frozen in the SnapStart snapshot).
+  - Versions: `aws-serverless-java-container-springboot3` 2.0.3 (built against Spring 6.1), Spring Cloud AWS 3.2.1.
+- **Tests:** backend 507 (Maven, DynamoDB Local), frontend 170 (Vitest). Lambda zip about 46 MB, 105 jars under `lib/`.
+- **Next step:** part 2, Terraform foundations (state, IAM, budgets), with its own plan. Terraform values for
+  part 3: handler `com.valuescreener.lambda.StreamLambdaHandler::handleRequest`, SSM parameter names in
+  `application-aws.yml`, alias `live`. CloudFront's origin request policy must forward the CloudFront-generated
+  `CloudFront-Viewer-Address` (overwriting any client-sent value) and CloudFront must add `X-Origin-Verify`.
+  The SSM parameter `/value-screener/app.security.origin-verify.secret` is required: in profile `aws` the app
+  refuses to start without it.
+- **Kurzfassung (Deutsch):** Teil 1 ist fertig: Das Backend läuft komplett auf DynamoDB und ist mit
+  Lambda-Handler, geheimem Origin-Header, echter Client-IP, SSM-Secrets und Alias `live` bereit für AWS.
+  Backend 507 Tests, Frontend 170 Tests, alles lokal. Nächster Schritt ist Teil 2 (Terraform-Grundlagen) mit
+  eigenem Plan.
+
+## Serverless-Neuaufbau mit Terraform (2026-11-14): Plan und Entscheidungen
 
 **Für eine neue Session zuerst lesen:** Design
 [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](docs/superpowers/specs/2026-11-14-serverless-terraform-design.md)
@@ -26,8 +64,8 @@ und Plan Teil 1
   1. Backend-Umbau, lokal (Plan steht, 7 Tasks)
   2. Terraform-Grundlagen
   3. Terraform für die App
-- **Stand:** Design und Plan Teil 1 sind committet. Die Umsetzung hat **noch nicht begonnen**.
-- **Nächster Schritt:** Der Nutzer legt den Branch `feature/serverless-backend` an. Danach Task 1 per
+- **Stand (2026-11-14, historisch):** Design und Plan Teil 1 waren committet, die Umsetzung hatte noch nicht begonnen. Aktueller Stand: siehe Abschnitt "Serverless rewrite part 1 done" oben.
+- **Nächster Schritt (2026-11-14, historisch, erledigt):** Der Nutzer legt den Branch `feature/serverless-backend` an. Danach Task 1 per
   Subagent-Driven Development, aber erst nach ausdrücklichem Go des Nutzers und mit vorheriger
   deutscher Konzepterklärung.
 - **Überholt:** die Übergabedatei vom 2026-11-14 (ihre offenen Fragen sind im Design beantwortet), der
