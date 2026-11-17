@@ -1,5 +1,6 @@
 package com.valuescreener.research;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -11,10 +12,10 @@ import java.time.LocalDate;
 
 public record FindingRequest(
         @NotNull ResearchCriterion criterionKey,
-        BigDecimal numericValue,
+        @Digits(integer = 8, fraction = 10) BigDecimal numericValue,
         Boolean booleanValue,
         @NotBlank @Size(max = 2000) String claim,
-        @URL @Pattern(regexp = "^https?://.+", flags = Pattern.Flag.CASE_INSENSITIVE) String sourceUrl,
+        @Size(max = 1000) @URL @Pattern(regexp = "^https?://.+", flags = Pattern.Flag.CASE_INSENSITIVE) String sourceUrl,
         @NotNull LocalDate asOfDate
 ) {
 }

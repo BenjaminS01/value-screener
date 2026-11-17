@@ -8,7 +8,7 @@ const guest: AuthUser = { username: 'guest', role: 'USER' }
 
 function snapshot(over: Record<string, unknown> = {}) {
   return {
-    id: 1, ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US',
+    ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US',
     businessDescription: 'Macht iPhones',
     group: { key: 'tech', name: 'Technologie', source: 'AI' },
     findings: [

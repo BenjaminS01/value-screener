@@ -131,6 +131,56 @@ DynamoDB Local; in AWS, Terraform creates tables. The table definitions must not
 - Postgres-specific dependencies (`spring-boot-starter-data-jpa`, `postgresql`, `flyway-*`) are
   removed at the end, when no code uses them.
 
+### 6.5 Stock group catalog (revised with the user, 2026-11-15)
+
+Replaces the 2026-11-04 seed list. Seeded once by `StockGroupSeeder` from `StockGroupSeed.java` (the
+single source in code); afterwards the ADMIN maintains groups in the app. Postgres migration `V4` keeps
+the old list until it is deleted in Task 6 (applied Flyway migrations must not change).
+
+| Sort | Key | Name | Area (docs only, not in the app) |
+|---|---|---|---|
+| 10 | `BANKS` | Banks | Financials |
+| 20 | `INSURANCE` | Insurance | Financials |
+| 30 | `ASSET_MANAGEMENT` | Asset Management | Financials |
+| 40 | `CAPITAL_MARKETS` | Exchanges & Capital Markets | Financials |
+| 50 | `PAYMENTS_FINTECH` | Payments & Fintech | Financials |
+| 60 | `HOLDING_COMPANIES` | Holding Companies | Holdings |
+| 70 | `OIL_GAS` | Oil & Gas | Energy & utilities |
+| 80 | `RENEWABLE_ENERGY` | Renewable Energy | Energy & utilities |
+| 90 | `UTILITIES` | Utilities | Energy & utilities |
+| 100 | `CHEMICALS` | Chemicals | Materials |
+| 110 | `MINING_METALS` | Mining & Metals | Materials |
+| 120 | `CONSTRUCTION_MATERIALS` | Construction & Building Materials | Materials |
+| 130 | `INDUSTRIAL_MACHINERY` | Industrial Machinery | Industrials |
+| 140 | `ELECTRICAL_EQUIPMENT` | Electrical Equipment & Automation | Industrials |
+| 150 | `AEROSPACE_DEFENSE` | Aerospace & Defense | Industrials |
+| 160 | `TRANSPORTATION_LOGISTICS` | Transportation & Logistics | Industrials |
+| 170 | `AUTOMOTIVE` | Automotive & Suppliers | Industrials |
+| 180 | `BUSINESS_SERVICES` | Business Services | Industrials |
+| 190 | `CONSUMER_SERVICES` | Consumer Services | Consumer (travel, hotels, restaurants, leisure) |
+| 200 | `CONSUMER_GOODS` | Consumer Goods | Consumer (food, beverages, tobacco, household, luxury, apparel) |
+| 210 | `RETAIL_ECOMMERCE` | Retail & E-Commerce | Consumer |
+| 220 | `PHARMA` | Pharma | Health |
+| 230 | `BIOTECH` | Biotech | Health |
+| 240 | `MEDICAL_TECHNOLOGY` | Medical Technology | Health |
+| 250 | `HEALTHCARE_SERVICES` | Healthcare Services | Health |
+| 260 | `SEMICONDUCTORS` | Semiconductors | Technology |
+| 270 | `SOFTWARE` | Software | Technology |
+| 280 | `CYBERSECURITY` | Cybersecurity | Technology |
+| 290 | `IT_SERVICES` | IT Services | Technology |
+| 300 | `HARDWARE_ELECTRONICS` | Hardware & Electronics | Technology |
+| 310 | `INTERNET_PLATFORMS` | Internet Platforms | Technology |
+| 320 | `MEDIA_ENTERTAINMENT` | Media & Entertainment | Communication & media |
+| 330 | `TELECOMMUNICATIONS` | Telecommunications | Communication & media |
+| 340 | `REAL_ESTATE` | Real Estate | Real estate |
+| 350 | `OTHER` | Other | Other; also the research skill's fallback |
+
+35 groups. Changes against 2026-11-04: asset management and exchanges split; new `HOLDING_COMPANIES`
+(conglomerates and investment holdings, formerly in `DIVERSIFIED_OTHER`); food, household and luxury
+merged into `CONSUMER_GOODS`; travel/hospitality broadened to `CONSUMER_SERVICES`; shorter keys
+(`CONSTRUCTION_MATERIALS`, `ELECTRICAL_EQUIPMENT`, `HEALTHCARE_SERVICES`); `DIVERSIFIED_OTHER` →
+`OTHER`.
+
 ## 7. Backend: running in Lambda
 
 ### 7.1 Runtime
@@ -187,9 +237,17 @@ CloudFront edge. To get the real client IP without letting clients forge it:
 
 ### 7.4 Secrets and configuration
 
-- Secrets in **SSM Parameter Store `SecureString`** (standard tier, AWS-managed key `aws/ssm`, free):
-  `ADMIN_PASSWORD_HASH`, each `APP_USERS_<n>_PASSWORD_HASH`, the origin-verify value, later the
-  research-sync token hash and other keys.
+- Secrets in **SSM Parameter Store `SecureString`** (standard tier, AWS-managed key `aws/ssm`, free).
+  Parameter names allow only `a-zA-Z0-9_.-/` (no brackets); Spring Cloud AWS maps the path below the import
+  prefix `/value-screener/` to the property name, and Spring Boot binds `app.users.0.username` into the
+  `app.users` list. A list must come from ONE property source, so for extra users **both** the username and
+  the hash come from SSM. The exact names:
+  - `/value-screener/app.admin.password-hash`
+  - `/value-screener/app.security.origin-verify.secret`
+  - per extra user `<n>` = 0, 1, ...: `/value-screener/app.users.<n>.username` and
+    `/value-screener/app.users.<n>.password-hash` (both of an index must exist)
+  - later the research-sync token hash and other keys.
+  The admin username is not secret: it is the Lambda environment variable `ADMIN_USERNAME`.
 - Terraform creates each user-supplied parameter with a placeholder value and
   `lifecycle { ignore_changes = [value] }`. **The user enters the real value once in the AWS console**
   (browser). Never via CLI arguments.
@@ -197,7 +255,7 @@ CloudFront edge. To get the real client IP without letting clients forge it:
   `/value-screener/`); the Lambda role may read only that prefix. Values read during SnapStart init end
   up in the encrypted snapshot; after changing a value a new version must be published (deploy). This
   is accepted (rare password changes).
-- Non-secret config (usernames, limits, `mode: lambda`, function name, table name(s)) as Lambda
+- Non-secret config (admin username, limits, `mode: lambda`, function name, table name(s)) as Lambda
   environment variables set by Terraform.
 - `app.research-ingest.enabled` stays `false` in AWS (never set its variables). `app.research-sync`
   stays disabled until the deferred live-transfer topic.
@@ -366,7 +424,9 @@ daher kein CORS und keine Änderung am Frontend; ein geheimer Header von CloudFr
 Weg zu API Gateway und liefert die echte Client-IP für den Login-Schutz. Alle Geschäftsregeln (eindeutige
 ISIN, optimistisches Sperren, gemeinsame Schreibvorgänge, Historie nur anhängen, Gruppen-Löschschutz,
 atomare Tageslimits) werden im Code mit DynamoDB-Bedingungen und Transaktionen abgesichert und getestet.
-Sessions und Login-Schutz wandern nach DynamoDB. Secrets liegen in **SSM Parameter Store**, Terraform
+Sessions und Login-Schutz wandern nach DynamoDB. Die Liste der 35 Aktiengruppen wurde am 2026-11-15
+mit dem Nutzer überarbeitet (Abschnitt 6.5, u. a. neue Gruppen Holding Companies und Consumer Services,
+Ausweichgruppe jetzt `OTHER`). Secrets liegen in **SSM Parameter Store**, Terraform
 legt nur Platzhalter an, die echten Werte trägt der Nutzer in der Konsole ein. Terraform führt der Nutzer
 lokal in WSL aus, angemeldet mit `aws login` und der `Admin`-Rolle mit MFA, ohne Access Keys; Claude führt
 nie `terraform`/`aws` mit diesen Zugangsdaten aus. State in S3 mit nativer Sperre. Vier getrennte Stacks

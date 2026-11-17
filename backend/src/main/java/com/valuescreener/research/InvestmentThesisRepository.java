@@ -1,6 +1,10 @@
 package com.valuescreener.research;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
 
-public interface InvestmentThesisRepository extends JpaRepository<InvestmentThesis, String> {
+public interface InvestmentThesisRepository {
+    Optional<InvestmentThesis> findById(String isin);
+
+    /** Creates (version null) or updates (version must match); a lost race throws ConcurrentUpdateException. */
+    InvestmentThesis save(InvestmentThesis thesis);
 }

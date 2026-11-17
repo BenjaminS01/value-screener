@@ -38,7 +38,7 @@ public class DeepAnalysisConfig {
     @ConditionalOnProperty(name = "app.deep-analysis.mode", havingValue = "lambda", matchIfMissing = true)
     public DeepAnalysisInvoker lambdaDeepAnalysisInvoker(LambdaClient client, ObjectMapper mapper,
                                                          DeepAnalysisProperties props) {
-        return new LambdaDeepAnalysisInvoker(client, mapper, props.functionName());
+        return new LambdaDeepAnalysisInvoker(client, mapper, props.functionName(), props.qualifier());
     }
 
     @Bean

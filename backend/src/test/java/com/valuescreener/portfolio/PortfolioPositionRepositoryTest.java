@@ -1,15 +1,13 @@
 package com.valuescreener.portfolio;
 
+import com.valuescreener.persistence.ConcurrentUpdateException;
+import com.valuescreener.persistence.DynamoProperties;
+import com.valuescreener.persistence.DynamoTableInitializer;
+import com.valuescreener.persistence.DynamoTestSupport;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,27 +15,35 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Testcontainers
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class PortfolioPositionRepositoryTest {
+class PortfolioPositionRepositoryTest extends DynamoTestSupport {
 
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
-    @Autowired
+    private final DynamoDbClient client = newClient();
     private PortfolioPositionRepository repository;
 
-    @Autowired
-    private TestEntityManager entityManager;
+    @BeforeEach
+    void setUp() {
+        DynamoProperties props = new DynamoProperties(freshTableName(), endpoint(), "eu-central-1", true);
+        new DynamoTableInitializer(client, props).run(null);
+        repository = new DynamoPortfolioPositionRepository(
+                DynamoDbEnhancedClient.builder().dynamoDbClient(client).build(), props);
+    }
+
+    private static PortfolioPosition position(String isin, String ticker) {
+        return new PortfolioPosition(ticker, isin, "Company " + ticker, new BigDecimal("5"),
+                new BigDecimal("300.00"), LocalDate.of(2026, 2, 1));
+    }
 
     @Test
-    void savesAndFindsPositionByIsin() {
-        repository.save(new PortfolioPosition(
-                "MSFT", "US5949181045", "Microsoft Corp.", new BigDecimal("5"), new BigDecimal("300.00"), LocalDate.of(2026, 2, 1)));
+    void savesAndFindsByIsin() {
+        PortfolioPosition saved = repository.save(position("US5949181045", "MSFT"));
 
-        assertThat(repository.findByIsin("US5949181045")).isPresent();
+        PortfolioPosition found = repository.findByIsin("US5949181045").orElseThrow();
+        assertThat(found.getTicker()).isEqualTo("MSFT");
+        assertThat(found.getCompanyName()).isEqualTo("Company MSFT");
+        assertThat(found.getQuantity()).isEqualByComparingTo("5");
+        assertThat(found.getEntryPrice()).isEqualByComparingTo("300.00");
+        assertThat(found.getPurchaseDate()).isEqualTo(LocalDate.of(2026, 2, 1));
+        assertThat(found.version()).isEqualTo(1L).isEqualTo(saved.version());
     }
 
     @Test
@@ -46,20 +52,77 @@ class PortfolioPositionRepositoryTest {
     }
 
     @Test
-    void rejectsSaveOfAStaleCopyAfterAConcurrentUpdate() {
-        PortfolioPosition saved = repository.saveAndFlush(new PortfolioPosition(
-                "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("10"), new BigDecimal("150.00"), LocalDate.of(2026, 1, 15)));
-        Long id = saved.getId();
+    void findAllReturnsAllPositions() {
+        repository.save(position("US5949181045", "MSFT"));
+        repository.save(position("US0378331005", "AAPL"));
 
-        PortfolioPosition staleCopy = repository.findById(id).orElseThrow();
-        entityManager.detach(staleCopy);
+        assertThat(repository.findAll()).extracting(PortfolioPosition::getIsin)
+                .containsExactlyInAnyOrder("US5949181045", "US0378331005");
+    }
 
-        PortfolioPosition freshCopy = repository.findById(id).orElseThrow();
-        freshCopy.recordPurchase(new BigDecimal("5"), new BigDecimal("160.00"));
-        repository.saveAndFlush(freshCopy);
+    @Test
+    void secondCreateWithSameIsinIsRejected() {
+        repository.save(position("US0378331005", "AAPL"));
 
-        staleCopy.recordPurchase(new BigDecimal("3"), new BigDecimal("170.00"));
-        assertThatThrownBy(() -> repository.saveAndFlush(staleCopy))
-                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+        assertThatThrownBy(() -> repository.save(position("US0378331005", "AAPL")))
+                .isInstanceOf(ConcurrentUpdateException.class);
+    }
+
+    @Test
+    void staleSaveIsRejected() {
+        repository.save(position("US0378331005", "AAPL"));
+        PortfolioPosition first = repository.findByIsin("US0378331005").orElseThrow();
+        PortfolioPosition second = repository.findByIsin("US0378331005").orElseThrow();
+
+        first.recordPurchase(new BigDecimal("5"), new BigDecimal("160.00"));
+        repository.save(first);
+        assertThat(first.version()).isEqualTo(2L);
+
+        second.recordPurchase(new BigDecimal("3"), new BigDecimal("170.00"));
+        assertThatThrownBy(() -> repository.save(second)).isInstanceOf(ConcurrentUpdateException.class);
+        assertThat(repository.findByIsin("US0378331005").orElseThrow().getQuantity()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void repeatedSaveOfSameObjectKeepsWorking() {
+        PortfolioPosition p = repository.save(position("US0378331005", "AAPL"));
+        p.recordPurchase(new BigDecimal("1"), new BigDecimal("100"));
+        repository.save(p);
+        p.recordPurchase(new BigDecimal("1"), new BigDecimal("100"));
+        repository.save(p);
+
+        assertThat(repository.findByIsin("US0378331005").orElseThrow().version()).isEqualTo(3L);
+    }
+
+    @Test
+    void deleteRemovesPosition() {
+        PortfolioPosition saved = repository.save(position("US0378331005", "AAPL"));
+
+        repository.delete(saved);
+
+        assertThat(repository.findByIsin("US0378331005")).isEmpty();
+    }
+
+    @Test
+    void deleteOfStaleCopyIsRejected() {
+        repository.save(position("US0378331005", "AAPL"));
+        PortfolioPosition stale = repository.findByIsin("US0378331005").orElseThrow();
+        PortfolioPosition fresh = repository.findByIsin("US0378331005").orElseThrow();
+        fresh.recordPurchase(new BigDecimal("1"), new BigDecimal("100"));
+        repository.save(fresh);
+
+        assertThatThrownBy(() -> repository.delete(stale)).isInstanceOf(ConcurrentUpdateException.class);
+        assertThat(repository.findByIsin("US0378331005")).isPresent();
+    }
+
+    @Test
+    void decimalsRoundTripExactly() {
+        PortfolioPosition p = new PortfolioPosition("AAPL", "US0378331005", "Apple", new BigDecimal("0.123456"),
+                new BigDecimal("12345.678901"), LocalDate.of(2026, 1, 1));
+        repository.save(p);
+
+        PortfolioPosition found = repository.findByIsin("US0378331005").orElseThrow();
+        assertThat(found.getQuantity()).isEqualByComparingTo(new BigDecimal("0.123456"));
+        assertThat(found.getEntryPrice()).isEqualByComparingTo(new BigDecimal("12345.678901"));
     }
 }

@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -112,7 +112,7 @@ class InvestmentThesisControllerTest {
     @Test
     void staleVersionIs409() throws Exception {
         when(service.save(eq(ISIN), any(SaveThesisRequest.class)))
-                .thenThrow(new ObjectOptimisticLockingFailureException(InvestmentThesis.class, ISIN));
+                .thenThrow(new ConcurrentUpdateException("conflict", null));
 
         mockMvc.perform(put("/api/research/theses/" + ISIN).with(user("admin").roles("ADMIN")).with(csrf())
                         .contentType("application/json").content(BODY))

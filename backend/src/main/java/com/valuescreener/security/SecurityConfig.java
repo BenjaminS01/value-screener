@@ -53,6 +53,8 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
                 .logout(logout -> logout.disable())
+                // No saved request: it would create and store a session for every anonymous request.
+                .requestCache(cache -> cache.disable())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(errorHandlers)
                         .accessDeniedHandler(errorHandlers))

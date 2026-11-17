@@ -60,7 +60,7 @@ class ResearchIngestControllerTest {
     private static CompanySnapshotView sampleView() {
         FindingView pe = new FindingView(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
                 "Trailing P/E of 28.0.", "https://example.com/x", LocalDate.of(2026, 8, 1), false);
-        return new CompanySnapshotView(1L, "AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of(pe),
+        return new CompanySnapshotView("AAPL", "US0378331005", "Apple Inc.", "USA", "x", null, List.of(pe),
                 LocalDate.of(2026, 8, 1), false);
     }
 
@@ -161,12 +161,12 @@ class ResearchIngestControllerTest {
     @Test
     void ingestGroupsListsCatalog() throws Exception {
         when(groupService.list()).thenReturn(List.of(
-                new StockGroupView("BANKS", "Banks", 10, 2), new StockGroupView("DIVERSIFIED_OTHER", "Other", 20, 0)));
+                new StockGroupView("BANKS", "Banks", 10, 2), new StockGroupView("OTHER", "Other", 20, 0)));
 
         mockMvc.perform(get("/api/research/ingest/groups"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("BANKS"))
-                .andExpect(jsonPath("$[1].key").value("DIVERSIFIED_OTHER"));
+                .andExpect(jsonPath("$[1].key").value("OTHER"));
     }
 
     @Test
@@ -200,5 +200,42 @@ class ResearchIngestControllerTest {
 
         mockMvc.perform(get("/api/research/ingest/snapshots/US0378331005/export"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void rejectsOversizeCompanyNameWithValidationBody() throws Exception {
+        String json = body("US0378331005", "").replace("Apple Inc.", "a".repeat(201));
+        mockMvc.perform(post(URL).contentType("application/json").content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid request"));
+    }
+
+    @Test
+    void rejectsOversizeCountryAndDescription() throws Exception {
+        mockMvc.perform(post(URL).contentType("application/json")
+                        .content(body("US0378331005", "").replace("\"USA\"", "\"" + "a".repeat(101) + "\"")))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post(URL).contentType("application/json")
+                        .content(body("US0378331005", "")
+                                .replace("Designs and sells consumer electronics.", "a".repeat(50001))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsNumericValueWithMoreThanEightIntegerDigits() throws Exception {
+        String f = """
+                {"criterionKey":"PE_RATIO","numericValue":123456789.5,"claim":"c","asOfDate":"2026-08-01"}""";
+        mockMvc.perform(post(URL).contentType("application/json").content(body("US0378331005", f)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid request"));
+    }
+
+    @Test
+    void acceptsNumericValueWithEightIntegerDigits() throws Exception {
+        when(service.upsert(any(), any(), any())).thenReturn(sampleView());
+        String f = """
+                {"criterionKey":"PE_RATIO","numericValue":12345678.1234,"claim":"c","asOfDate":"2026-08-01"}""";
+        mockMvc.perform(post(URL).contentType("application/json").content(body("US0378331005", f)))
+                .andExpect(status().isOk());
     }
 }

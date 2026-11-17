@@ -17,7 +17,7 @@
 - Environment: `export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64; export PATH=$JAVA_HOME/bin:$PATH`. Docker needed for tests; keep `backend/src/test/resources/docker-java.properties` (`api.version=1.44`). Review diffs with `git diff --ignore-cr-at-eol`.
 - No new AWS resources, no `aws`/`terraform` commands. Nothing in this plan talks to real AWS.
 - One table. Name from `app.dynamodb.table-name` (default `value-screener`). Key attributes `pk` (S), `sk` (S); TTL attribute `ttl` (N, epoch seconds). **Provisioned** capacity, 20 RCU / 20 WCU, no GSI, no auto scaling (spec 6.2: sum ≤ 25).
-- DynamoDB Local does not delete expired items: every read of an item with `ttl` must treat `ttl <= now` as absent.
+- DynamoDB Local 2.5.4 does delete expired items (its timing differs from AWS, where deletion may lag up to ~48 h), so every read of an item with `ttl` must still treat `ttl <= now` as absent.
 - Behaviour of all existing endpoints, status codes and JSON fields stays the same, **except** `CompanySnapshotView.id` is removed (there is no numeric id any more; the frontend does not use it).
 - Business rules from spec 6.1 hold; each has a test (named in the tasks).
 - `app.research-ingest.enabled` and `app.research-sync.enabled` default `false` (unchanged).
@@ -150,7 +150,8 @@ Concept: replacing a foreign key with a "referenced" flag written in the same tr
 
 **Files:**
 - Modify: `research/StockGroup.java`, `research/StockGroupRepository.java`, `research/StockGroupService.java`
-- Create: `research/DynamoStockGroupRepository.java`, `research/StockGroupItem.java`, `research/StockGroupSeeder.java`, `research/StockGroupSeed.java` (the 35 groups from `V4__create_stock_group.sql`, same keys, names, sort orders)
+- Create: `research/DynamoStockGroupRepository.java`, `research/StockGroupItem.java`, `research/StockGroupSeeder.java`, `research/StockGroupSeed.java` (the 35 groups of the **revised catalog in spec Section 6.5**, exact keys, names, sort orders — not the old `V4__create_stock_group.sql` list)
+- Modify: `.claude/skills/research-company/SKILL.md` (fallback key `DIVERSIFIED_OTHER` → `OTHER`, mention `HOLDING_COMPANIES` for conglomerates/holdings), `research/ResearchIngestControllerTest.java` (test data uses `OTHER` instead of `DIVERSIFIED_OTHER`)
 - Tests: `research/StockGroupRepositoryTest.java` (new), `research/StockGroupSeederTest.java` (new), `research/StockGroupServiceTest.java`, delete `research/StockGroupMigrationTest.java`
 
 **Interfaces:**
@@ -161,10 +162,10 @@ Concept: replacing a foreign key with a "referenced" flag written in the same tr
   - `create`: transaction Put group (`attribute_not_exists(pk)`) + Put name guard (`attribute_not_exists(pk)`). `update` with a changed name: transaction Update group (version) + Delete old guard + Put new guard. Conflicts → `ConcurrentUpdateException`; a name clash keeps today's `StockGroupConflictException` message (check `existsByNameIgnoreCase` first, transaction protects the race).
   - `delete`: transaction Delete group with condition `attribute_not_exists(referenced) AND version = :v` + Delete name guard. Condition failure → `StockGroupConflictException("Group <KEY> appears in the group history and cannot be deleted")`.
   - Static helper for Task 4: `static TransactWriteItem markReferenced(String tableName, String groupKey)` → Update `SET referenced = :true` with condition `attribute_exists(pk)`.
-  - `StockGroupSeeder`: on startup, Put marker `pk="META"`, `sk="SEED#stock-groups-v1"` with `attribute_not_exists(pk)`; only if that succeeds, create the 35 groups (skip any that exist). Runs after `DynamoTableInitializer`.
+  - `StockGroupSeeder`: on startup, consistent read of marker `pk="META"`, `sk="SEED#stock-groups-v1"`; if it exists, do nothing. Otherwise create the 35 groups (skip any that exist; each create is conditional), and write the marker **last** (revised 2026-11-15 after review: marker-first could leave a partial catalog forever after one transient error). Runs after `DynamoTableInitializer`.
   - `StockGroupService.delete` keeps the "still has n stock(s) assigned" check first (count via `CompanySnapshotRepository.countByGroupKey`, see Task 4; until Task 4 lands, keep calling the existing snapshot repository).
 
-- [ ] **Step 1: Write tests**: `StockGroupSeederTest`: `seedsThirtyFiveGroupsWithKeysNamesAndOrder` (spot-check `BANKS`/`Banks`/10 and `DIVERSIFIED_OTHER`/`Diversified / Other`/350), `secondStartDoesNotReseedDeletedGroup`. `StockGroupRepositoryTest`: `createRejectsDuplicateNameIgnoringCase`, `renameFreesOldName`, `staleSaveIsRejected`, `deleteSucceedsForUnreferencedGroup`, `deleteFailsOnceGroupWasEverReferenced` (apply `markReferenced` in a transaction, then delete → `StockGroupConflictException`), `maxSortOrderIsZeroWhenEmpty`.
+- [ ] **Step 1: Write tests**: `StockGroupSeederTest`: `seedsThirtyFiveGroupsWithKeysNamesAndOrder` (exactly 35 groups, all keys unique, all names unique ignoring case, sort orders 10..350 step 10; spot-check `BANKS`/`Banks`/10, `CONSUMER_SERVICES`/`Consumer Services`/190, `HEALTHCARE_SERVICES`/`Healthcare Services`/250 and `OTHER`/`Other`/350), `secondStartDoesNotReseedDeletedGroup`. `StockGroupRepositoryTest`: `createRejectsDuplicateNameIgnoringCase`, `renameFreesOldName`, `staleSaveIsRejected`, `deleteSucceedsForUnreferencedGroup`, `deleteFailsOnceGroupWasEverReferenced` (apply `markReferenced` in a transaction, then delete → `StockGroupConflictException`), `maxSortOrderIsZeroWhenEmpty`.
 - [ ] **Step 2: Run, expect FAIL.**
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Update `StockGroupServiceTest`** to the new repository interface; messages and statuses unchanged.
@@ -275,7 +276,7 @@ Concept: how a Lambda handler wraps Spring (`SpringBootLambdaContainerHandler`),
   - `OriginVerifyFilter` (`OncePerRequestFilter`): active only if `app.security.origin-verify.secret` is non-blank; header `X-Origin-Verify`; constant-time compare (`MessageDigest.isEqual`); mismatch/missing → 403 empty body, before Spring Security.
   - `ClientIpResolver`: new property `app.security.client-ip-header` (default blank). If set **and** origin-verify is active: use that header (`CloudFront-Viewer-Address`, format `ip:port`; IPv6 without brackets → strip the part after the last `:`); if header missing fall back to `getRemoteAddr()`. Otherwise today's logic unchanged.
   - `DeepAnalysisProperties` gains `String qualifier` (default blank); invoker sets `.qualifier(...)` only when non-blank.
-  - `application-aws.yml`: `spring.config.import: aws-parameterstore:/value-screener/`; `app.dynamodb.create-table: false`; `app.deep-analysis.qualifier: live`; `app.security.client-ip-header: CloudFront-Viewer-Address`; `app.security.trust-forwarded-for: false`. SSM parameter names (for part 3): `/value-screener/app.admin.password-hash`, `/value-screener/app.security.origin-verify.secret`, and per extra user both `/value-screener/app.users[<n>].username` and `/value-screener/app.users[<n>].password-hash` (lists must come from one property source). `ADMIN_USERNAME` and non-secret settings come from Lambda env vars.
+  - `application-aws.yml`: `spring.config.import: aws-parameterstore:/value-screener/`; `app.dynamodb.create-table: false`; `app.deep-analysis.qualifier: live`; `app.security.client-ip-header: CloudFront-Viewer-Address`; `app.security.trust-forwarded-for: false`. SSM parameter names (for part 3): `/value-screener/app.admin.password-hash`, `/value-screener/app.security.origin-verify.secret`, and per extra user both `/value-screener/app.users.<n>.username` and `/value-screener/app.users.<n>.password-hash` (lists must come from one property source). `ADMIN_USERNAME` and non-secret settings come from Lambda env vars.
 
 - [ ] **Step 1: Tests**:
   - `OriginVerifyFilterTest`: `inactiveWhenSecretBlank`, `rejectsMissingHeaderWith403`, `rejectsWrongHeaderWith403`, `passesCorrectHeader`.

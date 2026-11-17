@@ -1,0 +1,29 @@
+# Profile "aws": the Lambda behind CloudFront + HTTP API. Activated by SPRING_PROFILES_ACTIVE=aws.
+# Secrets come from SSM Parameter Store (Spring Cloud AWS), everything non-secret from Lambda env vars.
+#
+# SSM parameter names (the import prefix is stripped, the rest is the property name):
+#   /value-screener/app.admin.password-hash
+#   /value-screener/app.security.origin-verify.secret
+#   /value-screener/app.users.<n>.username       (per extra user, <n> = 0, 1, ...; both parameters of an
+#   /value-screener/app.users.<n>.password-hash   index must exist: a list comes from ONE property source;
+#                                                 SSM names allow no brackets, Spring binds app.users.0.* into the list)
+# ADMIN_USERNAME and the other non-secret settings are Lambda environment variables.
+spring:
+  config:
+    import: aws-parameterstore:/value-screener/
+  cloud:
+    aws:
+      parameterstore:
+        enabled: true
+
+app:
+  dynamodb:
+    create-table: false   # the table is created by Terraform
+    seed-groups: true     # ...so the group seeder must be switched on explicitly
+  deep-analysis:
+    qualifier: live
+  security:
+    client-ip-header: CloudFront-Viewer-Address
+    origin-verify:
+      required: true   # start fails if the SSM secret is missing: never run with the origin check off
+    trust-forwarded-for: false

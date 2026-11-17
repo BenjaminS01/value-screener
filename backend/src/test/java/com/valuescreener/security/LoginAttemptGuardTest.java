@@ -19,7 +19,7 @@ class LoginAttemptGuardTest {
     @BeforeEach
     void setUp() {
         clock = new MutableClock();
-        guard = new LoginAttemptGuard(clock);
+        guard = new LoginAttemptGuard(clock, new InMemoryLoginAttemptStore());
     }
 
     private void attempts(String ip, int n) {
@@ -131,7 +131,7 @@ class LoginAttemptGuardTest {
         assertThat(guard.isAccountLocked("admin")).isTrue();
 
         // Exact count: 9 parallel failures must not lock, the 10th must.
-        LoginAttemptGuard g2 = new LoginAttemptGuard(clock);
+        LoginAttemptGuard g2 = new LoginAttemptGuard(clock, new InMemoryLoginAttemptStore());
         ExecutorService pool2 = Executors.newFixedThreadPool(9);
         CountDownLatch start2 = new CountDownLatch(1);
         for (int i = 0; i < 9; i++) {
@@ -147,24 +147,5 @@ class LoginAttemptGuardTest {
         assertThat(g2.isAccountLocked("alice")).isFalse();
         g2.recordFailure("alice");
         assertThat(g2.isAccountLocked("alice")).isTrue();
-    }
-
-    @Test
-    void purgesExpiredEntriesAboveTenThousand() {
-        for (int i = 0; i < 10_001; i++) {
-            guard.recordAttempt("ip-" + i);
-        }
-        assertThat(guard.trackedIpCount()).isEqualTo(10_001);
-        clock.advance(Duration.ofHours(2));
-        guard.recordAttempt("fresh");
-        assertThat(guard.trackedIpCount()).isEqualTo(1);
-    }
-
-    @Test
-    void doesNotPurgeUnexpiredEntriesAboveTenThousand() {
-        for (int i = 0; i < 10_002; i++) {
-            guard.recordAttempt("ip-" + i);
-        }
-        assertThat(guard.trackedIpCount()).isEqualTo(10_002);
     }
 }

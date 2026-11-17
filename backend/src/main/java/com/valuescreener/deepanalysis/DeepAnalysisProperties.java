@@ -7,5 +7,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record DeepAnalysisProperties(
         @DefaultValue("lambda") String mode,
         @DefaultValue("deep-analysis-demo") String functionName,
-        @DefaultValue("eu-central-1") String region) {
+        @DefaultValue("eu-central-1") String region,
+        /** Lambda version or alias to invoke (e.g. "live"); blank = $LATEST. */
+        @DefaultValue("") String qualifier) {
 }

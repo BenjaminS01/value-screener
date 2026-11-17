@@ -2,6 +2,7 @@ package com.valuescreener.deepanalysis;
 
 import com.valuescreener.limits.LimitReachedException;
 import com.valuescreener.research.CompanySnapshotNotFoundException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -34,5 +35,12 @@ public class DeepAnalysisExceptionHandler {
     public ResponseEntity<Map<String, String>> unavailable(DeepAnalysisUnavailableException e) {
         log.warn("Deep analysis unavailable", e);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "Tiefenanalyse nicht verfügbar"));
+    }
+
+    /** Usage counter lost against concurrent requests; the client may simply retry. */
+    @ExceptionHandler(ConcurrentUpdateException.class)
+    public ResponseEntity<Map<String, String>> conflict(ConcurrentUpdateException e) {
+        log.warn("Usage counter update conflict", e);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Conflict, please reload"));
     }
 }

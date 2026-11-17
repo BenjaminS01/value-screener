@@ -1,8 +1,68 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-14
+Letztes Update: 2026-11-17
 
-## Serverless-Neuaufbau mit Terraform (2026-11-14): aktueller Einstiegspunkt
+## Serverless rewrite part 1 done (2026-11-16)
+
+**Part 1 (local backend rewrite) is finished on branch `feature/serverless-backend`; the final review fixes
+(see "Final fix wave" below) are committed by the user, then the branch is merged.** Nothing touched real AWS.
+
+- **Built (commits):**
+  - `4061c90` DynamoDB foundation (one table `pk`/`sk`/`ttl`), daily limits via transactions
+  - `60a3f89` portfolio and theses
+  - `814b691` stock groups with seeder, revised group catalog
+  - `cafc1fb` research snapshots with embedded findings and history
+  - `371eb38` sessions and login throttling in DynamoDB
+  - `4026e79` Postgres, JPA and Flyway removed
+  - `e1d3eeb` sandbox reaches the backend with rootless Docker
+  - `d6d5865` Task 7: `StreamLambdaHandler` (SnapStart-ready), `OriginVerifyFilter` (`X-Origin-Verify`),
+    CloudFront viewer address in `ClientIpResolver`, SSM via Spring Cloud AWS (profile `aws` only),
+    deep-analysis alias qualifier, Lambda zip via `maven-assembly-plugin`.
+- **Decisions made during the work:**
+  - Revised group catalog (spec 6.5), 35 seeded groups.
+  - Buying a position and its purchase reason are one atomic transaction.
+  - Request size limits added.
+  - Sessions use `attribute_exists` conditions (a stored session that vanished is never revived), no optimistic versioning.
+  - `app.dynamodb.seed-groups` flag: off by default, `true` in `application-aws.yml` (Terraform creates the table).
+  - Node 20 is needed for the frontend tests.
+  - Rootless Docker sandbox fix (`e1d3eeb`).
+  - Retry jitter uses `SecureRandom` (ThreadLocalRandom state would be frozen in the SnapStart snapshot).
+  - Versions: `aws-serverless-java-container-springboot3` 2.0.3 (built against Spring 6.1), Spring Cloud AWS 3.2.1.
+- **Final fix wave (whole-branch review, 2026-11-17):**
+  - Portfolio lists (admin and user) are sorted by company name (case-insensitive), then ISIN.
+  - Snapshot index: every snapshot save also writes a tiny index item (`pk=SNAPINDEX`, `sk=ISIN#<isin>`,
+    `groupKey`) in the same transaction. Group counts and the portfolio group lookup read only this partition
+    (eventually consistent) instead of the 5-10 KB snapshot items; read-only lists and history use eventually
+    consistent reads. `SnapshotIndexBackfill` (after the group seeder, marker `META / INDEX#snapshots-v1`) fills
+    the index for data saved before.
+  - SSM names fixed to `/value-screener/app.users.<n>.username` / `.password-hash` (brackets are invalid in SSM).
+  - A single-item write colliding with an in-flight transaction (`TransactionConflictException`) is now a 409,
+    not a 500.
+  - ISINs and group keys that can never exist (e.g. 2000 characters) get the pre-branch status codes
+    (404 / 400 / 422) without reaching DynamoDB.
+  - Ingest guard: profile `aws` refuses to start with `app.research-ingest.enabled=true`.
+  - `docker-compose.yml` publishes DynamoDB Local on `127.0.0.1` only.
+- **Accepted residual:** `GET /api/research/snapshots` still returns full snapshots, so one overview load reads
+  the whole SNAPSHOT partition once (eventually consistent: about 128 RCU at 100 snapshots, table has 20 RCU).
+  Follow-up before research sync: a lighter list endpoint (changes the frontend contract).
+- **Tests:** backend 541 (Maven, DynamoDB Local), frontend 170 (Vitest). Lambda zip about 46 MB, 105 jars under `lib/`.
+- **Next step:** part 2, Terraform foundations (state, IAM, budgets), with its own plan. Terraform values for
+  part 3: handler `com.valuescreener.lambda.StreamLambdaHandler::handleRequest`, SSM parameter names in
+  `application-aws.yml` (extra users: `app.users.<n>.username` and `.password-hash`, both from SSM; the admin
+  username is the env var `ADMIN_USERNAME`), alias `live`. CloudFront's origin request policy must forward the CloudFront-generated
+  `CloudFront-Viewer-Address` (overwriting any client-sent value) and CloudFront must add `X-Origin-Verify`.
+  The SSM parameter `/value-screener/app.security.origin-verify.secret` is required: in profile `aws` the app
+  refuses to start without it.
+- **Kurzfassung (Deutsch):** Teil 1 ist fertig: Das Backend läuft komplett auf DynamoDB und ist mit
+  Lambda-Handler, geheimem Origin-Header, echter Client-IP, SSM-Secrets und Alias `live` bereit für AWS.
+  Backend 541 Tests, Frontend 170 Tests, alles lokal. Die Abschluss-Review ist eingearbeitet: Portfolio nach
+  Firmenname sortiert, kleiner Snapshot-Index (Gruppenzählung und Portfolio-Gruppen lesen nur ihn), gültige
+  SSM-Namen, 409 statt 500 bei Transaktionskonflikten, Prüfung überlanger ISINs und Gruppenschlüssel,
+  Ingest-Sperre im AWS-Profil und DynamoDB Local nur auf 127.0.0.1. Bekannter Restpunkt: die Übersicht liest
+  weiterhin alle Snapshots (schlankere Liste vor dem Research-Sync). Nächster Schritt ist Teil 2
+  (Terraform-Grundlagen) mit eigenem Plan.
+
+## Serverless-Neuaufbau mit Terraform (2026-11-14): Plan und Entscheidungen
 
 **Für eine neue Session zuerst lesen:** Design
 [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](docs/superpowers/specs/2026-11-14-serverless-terraform-design.md)
@@ -26,8 +86,8 @@ und Plan Teil 1
   1. Backend-Umbau, lokal (Plan steht, 7 Tasks)
   2. Terraform-Grundlagen
   3. Terraform für die App
-- **Stand:** Design und Plan Teil 1 sind committet. Die Umsetzung hat **noch nicht begonnen**.
-- **Nächster Schritt:** Der Nutzer legt den Branch `feature/serverless-backend` an. Danach Task 1 per
+- **Stand (2026-11-14, historisch):** Design und Plan Teil 1 waren committet, die Umsetzung hatte noch nicht begonnen. Aktueller Stand: siehe Abschnitt "Serverless rewrite part 1 done" oben.
+- **Nächster Schritt (2026-11-14, historisch, erledigt):** Der Nutzer legt den Branch `feature/serverless-backend` an. Danach Task 1 per
   Subagent-Driven Development, aber erst nach ausdrücklichem Go des Nutzers und mit vorheriger
   deutscher Konzepterklärung.
 - **Überholt:** die Übergabedatei vom 2026-11-14 (ihre offenen Fragen sind im Design beantwortet), der

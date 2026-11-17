@@ -9,7 +9,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -44,7 +44,7 @@ class InvestmentThesisServiceTest {
     @BeforeEach
     void setUp() {
         service = new InvestmentThesisService(repository, positions, Clock.fixed(NOW, ZoneOffset.UTC));
-        lenient().when(repository.saveAndFlush(any(InvestmentThesis.class))).then(returnsFirstArg());
+        lenient().when(repository.save(any(InvestmentThesis.class))).then(returnsFirstArg());
     }
 
     private static SaveThesisRequest request(Long version) {
@@ -99,7 +99,7 @@ class InvestmentThesisServiceTest {
         InvestmentThesisView view = service.save("us0378331005", request(null));
 
         ArgumentCaptor<InvestmentThesis> captor = ArgumentCaptor.forClass(InvestmentThesis.class);
-        verify(repository).saveAndFlush(captor.capture());
+        verify(repository).save(captor.capture());
         assertThat(captor.getValue().getIsin()).isEqualTo(ISIN);
         assertThat(view.whyInteresting()).isEqualTo("why");
         assertThat(view.status()).isEqualTo(ThesisStatus.WATCHING);
@@ -111,8 +111,8 @@ class InvestmentThesisServiceTest {
         when(repository.findById(ISIN)).thenReturn(Optional.of(existing()));
 
         assertThatThrownBy(() -> service.save(ISIN, request(null)))
-                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
-        verify(repository, never()).saveAndFlush(any());
+                .isInstanceOf(ConcurrentUpdateException.class);
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -133,7 +133,7 @@ class InvestmentThesisServiceTest {
         when(repository.findById(ISIN)).thenReturn(Optional.of(thesis));
 
         assertThatThrownBy(() -> service.save(ISIN, request(8L)))
-                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+                .isInstanceOf(ConcurrentUpdateException.class);
         assertThat(thesis.getWhyInteresting()).isEqualTo("old why");
     }
 
@@ -142,7 +142,7 @@ class InvestmentThesisServiceTest {
         when(repository.findById(ISIN)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.save(ISIN, request(3L)))
-                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+                .isInstanceOf(ConcurrentUpdateException.class);
     }
 
     @Test
@@ -164,47 +164,47 @@ class InvestmentThesisServiceTest {
         assertThatThrownBy(() -> service.save(ISIN, new SaveThesisRequest("a", "b", "c", null, "why", null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("statusReason requires status");
-        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).save(any());
     }
 
     @Test
     void saveRejectsMalformedIsin() {
         assertThatThrownBy(() -> service.save("NOPE", request(null)))
                 .isInstanceOf(IllegalArgumentException.class);
-        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).save(any());
     }
 
     @Test
-    void appendCreatesThesisWhenMissingUsingClockDate() {
+    void prepareCreatesThesisWhenMissingUsingClockDateAndDoesNotSave() {
         when(repository.findById(ISIN)).thenReturn(Optional.empty());
 
-        service.appendPurchaseReason(ISIN, "  Moat intact ");
+        InvestmentThesis thesis = service.prepareAppendPurchaseReason(ISIN, "  Moat intact ");
 
-        ArgumentCaptor<InvestmentThesis> captor = ArgumentCaptor.forClass(InvestmentThesis.class);
-        verify(repository).save(captor.capture());
-        assertThat(captor.getValue().getWhyInteresting()).isEqualTo("[2026-11-12] Kauf: Moat intact");
-        assertThat(captor.getValue().getUpdatedAt()).isEqualTo(NOW);
+        assertThat(thesis.getWhyInteresting()).isEqualTo("[2026-11-12] Kauf: Moat intact");
+        assertThat(thesis.getUpdatedAt()).isEqualTo(NOW);
+        assertThat(thesis.getVersion()).isNull();
+        verify(repository, never()).save(any());
     }
 
     @Test
-    void appendToExistingKeepsText() {
+    void prepareOnExistingKeepsTextAndDoesNotSave() {
         InvestmentThesis thesis = existing();
         when(repository.findById(ISIN)).thenReturn(Optional.of(thesis));
 
-        service.appendPurchaseReason(ISIN, "Moat intact");
+        InvestmentThesis prepared = service.prepareAppendPurchaseReason(ISIN, "Moat intact");
 
+        assertThat(prepared).isSameAs(thesis);
         assertThat(thesis.getWhyInteresting()).isEqualTo("old why\n\n[2026-11-12] Kauf: Moat intact");
-        verify(repository).save(thesis);
+        verify(repository, never()).save(any());
     }
 
     @Test
-    void appendBeyondLimitThrowsAndDoesNotSave() {
+    void prepareBeyondLimitThrows() {
         InvestmentThesis thesis = existing();
         thesis.replace("x".repeat(3995), null, null, null, null, NOW);
         when(repository.findById(ISIN)).thenReturn(Optional.of(thesis));
 
-        assertThatThrownBy(() -> service.appendPurchaseReason(ISIN, "Moat intact"))
+        assertThatThrownBy(() -> service.prepareAppendPurchaseReason(ISIN, "Moat intact"))
                 .isInstanceOf(ThesisTooLongException.class).hasMessage("Thesis text too long");
-        verify(repository, never()).save(any());
     }
 }

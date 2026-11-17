@@ -1,9 +1,8 @@
 package com.valuescreener.research;
 
-import org.springframework.dao.DataIntegrityViolationException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -34,8 +33,8 @@ public class StockGroupExceptionHandler {
         return error(HttpStatus.UNPROCESSABLE_ENTITY, exception);
     }
 
-    /** Races on unique keys / versions. Never expose the exception message (may contain SQL). */
-    @ExceptionHandler({DataIntegrityViolationException.class, ObjectOptimisticLockingFailureException.class})
+    /** Lost write against a concurrent writer. Never expose the exception message. */
+    @ExceptionHandler(ConcurrentUpdateException.class)
     public ResponseEntity<Map<String, String>> handleConcurrentModification() {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Conflict, please reload"));
     }

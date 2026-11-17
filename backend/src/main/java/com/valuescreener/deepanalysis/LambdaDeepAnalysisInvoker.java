@@ -29,22 +29,33 @@ public class LambdaDeepAnalysisInvoker implements DeepAnalysisInvoker {
     private final LambdaClient client;
     private final ObjectMapper mapper;
     private final String functionName;
+    private final String qualifier;
 
     public LambdaDeepAnalysisInvoker(LambdaClient client, ObjectMapper mapper, String functionName) {
+        this(client, mapper, functionName, null);
+    }
+
+    /** A non-blank qualifier (version or alias such as "live") is passed to Invoke; blank means $LATEST. */
+    public LambdaDeepAnalysisInvoker(LambdaClient client, ObjectMapper mapper, String functionName,
+                                     String qualifier) {
         this.client = client;
         this.mapper = mapper;
         this.functionName = functionName;
+        this.qualifier = qualifier == null || qualifier.isBlank() ? null : qualifier.trim();
     }
 
     @Override
     public DeepAnalysisResult invoke(String isin) {
         String normalized = isin.trim().toUpperCase(Locale.ROOT);
         try {
-            InvokeRequest request = InvokeRequest.builder()
+            InvokeRequest.Builder builder = InvokeRequest.builder()
                     .functionName(functionName)
                     .invocationType(InvocationType.REQUEST_RESPONSE)
-                    .payload(SdkBytes.fromUtf8String(mapper.writeValueAsString(Map.of("isin", normalized))))
-                    .build();
+                    .payload(SdkBytes.fromUtf8String(mapper.writeValueAsString(Map.of("isin", normalized))));
+            if (qualifier != null) {
+                builder.qualifier(qualifier);
+            }
+            InvokeRequest request = builder.build();
             InvokeResponse response = client.invoke(request);
             if (response.functionError() != null) {
                 log.warn("Deep-analysis Lambda reported a function error: {}", response.functionError());

@@ -111,4 +111,28 @@ class LambdaDeepAnalysisInvokerTest {
         assertThatThrownBy(() -> invoker.invoke("US0378331005"))
                 .isInstanceOf(DeepAnalysisUnavailableException.class);
     }
+
+    @Test
+    void passesQualifierWhenSet() {
+        when(client.invoke(any(InvokeRequest.class))).thenReturn(response(200, null, OK));
+
+        new LambdaDeepAnalysisInvoker(client, new ObjectMapper(), "deep-analysis-demo", "live").invoke("US0378331005");
+
+        ArgumentCaptor<InvokeRequest> cap = ArgumentCaptor.forClass(InvokeRequest.class);
+        verify(client).invoke(cap.capture());
+        assertThat(cap.getValue().qualifier()).isEqualTo("live");
+    }
+
+    @Test
+    void omitsQualifierWhenBlank() {
+        when(client.invoke(any(InvokeRequest.class))).thenReturn(response(200, null, OK));
+
+        for (String blank : new String[] {"", "  ", null}) {
+            new LambdaDeepAnalysisInvoker(client, new ObjectMapper(), "deep-analysis-demo", blank).invoke("US0378331005");
+        }
+
+        ArgumentCaptor<InvokeRequest> cap = ArgumentCaptor.forClass(InvokeRequest.class);
+        verify(client, org.mockito.Mockito.times(3)).invoke(cap.capture());
+        assertThat(cap.getAllValues()).allSatisfy(r -> assertThat(r.qualifier()).isNull());
+    }
 }

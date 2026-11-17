@@ -31,7 +31,7 @@ curl --fail-with-body -sS "${BACKEND_URL:-http://localhost:8080}/api/research/in
 
 The response is a JSON list of `{key, name, sortOrder, stockCount}`. Pick **exactly one `key`** from that
 list and send it as the required field `groupKey`. Use only keys that appear in the list; never invent
-one. If no group fits, use `DIVERSIFIED_OTHER` and give a one-line reason in your final report. The group
+one. If no group fits, use `OTHER` and give a one-line reason in your final report. Conglomerates and investment holdings go to `HOLDING_COMPANIES`. The group
 is only your proposal: the owner may have set it manually, in which case the backend keeps the owner's
 choice, so the response (not your proposal) tells you the effective group.
 
@@ -165,5 +165,5 @@ Boolean-valued criteria (`CURRENT_YEAR_FCF_POSITIVE`, `CURRENT_YEAR_NET_INCOME_G
 `"booleanValue": true` instead of `numericValue`; qualitative criteria (`MOAT_ASSESSMENT`, etc.) omit both
 and rely on `claim` alone, as shown above.
 
-Report back to the user: the effective group named in the response (`group.name`, and `group.source` -- if it is `MANUAL`, say your proposal was ignored), the fallback reason if you used `DIVERSIFIED_OTHER`, which criteria were found and persisted, which were skipped for lack of a
+Report back to the user: the effective group named in the response (`group.name`, and `group.source` -- if it is `MANUAL`, say your proposal was ignored), the fallback reason if you used `OTHER`, which criteria were found and persisted, which were skipped for lack of a
 reliable source, and the response status from the API call.

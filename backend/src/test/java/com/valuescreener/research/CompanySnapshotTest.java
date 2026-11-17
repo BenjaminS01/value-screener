@@ -114,7 +114,7 @@ class CompanySnapshotTest {
         assertThat(snapshot.assignGroup(SEMIS, GroupSource.AI)).isTrue();
         assertThat(snapshot.assignGroup(BANKS, GroupSource.AI)).isTrue();
 
-        assertThat(snapshot.getStockGroup()).isSameAs(BANKS);
+        assertThat(snapshot.getGroupKey()).isEqualTo("BANKS");
         assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.AI);
     }
 
@@ -125,7 +125,7 @@ class CompanySnapshotTest {
 
         assertThat(snapshot.assignGroup(BANKS, GroupSource.AI)).isFalse();
 
-        assertThat(snapshot.getStockGroup()).isSameAs(SEMIS);
+        assertThat(snapshot.getGroupKey()).isEqualTo("SEMICONDUCTORS");
         assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.MANUAL);
     }
 
@@ -137,7 +137,7 @@ class CompanySnapshotTest {
         assertThat(snapshot.assignGroup(BANKS, GroupSource.MANUAL)).isTrue();
         assertThat(snapshot.assignGroup(SEMIS, GroupSource.MANUAL)).isTrue();
 
-        assertThat(snapshot.getStockGroup()).isSameAs(SEMIS);
+        assertThat(snapshot.getGroupKey()).isEqualTo("SEMICONDUCTORS");
         assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.MANUAL);
     }
 
@@ -186,5 +186,38 @@ class CompanySnapshotTest {
                 LocalDate.of(2026, 8, 1))).isPresent();
         assertThat(snapshot.upsertFinding(ResearchCriterion.MOAT_ASSESSMENT, null, false, "C.", null,
                 LocalDate.of(2026, 9, 1))).isPresent();
+    }
+
+    @Test
+    void restoreRejectsGroupKeyWithoutSource() {
+        assertThatThrownBy(() -> CompanySnapshot.restore("AAPL", "US0378331005", "Apple", "USA", "x",
+                "BANKS", null, java.util.List.of(), 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("groupKey and groupSource must both be set or both be empty");
+    }
+
+    @Test
+    void restoreRejectsGroupSourceWithoutKey() {
+        assertThatThrownBy(() -> CompanySnapshot.restore("AAPL", "US0378331005", "Apple", "USA", "x",
+                null, GroupSource.AI, java.util.List.of(), 1L))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void restoreAcceptsNoGroupAndKeepsTheVersion() {
+        CompanySnapshot snapshot = CompanySnapshot.restore("AAPL", "US0378331005", "Apple", "USA", "x",
+                null, null, java.util.List.of(), 7L);
+
+        assertThat(snapshot.getGroupKey()).isNull();
+        assertThat(snapshot.version()).isEqualTo(7L);
+    }
+
+    @Test
+    void assignGroupAlwaysSetsKeyAndSourceTogether() {
+        CompanySnapshot snapshot = minimalSnapshot();
+        snapshot.assignGroup(new StockGroup("BANKS", "Banks", 10), GroupSource.MANUAL);
+
+        assertThat(snapshot.getGroupKey()).isEqualTo("BANKS");
+        assertThat(snapshot.getGroupSource()).isEqualTo(GroupSource.MANUAL);
     }
 }

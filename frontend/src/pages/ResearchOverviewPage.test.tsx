@@ -6,9 +6,9 @@ import type { AuthUser } from '../api/authApi'
 const user: AuthUser = { username: 'guest', role: 'USER' }
 
 const snapshots = [
-  { id: 1, ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'AI' }, findings: [], lastResearchedAt: '2025-01-01', stale: true },
-  { id: 2, ticker: 'SAP', isin: 'DE0007164600', companyName: 'SAP SE', country: 'DE', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'MANUAL' }, findings: [] },
-  { id: 3, ticker: 'XOM', isin: 'US30231G1022', companyName: 'Exxon Mobil', country: 'US', businessDescription: '', group: null, findings: [] },
+  { ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'AI' }, findings: [], lastResearchedAt: '2025-01-01', stale: true },
+  { ticker: 'SAP', isin: 'DE0007164600', companyName: 'SAP SE', country: 'DE', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'MANUAL' }, findings: [] },
+  { ticker: 'XOM', isin: 'US30231G1022', companyName: 'Exxon Mobil', country: 'US', businessDescription: '', group: null, findings: [] },
 ]
 const groups = [{ key: 'tech', name: 'Technologie', sortOrder: 1, stockCount: 2 }]
 

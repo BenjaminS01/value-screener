@@ -419,6 +419,8 @@ wird in Kauf genommen, weil es nur eine Handvoll persönlich vergebener Konten g
 
 ## AWS-Infrastruktur (Zielbild, grob)
 
+> **Überholt:** Dieses Zielbild mit RDS und ECS ist durch das Serverless-Design ersetzt (DynamoDB, Lambda, CloudFront): [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](docs/superpowers/specs/2026-11-14-serverless-terraform-design.md). Der Text unten bleibt als Historie stehen.
+
 Region `eu-central-1`.
 
 ```
@@ -548,7 +550,7 @@ Ausgabe: zwei Zeilen `token=<...>` und `sha256=<...>`.
 
 1. **Token und Hash erzeugen** (siehe oben) und den Hash als `APP_RESEARCH_INGEST_TOKEN_HASH` in die `.env`
    eintragen. Außerdem muss `ADMIN_PASSWORD_HASH` gesetzt sein (siehe "Admin-Passwort-Hash erzeugen").
-2. **Backend starten** (Terminal 1, im Projekt-Root; startet auch Postgres und das Frontend):
+2. **Backend starten** (Terminal 1, im Projekt-Root; startet auch DynamoDB Local und das Frontend):
    ```bash
    ./dev-up.sh
    ```
@@ -621,33 +623,40 @@ Hinweise:
 
 #### Lokaler End-to-End-Test mit einem zweiten Backend als "Live"
 
-Das "Live"-Backend braucht eine **eigene Datenbank**, sonst beweist der Test nichts:
+Das "Live"-Backend braucht eine **eigene Tabelle**, sonst beweist der Test nichts:
 
-1. Datenbank anlegen (Postgres läuft per `docker compose up -d`):
-   ```bash
-   docker compose exec postgres createdb -U value_screener value_screener_live
-   ```
-2. Zweites Backend starten, **ohne** Profil `local` (Ingest aus, wie live), nur mit dem Hash. Flyway legt die
-   Gruppen (V4) auch in dieser Datenbank an; `ADMIN_PASSWORD_HASH` wird wie gewohnt gebraucht:
+1. DynamoDB Local läuft (per `./dev-up.sh` oder `docker compose up -d dynamodb-local`). Die zweite Tabelle
+   `value-screener-live` legt das Backend selbst an (`APP_DYNAMODB_CREATE_TABLE=true`).
+2. Zweites Backend starten, **ohne** Profil `local` (Ingest aus, wie live), nur mit dem Hash. Beim ersten Start
+   legt es die Tabelle an und seedet einmalig die Gruppen (Marker-Item); `ADMIN_PASSWORD_HASH` wird wie gewohnt
+   gebraucht:
    ```bash
    cd backend
-   DB_URL=jdbc:postgresql://localhost:5432/value_screener_live SERVER_PORT=8081 \
+   APP_DYNAMODB_ENDPOINT=http://localhost:8000 APP_DYNAMODB_CREATE_TABLE=true \
+   APP_DYNAMODB_TABLE_NAME=value-screener-live SERVER_PORT=8081 \
    APP_RESEARCH_SYNC_ENABLED=true APP_RESEARCH_SYNC_TOKEN_HASH=<sha256> \
    mvn spring-boot:run
    ```
 3. In `live.env` `LIVE_BACKEND_URL=http://localhost:8081` setzen, dann `scripts/push-research.sh <ISIN>`
    ausführen. Erwartet: zweimal `HTTP 200`.
-4. Gegenprobe direkt in der "Live"-Datenbank:
+4. Optional: Gegenprobe direkt in der "Live"-Tabelle. Braucht die AWS CLI (wird erst in Teil 2 installiert) und
+   läuft mit Dummy-Zugangsdaten **nur** gegen DynamoDB Local; `env -u` entfernt `AWS_PROFILE` und
+   `AWS_SESSION_TOKEN`, damit kein echtes Profil greift:
    ```bash
-   docker compose exec postgres psql -U value_screener -d value_screener_live \
-     -c "select isin, company_name, group_source from company_snapshot"
+   env -u AWS_PROFILE -u AWS_SESSION_TOKEN \
+     AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_DEFAULT_REGION=eu-central-1 \
+     aws dynamodb scan --endpoint-url http://localhost:8000 --table-name value-screener-live --max-items 5
    ```
 
-### Lokale Postgres-Datenbank starten
+### Lokale DynamoDB-Datenbank starten
 
 ```bash
-docker compose up -d
+docker compose up -d dynamodb-local
 ```
+
+Läuft auf Port 8000, die Daten bleiben im Docker-Volume `value-screener-dynamodb-data`. Das Backend nutzt sie
+über `APP_DYNAMODB_ENDPOINT=http://localhost:8000` und `APP_DYNAMODB_CREATE_TABLE=true` (setzt `dev-up.sh`
+automatisch); der Tabellenname lässt sich mit `APP_DYNAMODB_TABLE_NAME` ändern (Standard `value-screener`).
 
 ### Admin-Passwort-Hash erzeugen
 
@@ -699,6 +708,20 @@ Backend läuft auf http://localhost:8080.
 cd backend
 mvn test
 ```
+
+### Lambda-Zip bauen
+
+Für die spätere Bereitstellung als AWS Lambda baut Maven neben dem normalen Spring-Boot-Jar ein zweites Paket:
+
+```bash
+cd backend
+mvn -B package -DskipTests
+```
+
+Ergebnis: `backend/target/value-screener-backend-lambda.zip` (Klassen im Wurzelverzeichnis, Laufzeit-Jars unter
+`lib/`, rund 46 MB). Handler: `com.valuescreener.lambda.StreamLambdaHandler::handleRequest`. Lokal ändert sich nichts:
+`mvn spring-boot:run` und `dev-up.sh` laufen wie bisher. Die AWS-Einstellungen stehen im Profil `aws`
+(`application-aws.yml`, Secrets aus SSM); ohne dieses Profil ist Spring Cloud AWS abgeschaltet.
 
 ### Frontend starten
 

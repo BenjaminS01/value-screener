@@ -4,6 +4,7 @@ import com.valuescreener.limits.JobType;
 import com.valuescreener.limits.LimitReachedException;
 import com.valuescreener.limits.Quota;
 import com.valuescreener.limits.UsageLimiter;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import com.valuescreener.research.CompanySnapshotNotFoundException;
 import com.valuescreener.research.CompanySnapshotService;
 import com.valuescreener.security.Role;
@@ -123,6 +124,17 @@ class DeepAnalysisControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().json("{\"error\":\"Snapshot not found\"}"));
         verify(usageLimiter, never()).consume(anyString(), any(), any());
+        verifyNoInteractions(invoker);
+    }
+
+    @Test
+    void concurrentUpdateIs409AndInvokerNotCalled() throws Exception {
+        when(usageLimiter.consume("alice", Role.USER, JobType.DEEP_ANALYSIS_DEMO))
+                .thenThrow(new ConcurrentUpdateException("conflict", new RuntimeException()));
+
+        mockMvc.perform(post(URL).with(user("alice").roles("USER")).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(content().json("{\"error\":\"Conflict, please reload\"}", true));
         verifyNoInteractions(invoker);
     }
 

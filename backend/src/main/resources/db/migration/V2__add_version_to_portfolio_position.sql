@@ -1,1 +1,0 @@
-ALTER TABLE portfolio_position ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

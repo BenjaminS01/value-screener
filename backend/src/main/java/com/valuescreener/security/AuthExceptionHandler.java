@@ -1,5 +1,6 @@
 package com.valuescreener.security;
 
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -26,5 +27,18 @@ public class AuthExceptionHandler {
     public ResponseEntity<Map<String, String>> invalidRequest(HttpServletRequest request) {
         LoginAudit.failure(null, ip(request), "MALFORMED");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid request"));
+    }
+
+    /**
+     * The per-IP throttle state could not be updated (retries exhausted under heavy contention). That
+     * update happens before the password is checked, so refusing the login here skips nothing: no attempt
+     * goes uncounted and no session is issued; the client may retry. Account failures cannot end here,
+     * they are counted by an atomic update.
+     */
+    @ExceptionHandler(ConcurrentUpdateException.class)
+    public ResponseEntity<Map<String, String>> throttleStateBusy(HttpServletRequest request) {
+        LoginAudit.failure(null, ip(request), "THROTTLE_STATE_CONFLICT");
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header("Retry-After", "1")
+                .body(Map.of("error", "Login temporarily unavailable"));
     }
 }

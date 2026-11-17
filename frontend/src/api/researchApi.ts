@@ -26,7 +26,6 @@ export interface StockGroup {
 }
 
 export interface CompanySnapshot {
-  id: number
   ticker: string
   isin: string
   companyName: string

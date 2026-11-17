@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Starts Postgres, backend, and frontend together for local development.
-# Stop with Ctrl+C — backend and frontend are stopped, Postgres keeps running.
+# Starts DynamoDB Local, backend, and frontend together for local development.
+# Stop with Ctrl+C — backend and frontend are stopped, DynamoDB Local keeps running.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
@@ -40,14 +40,27 @@ fi
 
 mkdir -p logs
 
-echo "==> Starting Postgres (docker compose)"
-docker compose up -d
+echo "==> Starting DynamoDB Local (docker compose)"
+docker compose up -d dynamodb-local
 
-echo "==> Waiting for Postgres to accept connections"
-until docker compose exec -T postgres pg_isready -U value_screener >/dev/null 2>&1; do
+echo "==> Waiting for DynamoDB Local on :8000 (max 30 s)"
+dynamo_ready=false
+for _ in $(seq 1 30); do
+  if (exec 3<>/dev/tcp/127.0.0.1/8000) 2>/dev/null; then
+    dynamo_ready=true
+    break
+  fi
   sleep 1
 done
-echo "    Postgres is ready."
+if [[ "$dynamo_ready" != true ]]; then
+  echo "DynamoDB Local did not accept connections on port 8000 within 30 s." >&2
+  echo "Check:  docker compose ps  and  docker compose logs dynamodb-local" >&2
+  exit 1
+fi
+echo "    DynamoDB Local is ready."
+
+export APP_DYNAMODB_ENDPOINT=http://localhost:8000
+export APP_DYNAMODB_CREATE_TABLE=true
 
 echo "==> Starting backend (logs/backend.log)"
 (cd backend && mvn -q spring-boot:run -Dspring-boot.run.profiles=local) >logs/backend.log 2>&1 &
@@ -70,7 +83,7 @@ FRONTEND_PID=$!
 
 cleanup() {
   echo ""
-  echo "==> Stopping backend and frontend (Postgres keeps running — 'docker compose down' to stop it too)"
+  echo "==> Stopping backend and frontend (DynamoDB Local keeps running — 'docker compose down' to stop it too)"
   kill "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
   wait "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
 }

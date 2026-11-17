@@ -83,4 +83,18 @@ class ResearchFindingTest {
         assertThat(finding.differsFrom(new BigDecimal("1.23456"), null, "claim", null,
                 LocalDate.of(2026, 8, 1))).isFalse();
     }
+
+    @Test
+    void rejectsNumericValueWithMoreThanEightIntegerDigits() {
+        assertThatThrownBy(() -> new ResearchFinding(ResearchCriterion.PE_RATIO, new BigDecimal("123456789"),
+                null, "c", null, LocalDate.of(2026, 8, 1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("numericValue must have at most 8 integer digits");
+        // rounding up to nine digits is rejected too
+        assertThatThrownBy(() -> new ResearchFinding(ResearchCriterion.PE_RATIO, new BigDecimal("99999999.99995"),
+                null, "c", null, LocalDate.of(2026, 8, 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new ResearchFinding(ResearchCriterion.PE_RATIO, new BigDecimal("99999999.9999"),
+                null, "c", null, LocalDate.of(2026, 8, 1)).getNumericValue()).isEqualByComparingTo("99999999.9999");
+    }
 }

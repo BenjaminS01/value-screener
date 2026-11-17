@@ -3,7 +3,7 @@ package com.valuescreener.portfolio;
 import com.valuescreener.research.ThesisTooLongException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.Map;
@@ -22,8 +22,8 @@ public class PortfolioExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", message));
     }
 
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<Map<String, String>> handleConcurrentModification(ObjectOptimisticLockingFailureException exception) {
+    @ExceptionHandler(ConcurrentUpdateException.class)
+    public ResponseEntity<Map<String, String>> handleConcurrentModification(ConcurrentUpdateException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", "Position was changed concurrently, please reload"));
     }

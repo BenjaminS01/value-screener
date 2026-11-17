@@ -1,13 +1,10 @@
 package com.valuescreener.research;
 
-import org.springframework.data.repository.Repository;
-
 import java.util.List;
 
-/** Insert-only on purpose: extends Repository, not JpaRepository, so no update or delete methods exist. */
-public interface ResearchFindingHistoryRepository extends Repository<ResearchFindingHistory, Long> {
+/** Read side only: finding history is append-only and written together with its snapshot. */
+public interface ResearchFindingHistoryRepository {
 
-    ResearchFindingHistory save(ResearchFindingHistory entry);
-
-    List<ResearchFindingHistory> findByCompanySnapshotIdOrderByReplacedAtDescIdDesc(Long companySnapshotId);
+    /** Newest first; entries with the same timestamp come back in reverse order of writing. */
+    List<ResearchFindingHistory> findBySnapshotIsin(String isin);
 }
