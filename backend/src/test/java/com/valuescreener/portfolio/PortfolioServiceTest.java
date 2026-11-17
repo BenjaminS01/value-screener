@@ -141,11 +141,33 @@ class PortfolioServiceTest {
         when(lookup.groupsByIsin(List.of("US5949181045", "US0378331005")))
                 .thenReturn(java.util.Map.of("US5949181045", software));
 
+        // sorted by company name: Apple before Microsoft
         assertThat(service.listForUser()).containsExactly(
-                new PortfolioPositionView("MSFT", "US5949181045", "Microsoft Corp.", software),
-                new PortfolioPositionView("AAPL", "US0378331005", "Apple Inc.", null));
+                new PortfolioPositionView("AAPL", "US0378331005", "Apple Inc.", null),
+                new PortfolioPositionView("MSFT", "US5949181045", "Microsoft Corp.", software));
         assertThat(service.listForAdmin()).extracting(AdminPortfolioPositionView::group)
-                .containsExactly(software, null);
+                .containsExactly(null, software);
+    }
+
+    @Test
+    void listsAreSortedByCompanyNameCaseInsensitiveThenIsin() {
+        PortfolioService service = new PortfolioService(repository, lookup, theses, purchaseWriter);
+        when(repository.findAll()).thenReturn(List.of(
+                position("ZZ", "US0000000003", "zeta corp"),
+                position("B2", "US0000000002", "Beta Inc."),
+                position("B1", "US0000000001", "beta inc."),
+                position("AL", "US0000000004", "alpha Ltd.")));
+        when(lookup.groupsByIsin(org.mockito.ArgumentMatchers.anyCollection())).thenReturn(java.util.Map.of());
+
+        assertThat(service.listForUser()).extracting(PortfolioPositionView::isin).containsExactly(
+                "US0000000004", "US0000000001", "US0000000002", "US0000000003");
+        assertThat(service.listForAdmin()).extracting(AdminPortfolioPositionView::isin).containsExactly(
+                "US0000000004", "US0000000001", "US0000000002", "US0000000003");
+    }
+
+    private static PortfolioPosition position(String ticker, String isin, String name) {
+        return new PortfolioPosition(ticker, isin, name, new BigDecimal("1"), new BigDecimal("1.00"),
+                LocalDate.of(2026, 1, 1));
     }
 
     private static CorrectPositionRequest correction() {

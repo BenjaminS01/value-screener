@@ -120,6 +120,11 @@ public class CompanySnapshot {
         return normalized;
     }
 
+    /** True for a normalized (trimmed, upper case) ISIN; anything else can never be stored, so never look it up. */
+    public static boolean isValidIsin(String normalized) {
+        return normalized != null && ISIN_PATTERN.matcher(normalized).matches();
+    }
+
     private static String requireValidIsin(String isin) {
         if (isin == null || isin.isBlank()) {
             throw new IllegalArgumentException("isin must not be blank");

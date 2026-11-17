@@ -38,21 +38,17 @@ class StockGroupServiceTest {
                 new StockGroup("ZED", "Zed", 20),
                 new StockGroup("BETA", "Beta", 20),
                 new StockGroup("FIRST", "First", 10)));
-        CompanySnapshot a = new CompanySnapshot("AAA", "US0000000001", "A", "USA", "x");
-        a.assignGroup(new StockGroup("FIRST", "First", 10), GroupSource.AI);
-        CompanySnapshot b = new CompanySnapshot("BBB", "US0000000002", "B", "USA", "x");
-        b.assignGroup(new StockGroup("FIRST", "First", 10), GroupSource.MANUAL);
-        CompanySnapshot c = new CompanySnapshot("CCC", "US0000000003", "C", "USA", "x");
-        c.assignGroup(new StockGroup("ZED", "Zed", 20), GroupSource.AI);
-        CompanySnapshot none = new CompanySnapshot("DDD", "US0000000004", "D", "USA", "x");
-        when(snapshots.findAll()).thenReturn(List.of(a, b, c, none));
+        when(snapshots.findIndex()).thenReturn(List.of(
+                new SnapshotIndexEntry("US0000000001", "FIRST"), new SnapshotIndexEntry("US0000000002", "FIRST"),
+                new SnapshotIndexEntry("US0000000003", "ZED"), new SnapshotIndexEntry("US0000000004", null)));
 
         List<StockGroupView> views = service.list();
 
         assertThat(views).extracting(StockGroupView::key).containsExactly("FIRST", "BETA", "ZED");
         assertThat(views).extracting(StockGroupView::stockCount).containsExactly(2L, 0L, 1L);
-        // one read of the snapshot partition, no count query per group
-        verify(snapshots, org.mockito.Mockito.times(1)).findAll();
+        // one read of the small snapshot index; neither the snapshot items nor a count query per group
+        verify(snapshots, org.mockito.Mockito.times(1)).findIndex();
+        verify(snapshots, never()).findAll();
         verify(snapshots, never()).countByGroupKey(any());
     }
 
@@ -213,5 +209,17 @@ class StockGroupServiceTest {
         StockGroup banks = new StockGroup("BANKS", "Banks", 10);
         when(groups.findById("BANKS")).thenReturn(Optional.of(banks));
         assertThat(service.require(" banks ")).isSameAs(banks);
+    }
+
+    @Test
+    void invalidKeysAreNotFoundWithoutALookup() {
+        String longKey = "A".repeat(2000);
+
+        assertThatThrownBy(() -> service.delete(longKey)).isInstanceOf(StockGroupNotFoundException.class);
+        assertThatThrownBy(() -> service.update(longKey, new UpdateStockGroupRequest("x", null)))
+                .isInstanceOf(StockGroupNotFoundException.class);
+        assertThatThrownBy(() -> service.require(longKey)).isInstanceOf(UnknownGroupException.class);
+
+        org.mockito.Mockito.verifyNoInteractions(groups);
     }
 }

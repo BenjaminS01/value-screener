@@ -11,14 +11,11 @@ import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
-import software.amazon.awssdk.services.dynamodb.model.Select;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,8 +25,10 @@ import java.util.Optional;
  * {@code "SNAPSHOT#"+isin} (see {@link FindingHistoryItem}, {@link GroupHistoryItem}).
  *
  * <p>{@link #save} is one TransactWriteItems with a fixed layout: index 0 is the snapshot, then one item per
- * finding history entry, then (only with a group change) the group's markReferenced update as the LAST item.
- * Cancellation reasons are mapped by those positions, see {@link #translate}. The request is built at the low
+ * finding history entry, then (only with a group change) the group history entry, then the snapshot index item
+ * ({@link SnapshotIndex}), and (only with a group change) the group's markReferenced update as the LAST item.
+ * Cancellation reasons are mapped by those positions (snapshot first, markReferenced last), see
+ * {@link #translate}; the history and index puts cannot fail on their own. The request is built at the low
  * level because markReferenced is a low-level item; the snapshot version is maintained here.
  */
 @Repository
@@ -65,20 +64,15 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
         return query("attribute_not_exists(#g)", Map.of("#g", "groupKey"), Map.of());
     }
 
+    /** From the snapshot index (eventually consistent), not from the snapshot items. */
     @Override
     public long countByGroupKey(String key) {
-        return HistoryQuery.count(client, partitionRequest("#g = :g", Map.of("#g", "groupKey"),
-                Map.of(":g", AttributeValue.fromS(key))).select(Select.COUNT).build());
+        return findIndex().stream().filter(e -> key.equals(e.groupKey())).count();
     }
 
-    /** One consistent GetItem per distinct ISIN (callers pass the handful of ISINs of a portfolio). */
     @Override
-    public List<CompanySnapshot> findAllByIsinIn(Collection<String> isins) {
-        List<CompanySnapshot> found = new ArrayList<>();
-        for (String isin : new LinkedHashSet<>(isins)) {
-            findByIsin(isin).ifPresent(found::add);
-        }
-        return found;
+    public List<SnapshotIndexEntry> findIndex() {
+        return SnapshotIndex.readAll(client, tableName);
     }
 
     @Override
@@ -99,7 +93,10 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
         if (groupHistory.isPresent()) {
             items.add(historyPut(GroupHistoryItem.SCHEMA.itemToMap(GroupHistoryItem.from(groupHistory.get()), true)));
             referencedGroup = groupHistory.get().getNewGroupKey();
-            items.add(StockGroupRepository.markReferenced(tableName, referencedGroup));
+        }
+        items.add(SnapshotIndex.put(tableName, isin, snapshot.getGroupKey()));
+        if (referencedGroup != null) {
+            items.add(StockGroupRepository.markReferenced(tableName, referencedGroup)); // LAST: see translate
         }
         try {
             client.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
@@ -183,7 +180,7 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
                                                   Map<String, AttributeValue> values) {
         Map<String, AttributeValue> allValues = new java.util.HashMap<>(values);
         allValues.put(":pk", AttributeValue.fromS(SnapshotItem.PK));
-        QueryRequest.Builder request = QueryRequest.builder().tableName(tableName).consistentRead(true)
+        QueryRequest.Builder request = QueryRequest.builder().tableName(tableName).consistentRead(false)
                 .keyConditionExpression("pk = :pk").expressionAttributeValues(allValues);
         if (filter != null) {
             request.filterExpression(filter);

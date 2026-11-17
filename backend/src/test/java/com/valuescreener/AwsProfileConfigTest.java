@@ -1,6 +1,9 @@
 package com.valuescreener;
 
+import com.valuescreener.security.AccountsProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.core.io.ClassPathResource;
 
@@ -37,5 +40,26 @@ class AwsProfileConfigTest {
 
         assertThat(p.getProperty("spring.cloud.aws.parameterstore.enabled")).isEqualTo("false");
         assertThat(p.getProperty("spring.config.import")).isNull();
+    }
+
+    /** SSM names allow only a-zA-Z0-9_.-/ : indexed users must be addressed as app.users.<n>.<field>. */
+    @Test
+    void ssmStyleUserPropertiesBindIntoTheUsersList() {
+        MapConfigurationPropertySource source = new MapConfigurationPropertySource(java.util.Map.of(
+                "app.users.0.username", "alice", "app.users.0.password-hash", "hash-a",
+                "app.users.1.username", "bob", "app.users.1.password-hash", "hash-b"));
+
+        AccountsProperties accounts = new Binder(source).bind("app", AccountsProperties.class).get();
+
+        assertThat(accounts.users()).containsExactly(
+                new AccountsProperties.Account("alice", "hash-a"), new AccountsProperties.Account("bob", "hash-b"));
+    }
+
+    @Test
+    void awsProfileDocumentsOnlyValidSsmParameterNames() throws Exception {
+        String yaml = new String(new ClassPathResource("application-aws.yml").getInputStream().readAllBytes());
+
+        assertThat(yaml).doesNotContain("[<n>]").contains("/value-screener/app.users.<n>.username")
+                .contains("/value-screener/app.users.<n>.password-hash");
     }
 }

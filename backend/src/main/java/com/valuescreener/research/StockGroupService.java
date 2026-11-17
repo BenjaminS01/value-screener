@@ -19,11 +19,11 @@ public class StockGroupService {
     }
 
     public List<StockGroupView> list() {
-        // one read of the snapshot partition, counted in memory (a count query per group would read it N times)
+        // one read of the small snapshot index, counted in memory (not the snapshot items themselves)
         Map<String, Long> counts = new HashMap<>();
-        snapshots.findAll().forEach(s -> {
-            if (s.getGroupKey() != null) {
-                counts.merge(s.getGroupKey(), 1L, Long::sum);
+        snapshots.findIndex().forEach(e -> {
+            if (e.groupKey() != null) {
+                counts.merge(e.groupKey(), 1L, Long::sum);
             }
         });
         return groups.findAll().stream()
@@ -92,11 +92,17 @@ public class StockGroupService {
     /** Resolves a group by (normalized) key; used when assigning groups to stocks. */
     public StockGroup require(String key) {
         String normalized = StockGroup.trimUpper(key);
+        if (!StockGroup.isValidKey(normalized)) {
+            throw new UnknownGroupException(normalized); // can never exist; do not send it to DynamoDB
+        }
         return groups.findById(normalized).orElseThrow(() -> new UnknownGroupException(normalized));
     }
 
     private StockGroup find(String key) {
         String normalized = StockGroup.trimUpper(key);
+        if (!StockGroup.isValidKey(normalized)) {
+            throw new StockGroupNotFoundException(normalized); // can never exist; do not send it to DynamoDB
+        }
         return groups.findById(normalized).orElseThrow(() -> new StockGroupNotFoundException(normalized));
     }
 

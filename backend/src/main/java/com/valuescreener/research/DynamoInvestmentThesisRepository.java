@@ -1,6 +1,5 @@
 package com.valuescreener.research;
 
-import com.valuescreener.persistence.ConcurrentUpdateException;
 import com.valuescreener.persistence.DynamoProperties;
 import com.valuescreener.persistence.ItemConditions;
 import org.springframework.stereotype.Repository;
@@ -9,7 +8,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.GetItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.PutItemEnhancedRequest;
-import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 
 import java.util.Optional;
 
@@ -32,14 +30,11 @@ public class DynamoInvestmentThesisRepository implements InvestmentThesisReposit
 
     @Override
     public InvestmentThesis save(InvestmentThesis thesis) {
-        try {
-            table.putItem(PutItemEnhancedRequest.builder(ThesisItem.class)
-                    .item(ThesisItem.from(thesis))
-                    .conditionExpression(ItemConditions.createOnlyIfNew(thesis.getVersion()))
-                    .build());
-        } catch (ConditionalCheckFailedException e) {
-            throw new ConcurrentUpdateException("Thesis " + thesis.getIsin() + " was changed concurrently", e);
-        }
+        ItemConditions.guarded("Thesis " + thesis.getIsin() + " was changed concurrently",
+                () -> table.putItem(PutItemEnhancedRequest.builder(ThesisItem.class)
+                        .item(ThesisItem.from(thesis))
+                        .conditionExpression(ItemConditions.createOnlyIfNew(thesis.getVersion()))
+                        .build()));
         ThesisItem.markSaved(thesis);
         return thesis;
     }

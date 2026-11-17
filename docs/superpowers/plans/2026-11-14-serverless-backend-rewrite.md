@@ -17,7 +17,7 @@
 - Environment: `export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64; export PATH=$JAVA_HOME/bin:$PATH`. Docker needed for tests; keep `backend/src/test/resources/docker-java.properties` (`api.version=1.44`). Review diffs with `git diff --ignore-cr-at-eol`.
 - No new AWS resources, no `aws`/`terraform` commands. Nothing in this plan talks to real AWS.
 - One table. Name from `app.dynamodb.table-name` (default `value-screener`). Key attributes `pk` (S), `sk` (S); TTL attribute `ttl` (N, epoch seconds). **Provisioned** capacity, 20 RCU / 20 WCU, no GSI, no auto scaling (spec 6.2: sum ≤ 25).
-- DynamoDB Local does not delete expired items: every read of an item with `ttl` must treat `ttl <= now` as absent.
+- DynamoDB Local 2.5.4 does delete expired items (its timing differs from AWS, where deletion may lag up to ~48 h), so every read of an item with `ttl` must still treat `ttl <= now` as absent.
 - Behaviour of all existing endpoints, status codes and JSON fields stays the same, **except** `CompanySnapshotView.id` is removed (there is no numeric id any more; the frontend does not use it).
 - Business rules from spec 6.1 hold; each has a test (named in the tasks).
 - `app.research-ingest.enabled` and `app.research-sync.enabled` default `false` (unchanged).
@@ -276,7 +276,7 @@ Concept: how a Lambda handler wraps Spring (`SpringBootLambdaContainerHandler`),
   - `OriginVerifyFilter` (`OncePerRequestFilter`): active only if `app.security.origin-verify.secret` is non-blank; header `X-Origin-Verify`; constant-time compare (`MessageDigest.isEqual`); mismatch/missing → 403 empty body, before Spring Security.
   - `ClientIpResolver`: new property `app.security.client-ip-header` (default blank). If set **and** origin-verify is active: use that header (`CloudFront-Viewer-Address`, format `ip:port`; IPv6 without brackets → strip the part after the last `:`); if header missing fall back to `getRemoteAddr()`. Otherwise today's logic unchanged.
   - `DeepAnalysisProperties` gains `String qualifier` (default blank); invoker sets `.qualifier(...)` only when non-blank.
-  - `application-aws.yml`: `spring.config.import: aws-parameterstore:/value-screener/`; `app.dynamodb.create-table: false`; `app.deep-analysis.qualifier: live`; `app.security.client-ip-header: CloudFront-Viewer-Address`; `app.security.trust-forwarded-for: false`. SSM parameter names (for part 3): `/value-screener/app.admin.password-hash`, `/value-screener/app.security.origin-verify.secret`, and per extra user both `/value-screener/app.users[<n>].username` and `/value-screener/app.users[<n>].password-hash` (lists must come from one property source). `ADMIN_USERNAME` and non-secret settings come from Lambda env vars.
+  - `application-aws.yml`: `spring.config.import: aws-parameterstore:/value-screener/`; `app.dynamodb.create-table: false`; `app.deep-analysis.qualifier: live`; `app.security.client-ip-header: CloudFront-Viewer-Address`; `app.security.trust-forwarded-for: false`. SSM parameter names (for part 3): `/value-screener/app.admin.password-hash`, `/value-screener/app.security.origin-verify.secret`, and per extra user both `/value-screener/app.users.<n>.username` and `/value-screener/app.users.<n>.password-hash` (lists must come from one property source). `ADMIN_USERNAME` and non-secret settings come from Lambda env vars.
 
 - [ ] **Step 1: Tests**:
   - `OriginVerifyFilterTest`: `inactiveWhenSecretBlank`, `rejectsMissingHeaderWith403`, `rejectsWrongHeaderWith403`, `passesCorrectHeader`.

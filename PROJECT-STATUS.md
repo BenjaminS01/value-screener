@@ -1,11 +1,11 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-16
+Letztes Update: 2026-11-17
 
 ## Serverless rewrite part 1 done (2026-11-16)
 
-**Part 1 (local backend rewrite) is finished on branch `feature/serverless-backend`; the user commits Task 7 and
-merges after the whole-branch review.** Nothing touched real AWS.
+**Part 1 (local backend rewrite) is finished on branch `feature/serverless-backend`; the final review fixes
+(see "Final fix wave" below) are committed by the user, then the branch is merged.** Nothing touched real AWS.
 
 - **Built (commits):**
   - `4061c90` DynamoDB foundation (one table `pk`/`sk`/`ttl`), daily limits via transactions
@@ -15,30 +15,52 @@ merges after the whole-branch review.** Nothing touched real AWS.
   - `371eb38` sessions and login throttling in DynamoDB
   - `4026e79` Postgres, JPA and Flyway removed
   - `e1d3eeb` sandbox reaches the backend with rootless Docker
-  - Task 7 (this commit): `StreamLambdaHandler` (SnapStart-ready), `OriginVerifyFilter` (`X-Origin-Verify`),
+  - `d6d5865` Task 7: `StreamLambdaHandler` (SnapStart-ready), `OriginVerifyFilter` (`X-Origin-Verify`),
     CloudFront viewer address in `ClientIpResolver`, SSM via Spring Cloud AWS (profile `aws` only),
     deep-analysis alias qualifier, Lambda zip via `maven-assembly-plugin`.
 - **Decisions made during the work:**
   - Revised group catalog (spec 6.5), 35 seeded groups.
   - Buying a position and its purchase reason are one atomic transaction.
   - Request size limits added.
-  - Sessions use conditional writes (optimistic versioning).
+  - Sessions use `attribute_exists` conditions (a stored session that vanished is never revived), no optimistic versioning.
   - `app.dynamodb.seed-groups` flag: off by default, `true` in `application-aws.yml` (Terraform creates the table).
   - Node 20 is needed for the frontend tests.
   - Rootless Docker sandbox fix (`e1d3eeb`).
   - Retry jitter uses `SecureRandom` (ThreadLocalRandom state would be frozen in the SnapStart snapshot).
   - Versions: `aws-serverless-java-container-springboot3` 2.0.3 (built against Spring 6.1), Spring Cloud AWS 3.2.1.
-- **Tests:** backend 507 (Maven, DynamoDB Local), frontend 170 (Vitest). Lambda zip about 46 MB, 105 jars under `lib/`.
+- **Final fix wave (whole-branch review, 2026-11-17):**
+  - Portfolio lists (admin and user) are sorted by company name (case-insensitive), then ISIN.
+  - Snapshot index: every snapshot save also writes a tiny index item (`pk=SNAPINDEX`, `sk=ISIN#<isin>`,
+    `groupKey`) in the same transaction. Group counts and the portfolio group lookup read only this partition
+    (eventually consistent) instead of the 5-10 KB snapshot items; read-only lists and history use eventually
+    consistent reads. `SnapshotIndexBackfill` (after the group seeder, marker `META / INDEX#snapshots-v1`) fills
+    the index for data saved before.
+  - SSM names fixed to `/value-screener/app.users.<n>.username` / `.password-hash` (brackets are invalid in SSM).
+  - A single-item write colliding with an in-flight transaction (`TransactionConflictException`) is now a 409,
+    not a 500.
+  - ISINs and group keys that can never exist (e.g. 2000 characters) get the pre-branch status codes
+    (404 / 400 / 422) without reaching DynamoDB.
+  - Ingest guard: profile `aws` refuses to start with `app.research-ingest.enabled=true`.
+  - `docker-compose.yml` publishes DynamoDB Local on `127.0.0.1` only.
+- **Accepted residual:** `GET /api/research/snapshots` still returns full snapshots, so one overview load reads
+  the whole SNAPSHOT partition once (eventually consistent: about 128 RCU at 100 snapshots, table has 20 RCU).
+  Follow-up before research sync: a lighter list endpoint (changes the frontend contract).
+- **Tests:** backend 541 (Maven, DynamoDB Local), frontend 170 (Vitest). Lambda zip about 46 MB, 105 jars under `lib/`.
 - **Next step:** part 2, Terraform foundations (state, IAM, budgets), with its own plan. Terraform values for
   part 3: handler `com.valuescreener.lambda.StreamLambdaHandler::handleRequest`, SSM parameter names in
-  `application-aws.yml`, alias `live`. CloudFront's origin request policy must forward the CloudFront-generated
+  `application-aws.yml` (extra users: `app.users.<n>.username` and `.password-hash`, both from SSM; the admin
+  username is the env var `ADMIN_USERNAME`), alias `live`. CloudFront's origin request policy must forward the CloudFront-generated
   `CloudFront-Viewer-Address` (overwriting any client-sent value) and CloudFront must add `X-Origin-Verify`.
   The SSM parameter `/value-screener/app.security.origin-verify.secret` is required: in profile `aws` the app
   refuses to start without it.
 - **Kurzfassung (Deutsch):** Teil 1 ist fertig: Das Backend läuft komplett auf DynamoDB und ist mit
   Lambda-Handler, geheimem Origin-Header, echter Client-IP, SSM-Secrets und Alias `live` bereit für AWS.
-  Backend 507 Tests, Frontend 170 Tests, alles lokal. Nächster Schritt ist Teil 2 (Terraform-Grundlagen) mit
-  eigenem Plan.
+  Backend 541 Tests, Frontend 170 Tests, alles lokal. Die Abschluss-Review ist eingearbeitet: Portfolio nach
+  Firmenname sortiert, kleiner Snapshot-Index (Gruppenzählung und Portfolio-Gruppen lesen nur ihn), gültige
+  SSM-Namen, 409 statt 500 bei Transaktionskonflikten, Prüfung überlanger ISINs und Gruppenschlüssel,
+  Ingest-Sperre im AWS-Profil und DynamoDB Local nur auf 127.0.0.1. Bekannter Restpunkt: die Übersicht liest
+  weiterhin alle Snapshots (schlankere Liste vor dem Research-Sync). Nächster Schritt ist Teil 2
+  (Terraform-Grundlagen) mit eigenem Plan.
 
 ## Serverless-Neuaufbau mit Terraform (2026-11-14): Plan und Entscheidungen
 

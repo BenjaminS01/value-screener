@@ -39,7 +39,9 @@ public class CompanySnapshotService {
     public CompanySnapshotView upsert(UpsertCompanySnapshotRequest request, GroupSource source,
                                       HistoryOrigin origin) {
         String normalizedIsin = request.isin().trim().toUpperCase();
-        CompanySnapshot snapshot = repository.findByIsin(normalizedIsin).orElse(null);
+        // an invalid ISIN is never looked up (key limit); the constructor below rejects it (400)
+        CompanySnapshot snapshot = CompanySnapshot.isValidIsin(normalizedIsin)
+                ? repository.findByIsin(normalizedIsin).orElse(null) : null;
         StockGroup group = groups.require(StockGroup.trimUpper(request.groupKey()));
         if (snapshot == null) {
             snapshot = new CompanySnapshot(request.ticker(), request.isin(), request.companyName(),
@@ -94,7 +96,7 @@ public class CompanySnapshotService {
 
     public SnapshotHistoryView history(String isin) {
         String normalizedIsin = normalizeIsin(isin);
-        CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
+        CompanySnapshot snapshot = find(normalizedIsin)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
         List<SnapshotHistoryView.FindingHistoryEntry> findings = findingHistory
                 .findBySnapshotIsin(snapshot.getIsin()).stream()
@@ -119,7 +121,7 @@ public class CompanySnapshotService {
     /** Snapshot in import format (stored group and group source); requires a group so the live import is valid. */
     public UpsertCompanySnapshotRequest export(String isin) {
         String normalizedIsin = normalizeIsin(isin);
-        CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
+        CompanySnapshot snapshot = find(normalizedIsin)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
         String groupKey = snapshot.getGroupKey();
         if (groupKey == null) {
@@ -136,7 +138,7 @@ public class CompanySnapshotService {
 
     public CompanySnapshotView assignGroupManually(String isin, String groupKey) {
         String normalizedIsin = normalizeIsin(isin);
-        CompanySnapshot snapshot = repository.findByIsin(normalizedIsin)
+        CompanySnapshot snapshot = find(normalizedIsin)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
         String previous = snapshot.getGroupKey();
         GroupSource previousSource = snapshot.getGroupSource();
@@ -162,9 +164,14 @@ public class CompanySnapshotService {
 
     public CompanySnapshotView getByIsin(String isin) {
         String normalizedIsin = normalizeIsin(isin);
-        return repository.findByIsin(normalizedIsin)
+        return find(normalizedIsin)
                 .map(this::toView)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(isin));
+    }
+
+    /** An invalid ISIN can never exist: not found without a lookup (DynamoDB rejects keys over 1024 bytes). */
+    private Optional<CompanySnapshot> find(String normalizedIsin) {
+        return CompanySnapshot.isValidIsin(normalizedIsin) ? repository.findByIsin(normalizedIsin) : Optional.empty();
     }
 
     private static String normalizeIsin(String isin) {

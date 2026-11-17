@@ -15,10 +15,10 @@ final class HistoryQuery {
     private HistoryQuery() {
     }
 
-    /** All items of a partition whose sort key starts with the prefix, consistent read. */
+    /** All items of a partition whose sort key starts with the prefix (eventually consistent: read-only views). */
     static List<Map<String, AttributeValue>> items(DynamoDbClient client, String table, String pk,
                                                     String skPrefix, boolean newestFirst) {
-        QueryRequest request = QueryRequest.builder().tableName(table).consistentRead(true)
+        QueryRequest request = QueryRequest.builder().tableName(table).consistentRead(false)
                 .keyConditionExpression("pk = :pk AND begins_with(sk, :p)")
                 .expressionAttributeValues(Map.of(":pk", AttributeValue.fromS(pk),
                         ":p", AttributeValue.fromS(skPrefix)))

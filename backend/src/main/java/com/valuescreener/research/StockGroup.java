@@ -40,6 +40,11 @@ public class StockGroup {
         return key == null ? "" : key.trim().toUpperCase();
     }
 
+    /** True for a normalized key that can exist (pattern and length; NONE is reserved). */
+    static boolean isValidKey(String normalized) {
+        return normalized != null && KEY_PATTERN.matcher(normalized).matches() && !RESERVED_NONE.equals(normalized);
+    }
+
     private static String normalizeKey(String key) {
         String normalized = trimUpper(key);
         if (!KEY_PATTERN.matcher(normalized).matches()) {

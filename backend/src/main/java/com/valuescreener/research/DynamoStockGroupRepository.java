@@ -18,7 +18,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhanced
 import software.amazon.awssdk.enhanced.dynamodb.model.UpdateItemEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.CancellationReason;
-import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 import java.util.Comparator;
@@ -47,12 +46,17 @@ public class DynamoStockGroupRepository implements StockGroupRepository {
         return Optional.ofNullable(item).map(StockGroupItem::toDomain);
     }
 
+    /** Eventually consistent: read-only views (list, names). */
     @Override
     public List<StockGroup> findAll() {
+        return readAll(false);
+    }
+
+    private List<StockGroup> readAll(boolean consistent) {
         return groups.query(QueryEnhancedRequest.builder()
                         .queryConditional(QueryConditional.keyEqualTo(
                                 Key.builder().partitionValue(StockGroupItem.PK).build()))
-                        .consistentRead(true).build())
+                        .consistentRead(consistent).build())
                 .items().stream().map(StockGroupItem::toDomain).toList();
     }
 
@@ -66,7 +70,7 @@ public class DynamoStockGroupRepository implements StockGroupRepository {
 
     @Override
     public int maxSortOrder() {
-        return findAll().stream().map(StockGroup::getSortOrder).max(Comparator.naturalOrder()).orElse(0);
+        return readAll(true).stream().map(StockGroup::getSortOrder).max(Comparator.naturalOrder()).orElse(0);
     }
 
     @Override
@@ -98,12 +102,9 @@ public class DynamoStockGroupRepository implements StockGroupRepository {
         StockGroupItem item = StockGroupItem.from(group);
         if (GroupNameItem.sortKey(previousName).equals(GroupNameItem.sortKey(group.getName()))) {
             // same guard (also a case-only rename): one item, no guard operations
-            try {
-                groups.updateItem(UpdateItemEnhancedRequest.builder(StockGroupItem.class)
-                        .item(item).ignoreNulls(true).build());
-            } catch (ConditionalCheckFailedException e) {
-                throw concurrent(group, e);
-            }
+            ItemConditions.guarded("Group " + group.getKey() + " was changed concurrently",
+                    () -> groups.updateItem(UpdateItemEnhancedRequest.builder(StockGroupItem.class)
+                            .item(item).ignoreNulls(true).build()));
         } else {
             try {
                 client.transactWriteItems(TransactWriteItemsEnhancedRequest.builder()

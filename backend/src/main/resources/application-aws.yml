@@ -4,8 +4,9 @@
 # SSM parameter names (the import prefix is stripped, the rest is the property name):
 #   /value-screener/app.admin.password-hash
 #   /value-screener/app.security.origin-verify.secret
-#   /value-screener/app.users[<n>].username      (per extra user, both parameters of an index
-#   /value-screener/app.users[<n>].password-hash  must exist: a list comes from ONE property source)
+#   /value-screener/app.users.<n>.username       (per extra user, <n> = 0, 1, ...; both parameters of an
+#   /value-screener/app.users.<n>.password-hash   index must exist: a list comes from ONE property source;
+#                                                 SSM names allow no brackets, Spring binds app.users.0.* into the list)
 # ADMIN_USERNAME and the other non-secret settings are Lambda environment variables.
 spring:
   config:

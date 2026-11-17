@@ -3,6 +3,8 @@ package com.valuescreener.persistence;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.CancellationReason;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.TransactionConflictException;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 
@@ -40,5 +42,18 @@ public final class ItemConditions {
     public static boolean isConflict(TransactionCanceledException e) {
         return e.cancellationReasons().stream().map(CancellationReason::code)
                 .anyMatch(c -> "ConditionalCheckFailed".equals(c) || "TransactionConflict".equals(c));
+    }
+
+    /**
+     * Runs a single-item conditional write. A failed condition and a collision with an in-flight transaction
+     * on the same item ({@link TransactionConflictException}, which the SDK does not retry) both mean the
+     * caller lost against a concurrent writer: {@link ConcurrentUpdateException} (409).
+     */
+    public static void guarded(String message, Runnable write) {
+        try {
+            write.run();
+        } catch (ConditionalCheckFailedException | TransactionConflictException e) {
+            throw new ConcurrentUpdateException(message, e);
+        }
     }
 }

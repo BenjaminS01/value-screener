@@ -237,9 +237,17 @@ CloudFront edge. To get the real client IP without letting clients forge it:
 
 ### 7.4 Secrets and configuration
 
-- Secrets in **SSM Parameter Store `SecureString`** (standard tier, AWS-managed key `aws/ssm`, free):
-  `ADMIN_PASSWORD_HASH`, each `APP_USERS_<n>_PASSWORD_HASH`, the origin-verify value, later the
-  research-sync token hash and other keys.
+- Secrets in **SSM Parameter Store `SecureString`** (standard tier, AWS-managed key `aws/ssm`, free).
+  Parameter names allow only `a-zA-Z0-9_.-/` (no brackets); Spring Cloud AWS maps the path below the import
+  prefix `/value-screener/` to the property name, and Spring Boot binds `app.users.0.username` into the
+  `app.users` list. A list must come from ONE property source, so for extra users **both** the username and
+  the hash come from SSM. The exact names:
+  - `/value-screener/app.admin.password-hash`
+  - `/value-screener/app.security.origin-verify.secret`
+  - per extra user `<n>` = 0, 1, ...: `/value-screener/app.users.<n>.username` and
+    `/value-screener/app.users.<n>.password-hash` (both of an index must exist)
+  - later the research-sync token hash and other keys.
+  The admin username is not secret: it is the Lambda environment variable `ADMIN_USERNAME`.
 - Terraform creates each user-supplied parameter with a placeholder value and
   `lifecycle { ignore_changes = [value] }`. **The user enters the real value once in the AWS console**
   (browser). Never via CLI arguments.
@@ -247,7 +255,7 @@ CloudFront edge. To get the real client IP without letting clients forge it:
   `/value-screener/`); the Lambda role may read only that prefix. Values read during SnapStart init end
   up in the encrypted snapshot; after changing a value a new version must be published (deploy). This
   is accepted (rare password changes).
-- Non-secret config (usernames, limits, `mode: lambda`, function name, table name(s)) as Lambda
+- Non-secret config (admin username, limits, `mode: lambda`, function name, table name(s)) as Lambda
   environment variables set by Terraform.
 - `app.research-ingest.enabled` stays `false` in AWS (never set its variables). `app.research-sync`
   stays disabled until the deferred live-transfer topic.

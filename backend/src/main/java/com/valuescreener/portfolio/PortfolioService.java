@@ -1,11 +1,13 @@
 package com.valuescreener.portfolio;
 
+import com.valuescreener.research.CompanySnapshot;
 import com.valuescreener.research.InvestmentThesis;
 import com.valuescreener.research.InvestmentThesisService;
 import com.valuescreener.research.StockGroupLookup;
 import com.valuescreener.research.StockGroupRef;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +29,9 @@ public class PortfolioService {
 
     public void buy(BuyPositionRequest request) {
         String isin = normalizeIsin(request.isin());
+        if (!CompanySnapshot.isValidIsin(isin)) {
+            throw new IllegalArgumentException("isin must be a valid 12-character ISIN"); // before any lookup
+        }
         // Everything is prepared and validated in memory first (a too-long thesis or invalid input
         // aborts before anything is written); then position and thesis are written in one transaction.
         InvestmentThesis thesis = null;
@@ -76,7 +81,7 @@ public class PortfolioService {
     public List<PortfolioPositionView> listForUser() {
         List<PortfolioPosition> positions = repository.findAll();
         Map<String, StockGroupRef> groups = groupsFor(positions);
-        return positions.stream()
+        return sorted(positions).stream()
                 .map(p -> new PortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName(),
                         groups.get(p.getIsin())))
                 .toList();
@@ -85,10 +90,17 @@ public class PortfolioService {
     public List<AdminPortfolioPositionView> listForAdmin() {
         List<PortfolioPosition> positions = repository.findAll();
         Map<String, StockGroupRef> groups = groupsFor(positions);
-        return positions.stream()
+        return sorted(positions).stream()
                 .map(p -> new AdminPortfolioPositionView(p.getTicker(), p.getIsin(), p.getCompanyName(),
                         groups.get(p.getIsin()), p.getQuantity(), p.getEntryPrice(), p.getPurchaseDate()))
                 .toList();
+    }
+
+    /** By company name (case-insensitive), then ISIN. */
+    private static List<PortfolioPosition> sorted(List<PortfolioPosition> positions) {
+        return positions.stream().sorted(Comparator
+                .comparing(PortfolioPosition::getCompanyName, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(PortfolioPosition::getIsin)).toList();
     }
 
     private Map<String, StockGroupRef> groupsFor(List<PortfolioPosition> positions) {
@@ -101,6 +113,9 @@ public class PortfolioService {
 
     private PortfolioPosition find(String isin) {
         String normalized = normalizeIsin(isin);
+        if (!CompanySnapshot.isValidIsin(normalized)) {
+            throw new PositionNotFoundException(normalized); // can never exist; do not send it to DynamoDB
+        }
         return repository.findByIsin(normalized)
                 .orElseThrow(() -> new PositionNotFoundException(normalized));
     }
