@@ -156,7 +156,7 @@ class StockGroupRepositoryTest extends DynamoTestSupport {
 
         assertThatThrownBy(() -> repository.delete(banks))
                 .isInstanceOf(StockGroupConflictException.class)
-                .hasMessage("Group BANKS appears in the group history and cannot be deleted");
+                .hasMessage("Group BANKS was assigned to a stock and cannot be deleted");
         assertThat(repository.findById("BANKS")).isPresent();
         assertThat(repository.existsByNameIgnoreCase("Banks")).isTrue();
     }

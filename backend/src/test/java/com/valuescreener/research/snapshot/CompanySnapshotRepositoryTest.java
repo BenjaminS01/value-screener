@@ -6,13 +6,10 @@ import com.valuescreener.research.group.StockGroupConflictException;
 import com.valuescreener.research.group.StockGroupRepository;
 import com.valuescreener.research.group.UnknownGroupException;
 import com.valuescreener.research.history.DynamoResearchFindingHistoryRepository;
-import com.valuescreener.research.history.DynamoStockGroupHistoryRepository;
 import com.valuescreener.research.history.HistoryOrigin;
 import com.valuescreener.research.history.ReplacedFinding;
 import com.valuescreener.research.history.ResearchFindingHistory;
 import com.valuescreener.research.history.ResearchFindingHistoryRepository;
-import com.valuescreener.research.history.StockGroupHistory;
-import com.valuescreener.research.history.StockGroupHistoryRepository;
 import com.valuescreener.persistence.ConcurrentUpdateException;
 import com.valuescreener.persistence.DynamoProperties;
 import com.valuescreener.persistence.DynamoTableInitializer;
@@ -34,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,7 +45,6 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
     private DynamoProperties props;
     private CompanySnapshotRepository repository;
     private ResearchFindingHistoryRepository findingHistory;
-    private StockGroupHistoryRepository groupHistory;
     private StockGroupRepository groups;
 
     @BeforeEach
@@ -58,7 +53,6 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         new DynamoTableInitializer(client, props).run(null);
         repository = new DynamoCompanySnapshotRepository(client, props);
         findingHistory = new DynamoResearchFindingHistoryRepository(client, props);
-        groupHistory = new DynamoStockGroupHistoryRepository(client, props);
         groups = new DynamoStockGroupRepository(DynamoDbEnhancedClient.builder().dynamoDbClient(client).build(), props);
         groups.create(new StockGroup("BANKS", "Banks", 10));
         groups.create(new StockGroup("INSURANCE", "Insurance", 20));
@@ -72,14 +66,9 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         return s;
     }
 
-    private static StockGroupHistory firstAssignment(String isin, String groupKey) {
-        return new StockGroupHistory(isin, null, null, groupKey, GroupSource.AI, T0, HistoryOrigin.INGEST);
-    }
-
     private CompanySnapshot saveWithGroup(String ticker, String isin, String groupKey) {
         CompanySnapshot s = snapshot(ticker, isin, groupKey);
-        return repository.save(s, List.of(), groupKey == null ? Optional.empty()
-                : Optional.of(firstAssignment(isin, groupKey)));
+        return repository.save(s, List.of(), groupKey != null);
     }
 
     private static ResearchFindingHistory replaced(String isin, String claim, Instant at) {
@@ -110,7 +99,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         }
         assertThat(criteria).hasSize(18);
 
-        CompanySnapshot saved = repository.save(s, List.of(), Optional.of(firstAssignment(ISIN, "BANKS")));
+        CompanySnapshot saved = repository.save(s, List.of(), true);
 
         assertThat(saved).isSameAs(s);
         assertThat(saved.version()).isEqualTo(1L);
@@ -155,7 +144,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
     void numbersAreStoredAsNumbersAndScaleDoesNotMatter() {
         CompanySnapshot s = snapshot("AAPL", ISIN, null);
         s.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("1.5"), null, "c", null, AS_OF);
-        repository.save(s, List.of(), Optional.empty());
+        repository.save(s, List.of(), false);
 
         Map<String, AttributeValue> item = rawItem("SNAPSHOT", "ISIN#" + ISIN);
         assertThat(item.get("findings").m().get("PE_RATIO").m().get("numericValue").n()).isNotNull();
@@ -196,8 +185,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         // group change moves the index groupKey
         CompanySnapshot moved = repository.findByIsin("US0000000001").orElseThrow();
         moved.assignGroup(new StockGroup("INSURANCE", "Insurance", 20), GroupSource.MANUAL);
-        repository.save(moved, List.of(), Optional.of(new StockGroupHistory("US0000000001", "BANKS", GroupSource.AI,
-                "INSURANCE", GroupSource.MANUAL, T0, HistoryOrigin.MANUAL)));
+        repository.save(moved, List.of(), true);
         assertThat(rawItem("SNAPINDEX", "ISIN#US0000000001").get("groupKey").s()).isEqualTo("INSURANCE");
         assertThat(repository.countByGroupKey("BANKS")).isZero();
         assertThat(repository.countByGroupKey("INSURANCE")).isEqualTo(1);
@@ -208,24 +196,23 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         saveWithGroup("AAA", ISIN, "BANKS");
         CompanySnapshot stale = repository.findByIsin(ISIN).orElseThrow();
         CompanySnapshot fresh = repository.findByIsin(ISIN).orElseThrow();
-        repository.save(fresh, List.of(), Optional.empty());
+        repository.save(fresh, List.of(), false);
         stale.assignGroup(new StockGroup("INSURANCE", "Insurance", 20), GroupSource.MANUAL);
 
-        assertThatThrownBy(() -> repository.save(stale, List.of(), Optional.of(new StockGroupHistory(ISIN, "BANKS",
-                GroupSource.AI, "INSURANCE", GroupSource.MANUAL, T0, HistoryOrigin.MANUAL))))
+        assertThatThrownBy(() -> repository.save(stale, List.of(), true))
                 .isInstanceOf(ConcurrentUpdateException.class);
 
         assertThat(rawItem("SNAPINDEX", "ISIN#" + ISIN).get("groupKey").s()).isEqualTo("BANKS");
 
         // a failed create writes no index item either
         CompanySnapshot duplicate = snapshot("DUP", ISIN, null);
-        assertThatThrownBy(() -> repository.save(duplicate, List.of(), Optional.empty()))
+        assertThatThrownBy(() -> repository.save(duplicate, List.of(), false))
                 .isInstanceOf(ConcurrentUpdateException.class);
         assertThat(rawPartition("SNAPINDEX")).hasSize(1);
         CompanySnapshot never = snapshot("NEV", "US0000000009", null);
         groups.delete(groups.findById("INSURANCE").orElseThrow());
         never.assignGroup(new StockGroup("INSURANCE", "Insurance", 20), GroupSource.AI);
-        assertThatThrownBy(() -> repository.save(never, List.of(), Optional.of(firstAssignment("US0000000009", "INSURANCE"))))
+        assertThatThrownBy(() -> repository.save(never, List.of(), true))
                 .isInstanceOf(UnknownGroupException.class);
         assertThat(rawPartition("SNAPINDEX")).hasSize(1);
     }
@@ -248,7 +235,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
             String isin = String.format("US00000000%02d", i);
             CompanySnapshot s = new CompanySnapshot("T" + i, isin, "Name", "USA", big);
             s.assignGroup(new StockGroup("BANKS", "Banks", 10), GroupSource.AI);
-            repository.save(s, List.of(), i == 0 ? Optional.of(firstAssignment(isin, "BANKS")) : Optional.empty());
+            repository.save(s, List.of(), i == 0);
         }
 
         assertThat(repository.findAll()).hasSize(60);
@@ -267,7 +254,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
             for (int i = 0; i < 18; i++) {
                 entries.add(replaced(ISIN, big + round + "-" + i, T0.plusSeconds(round)));
             }
-            repository.save(current, entries, Optional.empty());
+            repository.save(current, entries, false);
         }
 
         assertThat(findingHistory.findBySnapshotIsin(ISIN)).hasSize(12 * 18);
@@ -280,10 +267,10 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         CompanySnapshot stale = repository.findByIsin(ISIN).orElseThrow();
 
         first.applyUpdate("Apple Inc.", "USA", "Newer description");
-        repository.save(first, List.of(), Optional.empty());
+        repository.save(first, List.of(), false);
         stale.applyUpdate("Apple Inc.", "USA", "Stale description");
 
-        assertThatThrownBy(() -> repository.save(stale, List.of(), Optional.empty()))
+        assertThatThrownBy(() -> repository.save(stale, List.of(), false))
                 .isInstanceOf(ConcurrentUpdateException.class);
         CompanySnapshot read = repository.findByIsin(ISIN).orElseThrow();
         assertThat(read.getBusinessDescription()).isEqualTo("Newer description");
@@ -294,7 +281,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
     void creatingTheSameIsinTwiceIsRejected() {
         saveWithGroup("AAPL", ISIN, null);
 
-        assertThatThrownBy(() -> repository.save(snapshot("AAPL", ISIN, null), List.of(), Optional.empty()))
+        assertThatThrownBy(() -> repository.save(snapshot("AAPL", ISIN, null), List.of(), false))
                 .isInstanceOf(ConcurrentUpdateException.class);
     }
 
@@ -306,7 +293,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         Instant same = T0.plusSeconds(60);
         repository.save(current, List.of(replaced(ISIN, "a", same), replaced(ISIN, "b", same),
                 replaced(ISIN, "c", same), replaced(ISIN, "oldest", T0.minusSeconds(60)),
-                replaced(ISIN, "newest", same.plusNanos(1))), Optional.empty());
+                replaced(ISIN, "newest", same.plusNanos(1))), false);
 
         List<String> claims = findingHistory.findBySnapshotIsin(ISIN).stream()
                 .map(ResearchFindingHistory::getClaim).toList();
@@ -322,7 +309,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         CompanySnapshot current = repository.findByIsin(ISIN).orElseThrow();
         repository.save(current, List.of(replaced(ISIN, "x", Instant.parse("2026-11-12T10:00:00Z")),
                 replaced(ISIN, "y", Instant.parse("2026-11-12T10:00:00.5Z")),
-                replaced(ISIN, "z", Instant.parse("2026-11-12T10:00:00.000000001Z"))), Optional.empty());
+                replaced(ISIN, "z", Instant.parse("2026-11-12T10:00:00.000000001Z"))), false);
 
         List<String> sortKeys = rawPartition("SNAPSHOT#" + ISIN).stream().map(i -> i.get("sk").s())
                 .filter(k -> k.startsWith("FHIST#")).toList();
@@ -341,7 +328,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         ResearchFindingHistory entry = new ResearchFindingHistory(ISIN, new ReplacedFinding(
                 ResearchCriterion.MOAT_ASSESSMENT, new BigDecimal("28.4712"), true, "Old claim",
                 "https://example.com/x", AS_OF), T0, HistoryOrigin.SYNC);
-        repository.save(current, List.of(entry), Optional.empty());
+        repository.save(current, List.of(entry), false);
 
         ResearchFindingHistory read = findingHistory.findBySnapshotIsin(ISIN).get(0);
 
@@ -359,33 +346,10 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
     @Test
     void historyNumbersComeBackWithScaleFour() {
         saveWithGroup("AAPL", ISIN, "BANKS");
-        repository.save(repository.findByIsin(ISIN).orElseThrow(), List.of(replaced(ISIN, "c", T0)), Optional.empty());
+        repository.save(repository.findByIsin(ISIN).orElseThrow(), List.of(replaced(ISIN, "c", T0)), false);
 
         assertThat(findingHistory.findBySnapshotIsin(ISIN).get(0).getNumericValue())
                 .isEqualTo(new BigDecimal("1.5000"));
-    }
-
-    @Test
-    void groupHistoryIsStoredAndReadNewestFirst() {
-        saveWithGroup("AAPL", ISIN, "BANKS");
-        CompanySnapshot current = repository.findByIsin(ISIN).orElseThrow();
-        current.assignGroup(new StockGroup("INSURANCE", "Insurance", 20), GroupSource.MANUAL);
-        repository.save(current, List.of(), Optional.of(new StockGroupHistory(ISIN, "BANKS", GroupSource.AI,
-                "INSURANCE", GroupSource.MANUAL, T0.plusSeconds(5), HistoryOrigin.MANUAL)));
-
-        List<StockGroupHistory> read = groupHistory.findBySnapshotIsin(ISIN);
-
-        assertThat(read).hasSize(2);
-        assertThat(read.get(0).getPreviousGroupKey()).isEqualTo("BANKS");
-        assertThat(read.get(0).getPreviousSource()).isEqualTo(GroupSource.AI);
-        assertThat(read.get(0).getNewGroupKey()).isEqualTo("INSURANCE");
-        assertThat(read.get(0).getNewSource()).isEqualTo(GroupSource.MANUAL);
-        assertThat(read.get(0).getOrigin()).isEqualTo(HistoryOrigin.MANUAL);
-        assertThat(read.get(0).getChangedAt()).isEqualTo(T0.plusSeconds(5));
-        assertThat(read.get(1).getPreviousGroupKey()).isNull();
-        assertThat(read.get(1).getPreviousSource()).isNull();
-        assertThat(read.get(1).getSnapshotIsin()).isEqualTo(ISIN);
-        assertThat(groupHistory.findBySnapshotIsin("US0000000000")).isEmpty();
     }
 
     @Test
@@ -393,16 +357,14 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         saveWithGroup("AAPL", ISIN, "BANKS");
         CompanySnapshot first = repository.findByIsin(ISIN).orElseThrow();
         CompanySnapshot stale = repository.findByIsin(ISIN).orElseThrow();
-        repository.save(first, List.of(), Optional.empty());
+        repository.save(first, List.of(), false);
         stale.assignGroup(new StockGroup("INSURANCE", "Insurance", 20), GroupSource.MANUAL);
 
         assertThatThrownBy(() -> repository.save(stale, List.of(replaced(ISIN, "lost", T0)),
-                Optional.of(new StockGroupHistory(ISIN, "BANKS", GroupSource.AI, "INSURANCE",
-                        GroupSource.MANUAL, T0, HistoryOrigin.MANUAL))))
+                true))
                 .isInstanceOf(ConcurrentUpdateException.class);
 
         assertThat(findingHistory.findBySnapshotIsin(ISIN)).isEmpty();
-        assertThat(groupHistory.findBySnapshotIsin(ISIN)).hasSize(1); // only the first assignment
         assertThat(repository.findByIsin(ISIN).orElseThrow().getGroupKey()).isEqualTo("BANKS");
         // the reference mark of the group was part of the failed transaction too
         assertThat(rawItem("GROUP", "KEY#INSURANCE")).doesNotContainKey("referenced");
@@ -415,7 +377,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         CompanySnapshot s = snapshot("AAPL", ISIN, "TEMP");
 
         assertThatThrownBy(() -> repository.save(s, List.of(replaced(ISIN, "x", T0)),
-                Optional.of(firstAssignment(ISIN, "TEMP"))))
+                true))
                 .isInstanceOf(UnknownGroupException.class)
                 .hasMessage("Unknown group key: TEMP");
 
@@ -429,12 +391,18 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         saveWithGroup("AAPL", ISIN, "BANKS");
         CompanySnapshot moved = repository.findByIsin(ISIN).orElseThrow();
         moved.assignGroup(new StockGroup("INSURANCE", "Insurance", 20), GroupSource.MANUAL);
-        repository.save(moved, List.of(), Optional.of(new StockGroupHistory(ISIN, "BANKS", GroupSource.AI,
-                "INSURANCE", GroupSource.MANUAL, T0, HistoryOrigin.MANUAL)));
+        repository.save(moved, List.of(), true);
 
-        // BANKS holds no snapshot any more but appears in the history
+        // BANKS holds no snapshot any more but was referenced once
         assertThatThrownBy(() -> groups.delete(groups.findById("BANKS").orElseThrow()))
                 .isInstanceOf(StockGroupConflictException.class);
+    }
+
+    @Test
+    void saveWithoutGroupChangeDoesNotMarkTheGroup() {
+        repository.save(snapshot("AAPL", ISIN, "INSURANCE"), List.of(), false);
+
+        assertThat(rawItem("GROUP", "KEY#INSURANCE")).doesNotContainKey("referenced");
     }
 
     @Test
@@ -452,11 +420,9 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         }
         current.assignGroup(new StockGroup("INSURANCE", "Insurance", 20), GroupSource.MANUAL);
 
-        repository.save(current, entries, Optional.of(new StockGroupHistory(ISIN, "BANKS", GroupSource.AI,
-                "INSURANCE", GroupSource.MANUAL, T0, HistoryOrigin.MANUAL)));
+        repository.save(current, entries, true);
 
         assertThat(findingHistory.findBySnapshotIsin(ISIN)).hasSize(18);
-        assertThat(groupHistory.findBySnapshotIsin(ISIN)).hasSize(2);
         assertThat(repository.findByIsin(ISIN).orElseThrow().getFindings()).hasSize(18);
     }
 
@@ -479,7 +445,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         assertThat(DynamoCompanySnapshotRepository.translate(other, "AAPL", "G", 3)).isSameAs(other);
         // without a group reference the last index is a history item: never "unknown group"
         assertThat(DynamoCompanySnapshotRepository.translate(groupMissing, "AAPL", null, 3)).isSameAs(groupMissing);
-        // composition with a group change: [snapshot, finding history, group history, index, markReferenced]
+        // composition with a group change: [snapshot, finding history x2, index, markReferenced]
         assertThat(DynamoCompanySnapshotRepository.translate(
                 canceled("None", "None", "None", "None", "ConditionalCheckFailed"), "AAPL", "G", 5))
                 .isInstanceOf(UnknownGroupException.class);

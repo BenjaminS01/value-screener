@@ -5,6 +5,9 @@ Parent spec: [`2026-11-03-app-scope-v2-design.md`](2026-11-03-app-scope-v2-desig
 Builds on: phase 1 backend ([`2026-11-04-v2-phase1-backend-research-groups-design.md`](2026-11-04-v2-phase1-backend-research-groups-design.md))
 and phase 2a frontend ([`2026-11-08-v2-phase2a-frontend-design.md`](2026-11-08-v2-phase2a-frontend-design.md)).
 
+> **Update 2026-11-18:** the stock group history (and the "Gruppenverlauf" block) was removed; only the
+> finding history remains. See [`2026-11-18-remove-group-history-design.md`](2026-11-18-remove-group-history-design.md).
+
 ## 1. Intent
 
 The owner looks at research data to make decisions about real positions. Three things are missing:

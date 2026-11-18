@@ -2,15 +2,12 @@ package com.valuescreener.research.snapshot;
 
 import com.valuescreener.research.group.StockGroup;
 import com.valuescreener.research.group.StockGroupConflictException;
-import com.valuescreener.research.group.StockGroupRef;
 import com.valuescreener.research.group.StockGroupService;
 import com.valuescreener.research.history.HistoryOrigin;
 import com.valuescreener.research.history.ReplacedFinding;
 import com.valuescreener.research.history.ResearchFindingHistory;
 import com.valuescreener.research.history.ResearchFindingHistoryRepository;
 import com.valuescreener.research.history.SnapshotHistoryView;
-import com.valuescreener.research.history.StockGroupHistory;
-import com.valuescreener.research.history.StockGroupHistoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,17 +30,15 @@ public class CompanySnapshotService {
     private final StockGroupService groups;
     private final ResearchFreshness freshness;
     private final ResearchFindingHistoryRepository findingHistory;
-    private final StockGroupHistoryRepository groupHistory;
     private final Clock clock;
 
     public CompanySnapshotService(CompanySnapshotRepository repository, StockGroupService groups,
                                   ResearchFreshness freshness, ResearchFindingHistoryRepository findingHistory,
-                                  StockGroupHistoryRepository groupHistory, Clock clock) {
+                                  Clock clock) {
         this.repository = repository;
         this.groups = groups;
         this.freshness = freshness;
         this.findingHistory = findingHistory;
-        this.groupHistory = groupHistory;
         this.clock = clock;
     }
 
@@ -61,7 +56,6 @@ public class CompanySnapshotService {
             snapshot.applyUpdate(request.companyName(), request.country(), request.businessDescription());
         }
         String kept = snapshot.getGroupKey();
-        GroupSource keptSource = snapshot.getGroupSource();
         boolean assigned = snapshot.assignGroup(group, source);
         if (!assigned && (kept == null || !kept.equals(group.getKey()))) {
             log.info("group proposal ignored isin={} proposed={} kept={}",
@@ -76,20 +70,13 @@ public class CompanySnapshotService {
         Instant now = clock.instant();
         List<ResearchFindingHistory> findingEntries = replaced.stream()
                 .map(old -> new ResearchFindingHistory(normalizedIsin, old, now, origin)).toList();
-        Optional<StockGroupHistory> groupEntry = groupChange(snapshot, kept, keptSource, origin, now);
-        return toView(repository.save(snapshot, findingEntries, groupEntry));
+        return toView(repository.save(snapshot, findingEntries, groupChanged(snapshot, kept)));
     }
 
-    private static Optional<StockGroupHistory> groupChange(CompanySnapshot snapshot, String previous,
-                                                           GroupSource previousSource, HistoryOrigin origin,
-                                                           Instant now) {
+    /** True when the snapshot now has a group key it did not have before (the new group must be marked). */
+    private static boolean groupChanged(CompanySnapshot snapshot, String previous) {
         String current = snapshot.getGroupKey();
-        boolean sameKey = previous != null && previous.equals(current);
-        if (sameKey && previousSource == snapshot.getGroupSource()) {
-            return Optional.empty();
-        }
-        return Optional.of(new StockGroupHistory(snapshot.getIsin(), previous, previousSource, current,
-                snapshot.getGroupSource(), now, origin));
+        return current != null && !current.equals(previous);
     }
 
     /** Single snapshot: the group name comes from one lookup (the view shows key and name). */
@@ -115,18 +102,7 @@ public class CompanySnapshotService {
                         h.getBooleanValue(), h.getClaim(), h.getSourceUrl(), h.getAsOfDate(), h.getReplacedAt(),
                         h.getOrigin()))
                 .toList();
-        Map<String, String> names = groups.namesByKey();
-        List<SnapshotHistoryView.GroupHistoryEntry> groupEntries = groupHistory
-                .findBySnapshotIsin(snapshot.getIsin()).stream()
-                .map(h -> new SnapshotHistoryView.GroupHistoryEntry(ref(h.getPreviousGroupKey(), names),
-                        h.getPreviousSource(), ref(h.getNewGroupKey(), names), h.getNewSource(), h.getChangedAt(),
-                        h.getOrigin()))
-                .toList();
-        return new SnapshotHistoryView(findings, groupEntries);
-    }
-
-    private static StockGroupRef ref(String key, Map<String, String> names) {
-        return key == null ? null : new StockGroupRef(key, names.getOrDefault(key, key));
+        return new SnapshotHistoryView(findings);
     }
 
     /** Snapshot in import format (stored group and group source); requires a group so the live import is valid. */
@@ -152,11 +128,8 @@ public class CompanySnapshotService {
         CompanySnapshot snapshot = find(normalizedIsin)
                 .orElseThrow(() -> new CompanySnapshotNotFoundException(normalizedIsin));
         String previous = snapshot.getGroupKey();
-        GroupSource previousSource = snapshot.getGroupSource();
         snapshot.assignGroup(groups.require(StockGroup.trimUpper(groupKey)), GroupSource.MANUAL);
-        Optional<StockGroupHistory> groupEntry = groupChange(snapshot, previous, previousSource,
-                HistoryOrigin.MANUAL, clock.instant());
-        return toView(repository.save(snapshot, List.of(), groupEntry));
+        return toView(repository.save(snapshot, List.of(), groupChanged(snapshot, previous)));
     }
 
     /** null = all, "none" = ungrouped, otherwise a (normalized) group key; an unknown key yields an empty list. */

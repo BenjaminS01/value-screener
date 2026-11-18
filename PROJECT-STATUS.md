@@ -22,7 +22,7 @@ plan named here. Dead code (`HistoryQuery.count`, `IpState.expired`) was removed
   - Rename `persistence/HistoryQuery` → `PartitionQueries` (it reads snapshot, index and history partitions).
   - `app.dynamodb.seed-groups` as a field of `DynamoProperties` instead of two `@Value`s.
   - `Ttl.epochSeconds`: round up instead of truncating (an item can read as expired up to <1 s early).
-  - Group delete with a stale version: answer with the conflict body instead of "appears in the group history".
+  - Group delete with a stale version: answer with the conflict body instead of "was assigned to a stock".
   - `ItemConditions.versionEquals(null)`: `IllegalStateException` instead of `IllegalArgumentException`.
 
 **Deutsche Kurzfassung:** Offene Punkte aus den Reviews, bewusst nicht jetzt umgesetzt: Session-Härtung als
@@ -206,7 +206,8 @@ und Plan Teil 1
   - **Recherche-Historie:** In zwei Tabellen wird nur geschrieben, nie geändert (Migrationen V5 und
     V6 für die These). Geänderte Befunde und Gruppenwechsel werden mit Herkunft festgehalten
     (INGEST, SYNC oder MANUAL). Auf der Detailseite gibt es „Verlauf (n)“ und einen
-    „Gruppenverlauf“.
+    „Gruppenverlauf“. *(Der Gruppenverlauf wurde am 2026-11-18 entfernt, nur der Befund-Verlauf
+    bleibt.)*
     - Zahlen werden auf 4 Nachkommastellen gerundet, damit keine falschen Verlaufseinträge
       entstehen.
     - Eine Gruppe, die im Verlauf vorkommt, kann nicht gelöscht werden.

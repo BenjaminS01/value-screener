@@ -1,6 +1,5 @@
 package com.valuescreener.research.snapshot;
 
-import com.valuescreener.research.group.StockGroupRef;
 import com.valuescreener.research.history.HistoryOrigin;
 import com.valuescreener.research.history.SnapshotHistoryView;
 import com.valuescreener.SecuritySliceTestConfig;
@@ -39,10 +38,7 @@ class CompanySnapshotHistoryControllerTest {
                                 Instant.parse("2026-11-02T00:00:00Z"), HistoryOrigin.INGEST),
                         new SnapshotHistoryView.FindingHistoryEntry(ResearchCriterion.PE_RATIO,
                                 new BigDecimal("25.0"), null, "Older.", null, LocalDate.of(2026, 2, 1),
-                                Instant.parse("2026-08-01T00:00:00Z"), HistoryOrigin.SYNC)),
-                List.of(new SnapshotHistoryView.GroupHistoryEntry(null, null,
-                        new StockGroupRef("BANKS", "Banks"), GroupSource.MANUAL,
-                        Instant.parse("2026-11-03T00:00:00Z"), HistoryOrigin.MANUAL)));
+                                Instant.parse("2026-08-01T00:00:00Z"), HistoryOrigin.SYNC)));
     }
 
     @Test
@@ -54,9 +50,7 @@ class CompanySnapshotHistoryControllerTest {
                 .andExpect(jsonPath("$.findings[0].claim").value("Newer."))
                 .andExpect(jsonPath("$.findings[1].claim").value("Older."))
                 .andExpect(jsonPath("$.findings[0].origin").value("INGEST"))
-                .andExpect(jsonPath("$.groups[0].previousGroup").doesNotExist())
-                .andExpect(jsonPath("$.groups[0].newGroup.key").value("BANKS"))
-                .andExpect(jsonPath("$.groups[0].newSource").value("MANUAL"));
+                .andExpect(jsonPath("$.groups").doesNotExist());
     }
 
     @Test
@@ -65,7 +59,7 @@ class CompanySnapshotHistoryControllerTest {
 
         mockMvc.perform(get("/api/research/snapshots/US0378331005/history").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.groups[0].origin").value("MANUAL"));
+                .andExpect(jsonPath("$.findings[1].origin").value("SYNC"));
     }
 
     @Test

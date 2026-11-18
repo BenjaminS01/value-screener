@@ -8,7 +8,6 @@ import com.valuescreener.research.group.StockGroupService;
 import com.valuescreener.research.group.StockGroupView;
 import com.valuescreener.research.group.UnknownGroupException;
 import com.valuescreener.research.history.DynamoResearchFindingHistoryRepository;
-import com.valuescreener.research.history.DynamoStockGroupHistoryRepository;
 import com.valuescreener.research.history.HistoryOrigin;
 import com.valuescreener.research.history.SnapshotHistoryView;
 import com.valuescreener.persistence.DynamoProperties;
@@ -79,8 +78,7 @@ class CompanySnapshotServiceIntegrationTest extends DynamoTestSupport {
         groupService = new StockGroupService(groupRepository, snapshots);
         service = new CompanySnapshotService(snapshots, groupService,
                 new ResearchFreshness(clock, java.time.Period.ofMonths(9)),
-                new DynamoResearchFindingHistoryRepository(client, props),
-                new DynamoStockGroupHistoryRepository(client, props), clock);
+                new DynamoResearchFindingHistoryRepository(client, props), clock);
     }
 
     private UpsertCompanySnapshotRequest request(String groupKey, FindingRequest... findings) {
@@ -99,20 +97,13 @@ class CompanySnapshotServiceIntegrationTest extends DynamoTestSupport {
 
     @Test
     void historyIsWrittenOnlyForRealChangesAgainstARealDatabase() {
-        // (a) new ISIN with group G1: one group history entry without previous values, no finding history
+        // (a) new ISIN with group G1: no finding history
         upsert(request("BANKS", pe("24.1", "P/E is 24.1")));
-        SnapshotHistoryView afterCreate = service.history(ISIN);
-        assertThat(afterCreate.groups()).hasSize(1);
-        assertThat(afterCreate.groups().get(0).previousGroup()).isNull();
-        assertThat(afterCreate.groups().get(0).previousSource()).isNull();
-        assertThat(afterCreate.groups().get(0).newGroup().key()).isEqualTo("BANKS");
-        assertThat(afterCreate.groups().get(0).origin()).isEqualTo(HistoryOrigin.INGEST);
-        assertThat(afterCreate.findings()).isEmpty();
+        assertThat(service.history(ISIN).findings()).isEmpty();
 
         // (b) same findings, 24.10 vs 24.1, claim padded: no history, also after a round trip through DynamoDB
         upsert(request("BANKS", pe("24.10", "  P/E is 24.1  ")));
         assertThat(service.history(ISIN).findings()).isEmpty();
-        assertThat(service.history(ISIN).groups()).hasSize(1);
 
         // (c) more than 4 decimals, sent twice: rounded to 4 places, the second send is no change
         CompanySnapshotView first = upsert(request("BANKS", pe("28.47123", "P/E is 28.47")));
@@ -132,26 +123,19 @@ class CompanySnapshotServiceIntegrationTest extends DynamoTestSupport {
         assertThat(latest.origin()).isEqualTo(HistoryOrigin.INGEST);
         assertThat(service.getByIsin(ISIN).findings().get(0).numericValue()).isEqualByComparingTo("30.0");
 
-        // (e) manual assignment writes MANUAL history; repeating it writes nothing
+        // (e) manual assignment moves the stock; repeating it changes nothing and writes no finding history
         clock.tick();
         service.assignGroupManually(ISIN, "INSURANCE");
-        assertThat(service.history(ISIN).groups()).hasSize(2);
         clock.tick();
         service.assignGroupManually(ISIN, "INSURANCE");
-        SnapshotHistoryView history = service.history(ISIN);
-        assertThat(history.groups()).hasSize(2);
-        assertThat(history.groups().get(0).origin()).isEqualTo(HistoryOrigin.MANUAL);
-        assertThat(history.groups().get(0).newSource()).isEqualTo(GroupSource.MANUAL);
-        assertThat(history.groups().get(0).newGroup().key()).isEqualTo("INSURANCE");
-        assertThat(history.groups().get(0).newGroup().name()).isEqualTo("Insurance");
-        assertThat(history.groups().get(0).previousGroup().name()).isEqualTo("Banks");
-        assertThat(history.groups().get(1).origin()).isEqualTo(HistoryOrigin.INGEST);
-        assertThat(history.findings()).hasSize(afterFirst + 1);
+        assertThat(service.getByIsin(ISIN).group())
+                .isEqualTo(new SnapshotGroupView("INSURANCE", "Insurance", GroupSource.MANUAL));
+        assertThat(service.history(ISIN).findings()).hasSize(afterFirst + 1);
 
-        // (f) BANKS is unused now but appears in the group history: it cannot be deleted
+        // (f) BANKS holds no stock now but was assigned once: it cannot be deleted
         assertThatThrownBy(() -> groupService.delete("BANKS"))
                 .isInstanceOf(StockGroupConflictException.class)
-                .hasMessage("Group BANKS appears in the group history and cannot be deleted");
+                .hasMessage("Group BANKS was assigned to a stock and cannot be deleted");
     }
 
     @Test
@@ -164,7 +148,6 @@ class CompanySnapshotServiceIntegrationTest extends DynamoTestSupport {
 
         assertThat(view.group()).isEqualTo(new SnapshotGroupView("INSURANCE", "Insurance", GroupSource.MANUAL));
         assertThat(service.getByIsin(ISIN).group().source()).isEqualTo(GroupSource.MANUAL);
-        assertThat(service.history(ISIN).groups()).hasSize(2); // no entry for the ignored proposal
     }
 
     @Test

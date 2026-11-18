@@ -8,7 +8,6 @@ import {
   fetchGroups,
   fetchHistory,
   fetchSnapshot,
-  GroupHistoryEntry,
   StockGroup,
 } from '../api/researchApi'
 import type { AuthUser } from '../api/authApi'
@@ -79,12 +78,12 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
   const [snapshot, setSnapshot] = useState<CompanySnapshot | null>(null)
   const [groups, setGroups] = useState<StockGroup[]>([])
   const [findingHistory, setFindingHistory] = useState<FindingHistoryEntry[]>([])
-  const [groupHistory, setGroupHistory] = useState<GroupHistoryEntry[]>([])
   const [historyError, setHistoryError] = useState(false)
   const [held, setHeld] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedGroup, setSelectedGroup] = useState('')
+  const [editingGroup, setEditingGroup] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -108,7 +107,6 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
           (hist) => {
             if (cancelled) return
             setFindingHistory(hist.findings)
-            setGroupHistory(hist.groups)
           },
           () => {
             if (!cancelled) setHistoryError(true)
@@ -126,22 +124,25 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
     }
   }, [isin])
 
-  async function saveGroup() {
-    setSaving(true)
+  function editGroup() {
+    setSelectedGroup(snapshot?.group?.key ?? groups[0]?.key ?? '')
     setSaveError(null)
+    setEditingGroup(true)
+  }
+
+  async function saveGroup() {
+    setSaveError(null)
+    // Unchanged group: nothing to save, just leave edit mode.
+    if (selectedGroup === snapshot?.group?.key) {
+      setEditingGroup(false)
+      return
+    }
+    setSaving(true)
     try {
       const updated = await assignGroup(isin, selectedGroup)
       setSnapshot(updated)
       setSelectedGroup(updated.group?.key ?? selectedGroup)
-      // The save succeeded; a failing history reload must not undo that.
-      try {
-        const hist = await fetchHistory(isin)
-        setFindingHistory(hist.findings)
-        setGroupHistory(hist.groups)
-        setHistoryError(false)
-      } catch {
-        setHistoryError(true)
-      }
+      setEditingGroup(false)
     } catch (e) {
       setSaveError(writeErrorText(e))
     } finally {
@@ -198,47 +199,45 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
       <p>
         Beschreibung: <span>{snapshot.businessDescription?.trim() || '–'}</span>
       </p>
-      <p>
-        Gruppe:{' '}
-        {snapshot.group === null ? (
-          <span>–</span>
+      <div>
+        {editingGroup ? (
+          <>
+            <label>
+              Gruppe:{' '}
+              <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
+                {groups.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </label>{' '}
+            <button type="button" onClick={saveGroup} disabled={saving || selectedGroup === ''}>
+              Speichern
+            </button>
+          </>
         ) : (
-          <span>
-            {snapshot.group.name} ({snapshot.group.source === 'AI' ? 'KI-Vorschlag' : 'manuell'})
-          </span>
+          <>
+            Gruppe:{' '}
+            {snapshot.group === null ? (
+              <span>–</span>
+            ) : (
+              <span>
+                {snapshot.group.name} ({snapshot.group.source === 'AI' ? 'KI-Vorschlag' : 'manuell'})
+              </span>
+            )}
+            {user.role === 'ADMIN' && (
+              <>
+                {' '}
+                <button type="button" onClick={editGroup}>
+                  Bearbeiten
+                </button>
+              </>
+            )}
+          </>
         )}
-      </p>
-      {groupHistory.length > 0 && (
-        <div>
-          <h3>Gruppenverlauf</h3>
-          <ul>
-            {groupHistory.map((g, i) => (
-              <li key={i}>
-                {g.previousGroup?.name ?? '—'} → {g.newGroup.name} ({g.newSource === 'AI' ? 'KI-Vorschlag' : 'manuell'}) am{' '}
-                {formatDate(g.changedAt)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {user.role === 'ADMIN' && (
-        <div>
-          <label>
-            Gruppe
-            <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
-              {groups.map((g) => (
-                <option key={g.key} value={g.key}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" onClick={saveGroup} disabled={saving || selectedGroup === ''}>
-            Speichern
-          </button>
-          {saveError !== null && <p role="alert">{saveError}</p>}
-        </div>
-      )}
+        {saveError !== null && <p role="alert">{saveError}</p>}
+      </div>
 
       <InvestmentThesisSection user={user} isin={isin} />
 

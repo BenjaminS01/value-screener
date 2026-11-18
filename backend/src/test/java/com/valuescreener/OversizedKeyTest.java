@@ -13,7 +13,6 @@ import com.valuescreener.thesis.InvestmentThesisService;
 import com.valuescreener.research.history.ResearchFindingHistoryRepository;
 import com.valuescreener.research.snapshot.ResearchFreshness;
 import com.valuescreener.research.group.StockGroupController;
-import com.valuescreener.research.history.StockGroupHistoryRepository;
 import com.valuescreener.research.group.StockGroupLookup;
 import com.valuescreener.research.group.StockGroupRepository;
 import com.valuescreener.research.group.StockGroupService;
@@ -74,8 +73,6 @@ class OversizedKeyTest {
     @MockBean
     private ResearchFindingHistoryRepository findingHistory;
     @MockBean
-    private StockGroupHistoryRepository groupHistory;
-    @MockBean
     private PortfolioPositionRepository positions;
     @MockBean
     private StockGroupLookup lookup;
@@ -85,7 +82,7 @@ class OversizedKeyTest {
     private InvestmentThesisRepository theses;
 
     private void noRepositoryWasTouched() {
-        verifyNoInteractions(snapshots, groups, positions, theses, findingHistory, groupHistory, purchaseWriter);
+        verifyNoInteractions(snapshots, groups, positions, theses, findingHistory, purchaseWriter);
     }
 
     @Test

@@ -155,11 +155,11 @@ class StockGroupServiceTest {
         when(groups.findById("BANKS")).thenReturn(Optional.of(banks));
         when(snapshots.countByGroupKey("BANKS")).thenReturn(0L);
         org.mockito.Mockito.doThrow(new StockGroupConflictException(
-                "Group BANKS appears in the group history and cannot be deleted")).when(groups).delete(banks);
+                "Group BANKS was assigned to a stock and cannot be deleted")).when(groups).delete(banks);
 
         assertThatThrownBy(() -> service.delete("BANKS"))
                 .isInstanceOf(StockGroupConflictException.class)
-                .hasMessage("Group BANKS appears in the group history and cannot be deleted");
+                .hasMessage("Group BANKS was assigned to a stock and cannot be deleted");
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(snapshots, groups);
         order.verify(snapshots).countByGroupKey("BANKS");
         order.verify(groups).delete(banks);
