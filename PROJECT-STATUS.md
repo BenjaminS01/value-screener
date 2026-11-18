@@ -16,7 +16,9 @@ Pure moves, no behaviour change; the existing backend suite (541 tests) stays gr
 - **Removed:** `BASTI.md`.
 - **Docs and scripts:** main-class paths for `MachineTokenGenerator` and `AdminPasswordHashGenerator` updated
   in `dev-up.sh`, `.env.example`, `README.md`.
-- **Visibility:** a few security classes/members went package-private to `public` (needed across the new packages).
+- **Visibility:** a few research and security classes/members went package-private to `public` because they are
+  now used across the new packages (e.g. `HistoryQuery`, `StockGroup.trimUpper`, `SerializationSupport`,
+  `LoginAudit`).
 - **Next:** the user's follow-up improvements, then part 2 (Terraform foundations).
 
 **Deutsche Kurzfassung:** Backend-Pakete nach Themen aufgeteilt (`thesis`, `research/{snapshot,history,group,ingest}`,
