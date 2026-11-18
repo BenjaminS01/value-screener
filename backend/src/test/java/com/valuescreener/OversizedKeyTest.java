@@ -17,7 +17,7 @@ import com.valuescreener.research.history.StockGroupHistoryRepository;
 import com.valuescreener.research.group.StockGroupLookup;
 import com.valuescreener.research.group.StockGroupRepository;
 import com.valuescreener.research.group.StockGroupService;
-import com.valuescreener.security.LoginThrottleWebConfig;
+import com.valuescreener.security.throttle.LoginThrottleWebConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;

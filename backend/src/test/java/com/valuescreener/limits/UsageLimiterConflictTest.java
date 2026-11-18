@@ -2,8 +2,8 @@ package com.valuescreener.limits;
 
 import com.valuescreener.persistence.ConcurrentUpdateException;
 import com.valuescreener.persistence.DynamoProperties;
-import com.valuescreener.security.MutableClock;
-import com.valuescreener.security.Role;
+import com.valuescreener.MutableClock;
+import com.valuescreener.security.auth.Role;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;

@@ -1,6 +1,28 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-17
+Letztes Update: 2026-11-18
+
+## Package structure cleanup (2026-11-18)
+
+Pure moves, no behaviour change; the existing backend suite (541 tests) stays green.
+
+- **Backend layout (`com.valuescreener`):**
+  - `thesis/` (investment thesis, split out of research)
+  - `research/` with `snapshot`, `history`, `group`, `ingest`
+  - `persistence/` (now also holds `HistoryQuery`)
+  - `security/` with `auth`, `session`, `throttle`, `machinetoken`, `edge`
+  - root: `ClockConfig` (tests: `MutableClock`, `SecuritySliceTestConfig`)
+- **Prototype folder:** `company-research-agent/` moved to `prototypes/` (with `prototypes/README.md`).
+- **Removed:** `BASTI.md`.
+- **Docs and scripts:** main-class paths for `MachineTokenGenerator` and `AdminPasswordHashGenerator` updated
+  in `dev-up.sh`, `.env.example`, `README.md`.
+- **Visibility:** a few security classes/members went package-private to `public` (needed across the new packages).
+- **Next:** the user's follow-up improvements, then part 2 (Terraform foundations).
+
+**Deutsche Kurzfassung:** Backend-Pakete nach Themen aufgeteilt (`thesis`, `research/{snapshot,history,group,ingest}`,
+`security/{auth,session,throttle,machinetoken,edge}`), `company-research-agent` liegt jetzt in `prototypes/`,
+`BASTI.md` entfernt, Klassenpfade in Skript und Doku angepasst. Nur Verschiebungen, 541 Tests bleiben grün.
+Nächster Schritt: deine Verbesserungen, danach Teil 2 (Terraform-Grundlagen).
 
 ## Serverless rewrite part 1 done (2026-11-16)
 

@@ -9,7 +9,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.valuescreener.security.LoginThrottleWebConfig;
+import com.valuescreener.security.throttle.LoginThrottleWebConfig;
 
 import java.util.List;
 

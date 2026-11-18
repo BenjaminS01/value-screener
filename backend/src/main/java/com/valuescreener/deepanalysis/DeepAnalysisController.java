@@ -5,7 +5,7 @@ import com.valuescreener.limits.Quota;
 import com.valuescreener.limits.UsageLimiter;
 import com.valuescreener.research.snapshot.CompanySnapshotNotFoundException;
 import com.valuescreener.research.snapshot.CompanySnapshotService;
-import com.valuescreener.security.Role;
+import com.valuescreener.security.auth.Role;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

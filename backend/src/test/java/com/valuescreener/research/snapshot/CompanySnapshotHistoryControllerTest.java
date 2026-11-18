@@ -3,7 +3,7 @@ package com.valuescreener.research.snapshot;
 import com.valuescreener.research.group.StockGroupRef;
 import com.valuescreener.research.history.HistoryOrigin;
 import com.valuescreener.research.history.SnapshotHistoryView;
-import com.valuescreener.security.SecuritySliceTestConfig;
+import com.valuescreener.SecuritySliceTestConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

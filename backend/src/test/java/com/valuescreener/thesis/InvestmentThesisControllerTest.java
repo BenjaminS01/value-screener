@@ -1,6 +1,6 @@
 package com.valuescreener.thesis;
 
-import com.valuescreener.security.SecuritySliceTestConfig;
+import com.valuescreener.SecuritySliceTestConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

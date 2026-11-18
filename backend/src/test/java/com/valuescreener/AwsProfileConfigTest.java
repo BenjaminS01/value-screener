@@ -1,6 +1,6 @@
 package com.valuescreener;
 
-import com.valuescreener.security.AccountsProperties;
+import com.valuescreener.security.auth.AccountsProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;

@@ -4,7 +4,7 @@ import com.valuescreener.research.group.StockGroupController;
 import com.valuescreener.research.group.StockGroupService;
 import com.valuescreener.research.group.UnknownGroupException;
 import com.valuescreener.research.snapshot.CompanySnapshotService;
-import com.valuescreener.security.LoginThrottleWebConfig;
+import com.valuescreener.security.throttle.LoginThrottleWebConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;

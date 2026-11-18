@@ -13,7 +13,7 @@ import com.valuescreener.research.snapshot.FindingView;
 import com.valuescreener.research.snapshot.GroupSource;
 import com.valuescreener.research.snapshot.ResearchCriterion;
 import com.valuescreener.research.snapshot.UpsertCompanySnapshotRequest;
-import com.valuescreener.security.LoginThrottleWebConfig;
+import com.valuescreener.security.throttle.LoginThrottleWebConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
