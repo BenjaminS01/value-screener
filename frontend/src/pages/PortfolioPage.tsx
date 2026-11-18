@@ -4,24 +4,12 @@ import { AuthUser } from '../api/authApi'
 import { AdminPosition, fetchPortfolio, Position } from '../api/portfolioApi'
 import { fetchAllSnapshots } from '../api/researchApi'
 import { AddPositionForm } from '../components/AddPositionForm'
-import { PositionActions } from '../components/PositionActions'
+import { AdminPositionRow } from '../components/AdminPositionRow'
 import { Navigate } from '../navigation'
 
 interface PortfolioPageProps {
   user: AuthUser
   navigate: Navigate
-}
-
-function formatNumber(value: number, fractionDigits?: number): string {
-  return value.toLocaleString('de-DE', {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits ?? 20,
-  })
-}
-
-function formatDate(iso: string): string {
-  const [year, month, day] = iso.split('-')
-  return `${day}.${month}.${year}`
 }
 
 export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
@@ -85,9 +73,15 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
           </tr>
         </thead>
         <tbody>
-          {positions.map((position) => {
-            const admin = isAdmin ? (position as AdminPosition) : null
-            return (
+          {positions.map((position) =>
+            isAdmin ? (
+              <AdminPositionRow
+                key={position.isin}
+                position={position as AdminPosition}
+                onOpen={openPosition}
+                onChanged={handleChanged}
+              />
+            ) : (
               <tr key={position.isin}>
                 <td>
                   <button type="button" onClick={() => openPosition(position.isin)}>
@@ -96,19 +90,9 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
                 </td>
                 <td>{position.ticker}</td>
                 <td>{position.group ? position.group.name : '—'}</td>
-                {admin && (
-                  <>
-                    <td>{formatNumber(admin.quantity)}</td>
-                    <td>{formatNumber(admin.entryPrice, 2)}</td>
-                    <td>{formatDate(admin.purchaseDate)}</td>
-                    <td>
-                      <PositionActions position={admin} onChanged={handleChanged} />
-                    </td>
-                  </>
-                )}
               </tr>
-            )
-          })}
+            ),
+          )}
         </tbody>
       </table>
       {isAdmin && <AddPositionForm onAdded={handleChanged} />}
