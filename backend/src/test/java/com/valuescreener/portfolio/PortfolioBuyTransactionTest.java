@@ -4,11 +4,11 @@ import com.valuescreener.persistence.ConcurrentUpdateException;
 import com.valuescreener.persistence.DynamoProperties;
 import com.valuescreener.persistence.DynamoTableInitializer;
 import com.valuescreener.persistence.DynamoTestSupport;
-import com.valuescreener.research.DynamoInvestmentThesisRepository;
-import com.valuescreener.research.InvestmentThesis;
-import com.valuescreener.research.InvestmentThesisRepository;
-import com.valuescreener.research.InvestmentThesisService;
-import com.valuescreener.research.ThesisTooLongException;
+import com.valuescreener.thesis.DynamoInvestmentThesisRepository;
+import com.valuescreener.thesis.InvestmentThesis;
+import com.valuescreener.thesis.InvestmentThesisRepository;
+import com.valuescreener.thesis.InvestmentThesisService;
+import com.valuescreener.thesis.ThesisTooLongException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -46,7 +46,7 @@ class PortfolioBuyTransactionTest extends DynamoTestSupport {
         positions = new DynamoPortfolioPositionRepository(enhanced, props);
         theses = new DynamoInvestmentThesisRepository(enhanced, props);
         thesisService = new InvestmentThesisService(theses, positions, Clock.fixed(NOW, ZoneOffset.UTC));
-        service = new PortfolioService(positions, Mockito.mock(com.valuescreener.research.StockGroupLookup.class),
+        service = new PortfolioService(positions, Mockito.mock(com.valuescreener.research.group.StockGroupLookup.class),
                 thesisService, writer);
     }
 

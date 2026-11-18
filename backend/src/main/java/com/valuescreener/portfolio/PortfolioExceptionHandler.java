@@ -1,6 +1,6 @@
 package com.valuescreener.portfolio;
 
-import com.valuescreener.research.ThesisTooLongException;
+import com.valuescreener.thesis.ThesisTooLongException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import com.valuescreener.persistence.ConcurrentUpdateException;

@@ -1,7 +1,7 @@
 package com.valuescreener.deepanalysis;
 
 import com.valuescreener.limits.LimitReachedException;
-import com.valuescreener.research.CompanySnapshotNotFoundException;
+import com.valuescreener.research.snapshot.CompanySnapshotNotFoundException;
 import com.valuescreener.persistence.ConcurrentUpdateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

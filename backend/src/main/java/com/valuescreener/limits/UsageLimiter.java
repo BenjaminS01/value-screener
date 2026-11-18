@@ -4,7 +4,7 @@ import com.valuescreener.persistence.ConcurrentUpdateException;
 import com.valuescreener.persistence.DynamoProperties;
 import com.valuescreener.persistence.TableDefinition;
 import com.valuescreener.persistence.Ttl;
-import com.valuescreener.security.Role;
+import com.valuescreener.security.auth.Role;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;

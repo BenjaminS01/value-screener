@@ -483,7 +483,7 @@ Ausführlich:
 | Frontend für v2 (Login, Portfolio, Research-Seite) | ⏳ geplant |
 | Job-Tabelle, Tiefenanalyse-Platzhalter, Tageslimits | ⏳ geplant |
 | Quartalsberichte, Auswertung, Chat | ⏳ geplant (Design steht) |
-| Company Research Agent (`company-research-agent/`) | ❄️ eingefroren, wird vorerst nicht weiterentwickelt |
+| Company Research Agent (`prototypes/company-research-agent/`) | 🧪 Prototyp, verworfen – wird nicht gebaut oder deployt (siehe `prototypes/README.md`) |
 
 Laufender Projektstand: [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
 
@@ -534,10 +534,10 @@ Einmalig, analog zum Admin-Passwort-Hash (siehe unten):
 
 ```bash
 cd backend
-mvn -q spring-boot:run -Dspring-boot.run.main-class=com.valuescreener.security.MachineTokenGenerator
+mvn -q spring-boot:run -Dspring-boot.run.main-class=com.valuescreener.security.machinetoken.MachineTokenGenerator
 ```
 
-(Alternativ nach `mvn compile`: `java -cp target/classes com.valuescreener.security.MachineTokenGenerator`.)
+(Alternativ nach `mvn compile`: `java -cp target/classes com.valuescreener.security.machinetoken.MachineTokenGenerator`.)
 
 Ausgabe: zwei Zeilen `token=<...>` und `sha256=<...>`.
 
@@ -663,7 +663,7 @@ automatisch); der Tabellenname lässt sich mit `APP_DYNAMODB_TABLE_NAME` ändern
 ```bash
 cd backend
 mvn -q spring-boot:run \
-  -Dspring-boot.run.main-class=com.valuescreener.security.AdminPasswordHashGenerator
+  -Dspring-boot.run.main-class=com.valuescreener.security.auth.AdminPasswordHashGenerator
 ```
 
 Das Passwort wird verdeckt abgefragt (zweimal, bei Abweichung Abbruch) und nie als Argument übergeben, damit es nicht in Shell-History oder `ps` landet. Falls `spring-boot:run` keine Konsole bereitstellt, liest der Generator eine Zeile von stdin und warnt auf stderr, dass die Eingabe nicht verdeckt ist. Die Ausgabe des Generators daher nicht umleiten oder pipen (`> datei`, `| clip.exe`, `| tee`), sonst gibt es keine Konsole und die Passworteingabe wird sichtbar.
