@@ -2,6 +2,31 @@
 
 Letztes Update: 2026-11-18
 
+## Small improvements (2026-11-18, PR #7)
+
+- **Removed dead code:** `HistoryQuery.count`, `LoginAttemptGuard.IpState.expired`.
+- **Scripts:** `dev-up.sh`, `docker/claude-sandbox/run.sh`, `scripts/push-research.sh` are stored executable in
+  git (mode 100755; `core.fileMode=false` had let the bit get lost on rewrite).
+- **Stock group history removed** (design: `docs/superpowers/specs/2026-11-18-remove-group-history-design.md`):
+  no group history is written or read; the history API returns only `findings`. Delete protection of groups is
+  unchanged: `CompanySnapshotRepository.save(..., boolean groupChanged)` marks the new group as referenced when
+  the group key changes. The finding history stays. Old group history items in a local table are ignored.
+- **Research detail page:** the group appears once as text; ADMIN gets "Bearbeiten" → select + "Speichern".
+  An unchanged group is not saved (so confirming an AI group as manual by re-saving it is no longer possible).
+- **Portfolio page:**
+  - "Verkaufen" renamed to "Teilverkauf".
+  - "Korrigieren" edits the row in place (`AdminPositionRow` replaces `PositionActions`); an unchanged row is
+    not saved.
+  - Headings "Gehaltene Positionen" and "Position kaufen" (the latter ADMIN only).
+- Tests: backend 537, frontend 175, all green.
+- **Next:** part 2 (Terraform foundations) with its own plan. **Entry point for the new session:**
+  [`docs/superpowers/plans/2026-11-18-terraform-foundations-handoff.md`](docs/superpowers/plans/2026-11-18-terraform-foundations-handoff.md).
+
+**Deutsche Kurzfassung:** Toter Code entfernt, Skripte in git ausführbar, Gruppenverlauf entfernt (Löschschutz
+für benutzte Gruppen bleibt), Gruppe auf der Detailseite per „Bearbeiten“ änderbar, im Portfolio „Teilverkauf“,
+Korrigieren direkt in der Tabellenzeile und getrennte Abschnitte für gehaltene Positionen und Kaufen. Nächster
+Schritt: Teil 2 (Terraform-Grundlagen).
+
 ## Backlog for later plans (2026-11-18)
 
 Collected from the reviews of part 1 and the package cleanup. Not done now on purpose; each item goes into the
@@ -46,12 +71,12 @@ Pure moves, no behaviour change; the existing backend suite (541 tests) stays gr
 - **Visibility:** a few research and security classes/members went package-private to `public` because they are
   now used across the new packages (e.g. `HistoryQuery`, `StockGroup.trimUpper`, `SerializationSupport`,
   `LoginAudit`).
-- **Next:** the user's follow-up improvements, then part 2 (Terraform foundations).
+- **Next:** the user's follow-up improvements (done, see "Small improvements"), then part 2.
 
 **Deutsche Kurzfassung:** Backend-Pakete nach Themen aufgeteilt (`thesis`, `research/{snapshot,history,group,ingest}`,
 `security/{auth,session,throttle,machinetoken,edge}`), `company-research-agent` liegt jetzt in `prototypes/`,
 `BASTI.md` entfernt, Klassenpfade in Skript und Doku angepasst. Nur Verschiebungen, 541 Tests bleiben grün.
-Nächster Schritt: deine Verbesserungen, danach Teil 2 (Terraform-Grundlagen).
+Nächster Schritt: deine Verbesserungen (erledigt), danach Teil 2 (Terraform-Grundlagen).
 
 ## Serverless rewrite part 1 done (2026-11-16)
 

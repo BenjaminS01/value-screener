@@ -5,6 +5,8 @@
 > (DynamoDB + Lambda + CloudFront, everything new in Terraform). Next work:
 > [`2026-11-14-serverless-backend-rewrite.md`](2026-11-14-serverless-backend-rewrite.md). Section 4
 > (working mode) still applies.
+>
+> **Current entry point (2026-11-18):** [`2026-11-18-terraform-foundations-handoff.md`](2026-11-18-terraform-foundations-handoff.md).
 
 For a new Claude session. Read this file completely, then `PROJECT-STATUS.md` (top section, v2 phase 3).
 This file collects facts and open questions. **The user decides with the new session how to proceed**;
