@@ -33,13 +33,4 @@ public final class HistoryQuery {
         }
         return items;
     }
-
-    /** Count of matching items over all pages (Select=COUNT; a filter is applied before counting). */
-    public static long count(DynamoDbClient client, QueryRequest request) {
-        long total = 0;
-        for (QueryResponse page : client.queryPaginator(request)) {
-            total += page.count();
-        }
-        return total;
-    }
 }
