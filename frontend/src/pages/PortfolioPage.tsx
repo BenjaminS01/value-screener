@@ -56,6 +56,7 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
       {notice && <p>{notice}</p>}
       {error && <p role="alert">{error}</p>}
       {writeMessage && <p role="alert">{writeMessage}</p>}
+      <h2>Gehaltene Positionen</h2>
       <table>
         <thead>
           <tr>
@@ -95,7 +96,12 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
           )}
         </tbody>
       </table>
-      {isAdmin && <AddPositionForm onAdded={handleChanged} />}
+      {isAdmin && (
+        <>
+          <h2>Position kaufen</h2>
+          <AddPositionForm onAdded={handleChanged} />
+        </>
+      )}
     </section>
   )
 }

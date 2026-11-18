@@ -78,6 +78,20 @@ describe('PortfolioPage', () => {
     expect(screen.getByRole('button', { name: 'Kaufen' })).toBeInTheDocument()
   })
 
+  it('separates held positions and the buy form with headings; USER sees no buy heading', async () => {
+    mockBackend(adminRows)
+    const { unmount } = render(<PortfolioPage user={admin} navigate={vi.fn()} />)
+    await screen.findByText('Apple Inc.')
+    expect(screen.getByRole('heading', { level: 2, name: 'Gehaltene Positionen' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Position kaufen' })).toBeInTheDocument()
+    unmount()
+    mockBackend(userRows)
+    render(<PortfolioPage user={user} navigate={vi.fn()} />)
+    await screen.findByText('Apple Inc.')
+    expect(screen.getByRole('heading', { level: 2, name: 'Gehaltene Positionen' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Position kaufen' })).not.toBeInTheDocument()
+  })
+
   it('click on a researched position navigates to the detail', async () => {
     mockBackend(userRows)
     const navigate = vi.fn()
