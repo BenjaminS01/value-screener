@@ -483,7 +483,7 @@ Ausführlich:
 | Frontend für v2 (Login, Portfolio, Research-Seite) | ⏳ geplant |
 | Job-Tabelle, Tiefenanalyse-Platzhalter, Tageslimits | ⏳ geplant |
 | Quartalsberichte, Auswertung, Chat | ⏳ geplant (Design steht) |
-| Company Research Agent (`company-research-agent/`) | ❄️ eingefroren, wird vorerst nicht weiterentwickelt |
+| Company Research Agent (`prototypes/company-research-agent/`) | 🧪 Prototyp, verworfen – wird nicht gebaut oder deployt (siehe `prototypes/README.md`) |
 
 Laufender Projektstand: [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
 
