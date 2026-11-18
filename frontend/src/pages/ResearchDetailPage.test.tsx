@@ -33,7 +33,7 @@ function res(status: number, body?: unknown) {
 let putResponse: () => ReturnType<typeof res>
 function mockBackend(opts: { snap?: unknown; status?: number; portfolio?: () => ReturnType<typeof res>; history?: () => ReturnType<typeof res> } = {}) {
   const fetchMock = vi.fn((url: string, init?: RequestInit) => {
-    if (url.endsWith('/history')) return Promise.resolve((opts.history ?? (() => res(200, { findings: [], groups: [] })))())
+    if (url.endsWith('/history')) return Promise.resolve((opts.history ?? (() => res(200, { findings: [] })))())
     if (url.startsWith('/api/research/snapshots/') && init?.method === 'PUT') return Promise.resolve(putResponse())
     if (url.startsWith('/api/research/snapshots/')) return Promise.resolve(res(opts.status ?? 200, opts.snap ?? snapshot()))
     if (url.startsWith('/api/research/theses/')) return Promise.resolve(res(404, { error: 'Thesis not found' }))
@@ -91,7 +91,6 @@ describe('ResearchDetailPage', () => {
           { criterionKey: 'PE_RATIO', numericValue: 11, booleanValue: null, claim: 'KGV 11', sourceUrl: 'https://example.com/1', asOfDate: '2025-12-31', replacedAt: '2026-03-02T10:00:00Z', origin: 'SYNC' },
           { criterionKey: 'PE_RATIO', numericValue: 9, booleanValue: null, claim: 'KGV 9', sourceUrl: 'https://example.com/2', asOfDate: '2025-06-30', replacedAt: '2025-12-31T10:00:00Z', origin: 'INGEST' },
         ],
-        groups: [],
       }),
     })
     renderPage()
@@ -103,23 +102,7 @@ describe('ResearchDetailPage', () => {
     expect(screen.getAllByRole('button', { name: /Verlauf \(/ })).toHaveLength(1)
   })
 
-  it('lists the group history', async () => {
-    mockBackend({
-      history: () => res(200, {
-        findings: [],
-        groups: [
-          { previousGroup: { key: 'semi', name: 'Halbleiter' }, previousSource: 'AI', newGroup: { key: 'sw', name: 'Software' }, newSource: 'MANUAL', changedAt: '2026-11-03T08:00:00Z', origin: 'MANUAL' },
-          { previousGroup: null, previousSource: null, newGroup: { key: 'semi', name: 'Halbleiter' }, newSource: 'AI', changedAt: '2026-10-01T08:00:00Z', origin: 'INGEST' },
-        ],
-      }),
-    })
-    renderPage()
-    expect(await screen.findByText('Gruppenverlauf')).toBeInTheDocument()
-    expect(screen.getByText('Halbleiter → Software (manuell) am 03.11.2026')).toBeInTheDocument()
-    expect(screen.getByText('— → Halbleiter (KI-Vorschlag) am 01.10.2026')).toBeInTheDocument()
-  })
-
-  it('omits Gruppenverlauf without group entries', async () => {
+  it('shows no Gruppenverlauf', async () => {
     renderPage()
     await screen.findByRole('heading', { level: 1 })
     expect(screen.queryByText('Gruppenverlauf')).not.toBeInTheDocument()
@@ -196,53 +179,58 @@ describe('ResearchDetailPage', () => {
     expect(screen.queryByText('Der Betreiber hält diese Position')).not.toBeInTheDocument()
   })
 
-  it('lets ADMIN change the group', async () => {
+  it('shows the group once, as text with an edit button for ADMIN', async () => {
+    renderPage(admin)
+    expect(await screen.findByText('Technologie (KI-Vorschlag)')).toBeInTheDocument()
+    expect(screen.getAllByText(/Gruppe/)).toHaveLength(1)
+    expect(screen.queryByLabelText('Gruppe:')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument()
+  })
+
+  it('lets ADMIN change the group via edit and save, then shows the text again', async () => {
     const fetchMock = mockBackend()
     renderPage(admin)
-    const select = await screen.findByLabelText('Gruppe')
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }))
+    const select = screen.getByLabelText('Gruppe:')
     expect(select.querySelectorAll('option')).toHaveLength(2)
+    expect(select).toHaveValue('tech')
+    expect(screen.queryByText('Technologie (KI-Vorschlag)')).not.toBeInTheDocument()
     fireEvent.change(select, { target: { value: 'energy' } })
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
-    expect(await screen.findByText(/manuell/)).toBeInTheDocument()
+    expect(await screen.findByText('Energie (manuell)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Gruppe:')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument()
     const put = fetchMock.mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === 'PUT')!
     expect(JSON.parse((put[1] as RequestInit).body as string)).toEqual({ groupKey: 'energy' })
   })
 
-  it('refreshes the group history after ADMIN saves a group', async () => {
-    let calls = 0
-    mockBackend({
-      history: () => {
-        calls += 1
-        return res(200, {
-          findings: [],
-          groups: calls === 1 ? [] : [
-            { previousGroup: { key: 'tech', name: 'Technologie' }, previousSource: 'AI', newGroup: { key: 'energy', name: 'Energie' }, newSource: 'MANUAL', changedAt: '2026-11-05T08:00:00Z', origin: 'MANUAL' },
-          ],
-        })
-      },
-    })
+  it('saves nothing when the group is unchanged', async () => {
+    const fetchMock = mockBackend()
     renderPage(admin)
-    const select = await screen.findByLabelText('Gruppe')
-    expect(screen.queryByText('Gruppenverlauf')).not.toBeInTheDocument()
-    fireEvent.change(select, { target: { value: 'energy' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }))
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
-    expect(await screen.findByText('Gruppenverlauf')).toBeInTheDocument()
-    expect(screen.getByText('Technologie → Energie (manuell) am 05.11.2026')).toBeInTheDocument()
+    expect(await screen.findByText('Technologie (KI-Vorschlag)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Gruppe:')).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.some((c) => (c[1] as RequestInit | undefined)?.method === 'PUT')).toBe(false)
   })
 
-  it('shows save errors inline', async () => {
+  it('shows save errors inline and stays in edit mode', async () => {
     putResponse = () => res(403, { error: 'Forbidden' })
     renderPage(admin)
-    await screen.findByLabelText('Gruppe')
+    fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }))
+    fireEvent.change(screen.getByLabelText('Gruppe:'), { target: { value: 'energy' } })
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Keine Berechtigung')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled())
+    expect(screen.getByLabelText('Gruppe:')).toBeInTheDocument()
   })
 
   it('gives USER no group controls', async () => {
     renderPage(guest)
-    await screen.findByRole('heading', { level: 1 })
-    expect(screen.queryByLabelText('Gruppe')).not.toBeInTheDocument()
+    expect(await screen.findByText('Technologie (KI-Vorschlag)')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Gruppe:')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument()
   })
 

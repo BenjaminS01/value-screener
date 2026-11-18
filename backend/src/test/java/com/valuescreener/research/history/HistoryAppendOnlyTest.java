@@ -22,7 +22,6 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,12 +33,7 @@ class HistoryAppendOnlyTest extends DynamoTestSupport {
     void historyRepositoriesDeclareOnlyTheirReadMethod() {
         assertThat(Arrays.stream(ResearchFindingHistoryRepository.class.getDeclaredMethods()).map(Method::getName))
                 .containsExactly("findBySnapshotIsin");
-        assertThat(Arrays.stream(StockGroupHistoryRepository.class.getDeclaredMethods()).map(Method::getName))
-                .containsExactly("findBySnapshotIsin");
         assertThat(Arrays.stream(DynamoResearchFindingHistoryRepository.class.getDeclaredMethods())
-                .filter(m -> java.lang.reflect.Modifier.isPublic(m.getModifiers())).map(Method::getName))
-                .containsExactly("findBySnapshotIsin");
-        assertThat(Arrays.stream(DynamoStockGroupHistoryRepository.class.getDeclaredMethods())
                 .filter(m -> java.lang.reflect.Modifier.isPublic(m.getModifiers())).map(Method::getName))
                 .containsExactly("findBySnapshotIsin");
     }
@@ -54,7 +48,7 @@ class HistoryAppendOnlyTest extends DynamoTestSupport {
         CompanySnapshot snapshot = new CompanySnapshot("AAPL", isin, "Apple", "USA", "x");
         repository.save(snapshot, List.of(new ResearchFindingHistory(isin, new ReplacedFinding(
                 ResearchCriterion.PE_RATIO, new BigDecimal("1"), null, "original", null, LocalDate.of(2026, 8, 1)),
-                Instant.parse("2026-11-12T10:00:00Z"), HistoryOrigin.INGEST)), Optional.empty());
+                Instant.parse("2026-11-12T10:00:00Z"), HistoryOrigin.INGEST)), false);
         Map<String, AttributeValue> stored = client.query(b -> b.tableName(props.tableName()).consistentRead(true)
                 .keyConditionExpression("pk = :pk AND begins_with(sk, :p)")
                 .expressionAttributeValues(Map.of(":pk", AttributeValue.fromS("SNAPSHOT#" + isin),

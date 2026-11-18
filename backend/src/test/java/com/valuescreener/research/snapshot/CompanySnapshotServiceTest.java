@@ -10,8 +10,6 @@ import com.valuescreener.research.history.ReplacedFinding;
 import com.valuescreener.research.history.ResearchFindingHistory;
 import com.valuescreener.research.history.ResearchFindingHistoryRepository;
 import com.valuescreener.research.history.SnapshotHistoryView;
-import com.valuescreener.research.history.StockGroupHistory;
-import com.valuescreener.research.history.StockGroupHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +30,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,8 +53,6 @@ class CompanySnapshotServiceTest {
     @Mock
     private ResearchFindingHistoryRepository findingHistory;
 
-    @Mock
-    private StockGroupHistoryRepository groupHistory;
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-12T10:00:00Z"), ZoneOffset.UTC);
 
@@ -63,7 +60,7 @@ class CompanySnapshotServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CompanySnapshotService(repository, groups, freshness, findingHistory, groupHistory, clock);
+        service = new CompanySnapshotService(repository, groups, freshness, findingHistory, clock);
         // group names are resolved from the group catalog (DynamoDB), not from the snapshot
         lenient().when(groups.nameOf("SEMICONDUCTORS")).thenReturn("Semiconductors");
         lenient().when(groups.nameOf("BANKS")).thenReturn("Banks");
@@ -90,7 +87,7 @@ class CompanySnapshotServiceTest {
     @Test
     void upsertCreatesNewSnapshotWhenIsinUnknown() {
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
 
         CompanySnapshotView result = service.upsert(request("SEMICONDUCTORS",
@@ -109,7 +106,7 @@ class CompanySnapshotServiceTest {
         existing.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
                 "Trailing P/E of 28.0.", "https://example.com/first-source", LocalDate.of(2026, 8, 1));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
 
         CompanySnapshotView result = service.upsert(request("SEMICONDUCTORS",
@@ -126,7 +123,7 @@ class CompanySnapshotServiceTest {
                 .containsExactlyInAnyOrder(ResearchCriterion.PE_RATIO, ResearchCriterion.MOAT_ASSESSMENT);
 
         ArgumentCaptor<CompanySnapshot> captor = ArgumentCaptor.forClass(CompanySnapshot.class);
-        verify(repository).save(captor.capture(), any(), any());
+        verify(repository).save(captor.capture(), any(), anyBoolean());
         assertThat(captor.getValue()).isSameAs(existing);
     }
 
@@ -136,7 +133,7 @@ class CompanySnapshotServiceTest {
         existing.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
                 "Trailing P/E of 28.0.", "https://example.com/first-source", LocalDate.of(2026, 8, 1));
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
 
         CompanySnapshotView result = service.upsert(request("SEMICONDUCTORS",
@@ -158,7 +155,7 @@ class CompanySnapshotServiceTest {
     @Test
     void upsertNormalizesGroupKey() {
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
 
         CompanySnapshotView result = service.upsert(request(" semiconductors ", "x", List.of()), GroupSource.AI, HistoryOrigin.INGEST);
@@ -172,7 +169,7 @@ class CompanySnapshotServiceTest {
         CompanySnapshot existing = existing();
         existing.assignGroup(BANKS, GroupSource.MANUAL);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
 
         CompanySnapshotView result = service.upsert(request("SEMICONDUCTORS", "x", List.of()), GroupSource.AI, HistoryOrigin.INGEST);
@@ -186,7 +183,7 @@ class CompanySnapshotServiceTest {
         existing.assignGroup(SEMIS, GroupSource.AI);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
         when(groups.require("BANKS")).thenReturn(BANKS);
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
 
         CompanySnapshotView result = service.assignGroupManually("US0378331005", "BANKS");
 
@@ -198,7 +195,7 @@ class CompanySnapshotServiceTest {
         CompanySnapshot existing = existing();
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
         when(groups.require("BANKS")).thenReturn(BANKS);
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
 
         CompanySnapshotView result = service.assignGroupManually(" us0378331005 ", "BANKS");
 
@@ -265,7 +262,7 @@ class CompanySnapshotServiceTest {
         assertThat(exported.findings()).hasSize(2);
 
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
 
         CompanySnapshotView imported = service.upsert(exported, exported.groupSource(), HistoryOrigin.SYNC);
@@ -333,20 +330,19 @@ class CompanySnapshotServiceTest {
     @SuppressWarnings("unchecked")
     private List<ResearchFindingHistory> savedFindingHistory() {
         ArgumentCaptor<List<ResearchFindingHistory>> captor = ArgumentCaptor.forClass(List.class);
-        verify(repository).save(any(), captor.capture(), any());
+        verify(repository).save(any(), captor.capture(), anyBoolean());
         return captor.getValue();
     }
 
-    @SuppressWarnings("unchecked")
-    private Optional<StockGroupHistory> savedGroupHistory() {
-        ArgumentCaptor<Optional<StockGroupHistory>> captor = ArgumentCaptor.forClass(Optional.class);
+    private boolean savedGroupChanged() {
+        ArgumentCaptor<Boolean> captor = ArgumentCaptor.forClass(Boolean.class);
         verify(repository).save(any(), any(), captor.capture());
         return captor.getValue();
     }
 
     private void stubSaveAndGroups(CompanySnapshot existing) {
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
     }
 
@@ -369,7 +365,7 @@ class CompanySnapshotServiceTest {
         assertThat(row.getClaim()).isEqualTo("Trailing P/E of 28.0.");
         assertThat(row.getReplacedAt()).isEqualTo(Instant.parse("2026-11-12T10:00:00Z"));
         assertThat(row.getOrigin()).isEqualTo(HistoryOrigin.INGEST);
-        assertThat(savedGroupHistory()).isEmpty();
+        assertThat(savedGroupChanged()).isFalse();
     }
 
     @Test
@@ -384,7 +380,7 @@ class CompanySnapshotServiceTest {
                 HistoryOrigin.INGEST);
 
         assertThat(savedFindingHistory()).isEmpty();
-        assertThat(savedGroupHistory()).isEmpty();
+        assertThat(savedGroupChanged()).isFalse();
     }
 
     @Test
@@ -403,112 +399,90 @@ class CompanySnapshotServiceTest {
     }
 
     @Test
-    void aiGroupChangeWritesGroupHistoryRow() {
+    void aiGroupChangeMarksTheNewGroup() {
         CompanySnapshot existing = existing();
         existing.assignGroup(BANKS, GroupSource.AI);
         stubSaveAndGroups(existing);
 
         service.upsert(request("SEMICONDUCTORS", "x", List.of()), GroupSource.AI, HistoryOrigin.INGEST);
 
-        StockGroupHistory row = savedGroupHistory().orElseThrow();
-        assertThat(row.getPreviousGroupKey()).isEqualTo("BANKS");
-        assertThat(row.getPreviousSource()).isEqualTo(GroupSource.AI);
-        assertThat(row.getNewGroupKey()).isEqualTo("SEMICONDUCTORS");
-        assertThat(row.getNewSource()).isEqualTo(GroupSource.AI);
-        assertThat(row.getChangedAt()).isEqualTo(Instant.parse("2026-11-12T10:00:00Z"));
-        assertThat(row.getOrigin()).isEqualTo(HistoryOrigin.INGEST);
+        assertThat(savedGroupChanged()).isTrue();
     }
 
     @Test
-    void firstGroupAssignmentWritesRowWithoutPreviousGroup() {
+    void firstGroupAssignmentMarksTheGroup() {
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.empty());
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(groups.require("SEMICONDUCTORS")).thenReturn(SEMIS);
 
         service.upsert(request("SEMICONDUCTORS", "x", List.of()), GroupSource.AI, HistoryOrigin.INGEST);
 
-        StockGroupHistory row = savedGroupHistory().orElseThrow();
-        assertThat(row.getPreviousGroupKey()).isNull();
-        assertThat(row.getPreviousSource()).isNull();
-        assertThat(row.getNewGroupKey()).isEqualTo("SEMICONDUCTORS");
+        assertThat(savedGroupChanged()).isTrue();
     }
 
     @Test
-    void ignoredAiProposalWhileManualWritesNoGroupHistory() {
+    void ignoredAiProposalWhileManualIsNoGroupChange() {
         CompanySnapshot existing = existing();
         existing.assignGroup(BANKS, GroupSource.MANUAL);
         stubSaveAndGroups(existing);
 
         service.upsert(request("SEMICONDUCTORS", "x", List.of()), GroupSource.AI, HistoryOrigin.INGEST);
 
-        assertThat(savedGroupHistory()).isEmpty();
+        assertThat(savedGroupChanged()).isFalse();
     }
 
     @Test
-    void syncWithManualSourceOverAiGroupWritesRow() {
+    void sourceOnlyChangeIsNoGroupChange() {
         CompanySnapshot existing = existing();
         existing.assignGroup(SEMIS, GroupSource.AI);
         stubSaveAndGroups(existing);
 
         service.upsert(request("SEMICONDUCTORS", "x", List.of()), GroupSource.MANUAL, HistoryOrigin.SYNC);
 
-        StockGroupHistory row = savedGroupHistory().orElseThrow();
-        assertThat(row.getNewSource()).isEqualTo(GroupSource.MANUAL);
-        assertThat(row.getOrigin()).isEqualTo(HistoryOrigin.SYNC);
+        assertThat(savedGroupChanged()).isFalse();
     }
 
     @Test
-    void manualAssignmentWritesRowWithOriginManual() {
+    void manualAssignmentOfAnotherGroupMarksIt() {
         CompanySnapshot existing = existing();
         existing.assignGroup(SEMIS, GroupSource.AI);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
         when(groups.require("BANKS")).thenReturn(BANKS);
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.assignGroupManually("US0378331005", "BANKS");
 
-        StockGroupHistory row = savedGroupHistory().orElseThrow();
-        assertThat(row.getOrigin()).isEqualTo(HistoryOrigin.MANUAL);
-        assertThat(row.getNewSource()).isEqualTo(GroupSource.MANUAL);
-        assertThat(row.getPreviousGroupKey()).isEqualTo("SEMICONDUCTORS");
+        assertThat(savedGroupChanged()).isTrue();
     }
 
     @Test
-    void manualReassignOfSameGroupAlreadyManualWritesNoRow() {
+    void manualReassignOfSameGroupIsNoGroupChange() {
         CompanySnapshot existing = existing();
         existing.assignGroup(BANKS, GroupSource.MANUAL);
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
         when(groups.require("BANKS")).thenReturn(BANKS);
-        when(repository.save(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(), any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.assignGroupManually("US0378331005", "BANKS");
 
-        assertThat(savedGroupHistory()).isEmpty();
+        assertThat(savedGroupChanged()).isFalse();
     }
 
     @Test
-    void historyReturnsBothListsNewestFirst() {
+    void historyReturnsFindingHistory() {
         CompanySnapshot existing = existing();
         when(repository.findByIsin("US0378331005")).thenReturn(Optional.of(existing));
         ResearchFindingHistory f = new ResearchFindingHistory("US0378331005", new ReplacedFinding(
                 ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null, "Old.", null, LocalDate.of(2026, 8, 1)),
                 Instant.parse("2026-11-01T00:00:00Z"), HistoryOrigin.SYNC);
-        StockGroupHistory g = new StockGroupHistory("US0378331005", null, null, "SEMICONDUCTORS", GroupSource.AI,
-                Instant.parse("2026-11-02T00:00:00Z"), HistoryOrigin.INGEST);
         when(findingHistory.findBySnapshotIsin("US0378331005"))
                 .thenReturn(List.of(f));
-        when(groupHistory.findBySnapshotIsin("US0378331005"))
-                .thenReturn(List.of(g));
 
         SnapshotHistoryView view = service.history(" us0378331005 ");
 
         assertThat(view.findings()).singleElement().satisfies(e -> {
             assertThat(e.claim()).isEqualTo("Old.");
             assertThat(e.origin()).isEqualTo(HistoryOrigin.SYNC);
-        });
-        assertThat(view.groups()).singleElement().satisfies(e -> {
-            assertThat(e.previousGroup()).isNull();
-            assertThat(e.newGroup()).isEqualTo(new StockGroupRef("SEMICONDUCTORS", "Semiconductors"));
         });
     }
 

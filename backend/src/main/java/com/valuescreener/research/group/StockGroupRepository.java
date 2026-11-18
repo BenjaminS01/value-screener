@@ -33,7 +33,7 @@ public interface StockGroupRepository {
 
     /**
      * For Task 4: add this to the transaction that first stores a reference to the group (snapshot group
-     * assignment, group history). It fails the transaction when the group no longer exists and makes
+     * assignment). It fails the transaction when the group no longer exists and makes
      * {@link #delete} fail from then on.
      */
     static TransactWriteItem markReferenced(String tableName, String groupKey) {

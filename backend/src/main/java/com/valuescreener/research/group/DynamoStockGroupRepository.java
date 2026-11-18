@@ -149,7 +149,7 @@ public class DynamoStockGroupRepository implements StockGroupRepository {
         } catch (TransactionCanceledException e) {
             if (ItemConditions.isConflict(e)) {
                 throw new StockGroupConflictException(
-                        "Group " + group.getKey() + " appears in the group history and cannot be deleted");
+                        "Group " + group.getKey() + " was assigned to a stock and cannot be deleted");
             }
             throw e;
         }

@@ -74,18 +74,8 @@ export interface FindingHistoryEntry {
   origin: HistoryOrigin
 }
 
-export interface GroupHistoryEntry {
-  previousGroup: { key: string; name: string } | null
-  previousSource: GroupSource | null
-  newGroup: { key: string; name: string }
-  newSource: GroupSource
-  changedAt: string
-  origin: HistoryOrigin
-}
-
 export interface SnapshotHistory {
   findings: FindingHistoryEntry[]
-  groups: GroupHistoryEntry[]
 }
 
 export function fetchHistory(isin: string): Promise<SnapshotHistory> {

@@ -26,12 +26,6 @@ public class LoginAttemptGuard {
 
     record IpState(Instant windowStart, int count, int violations, Instant lastViolation,
                    Instant blockedUntil) implements LoginAttemptStore.State {
-        boolean expired(Instant now) {
-            return !blockedUntil.isAfter(now)
-                    && !windowStart.plus(WINDOW).isAfter(now)
-                    && (violations == 0 || !lastViolation.plus(VIOLATION_MEMORY).isAfter(now));
-        }
-
         /** Later of block end and window end + violation memory; after that nothing of this state matters. */
         @Override
         public Instant expiresAt() {

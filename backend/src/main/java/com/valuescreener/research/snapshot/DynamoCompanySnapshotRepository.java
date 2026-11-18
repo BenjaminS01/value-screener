@@ -4,9 +4,7 @@ import com.valuescreener.persistence.HistoryQuery;
 import com.valuescreener.research.group.StockGroupRepository;
 import com.valuescreener.research.group.UnknownGroupException;
 import com.valuescreener.research.history.FindingHistoryItem;
-import com.valuescreener.research.history.GroupHistoryItem;
 import com.valuescreener.research.history.ResearchFindingHistory;
-import com.valuescreener.research.history.StockGroupHistory;
 import com.valuescreener.persistence.ConcurrentUpdateException;
 import com.valuescreener.persistence.DynamoProperties;
 import com.valuescreener.persistence.ItemConditions;
@@ -29,10 +27,10 @@ import java.util.Optional;
 
 /**
  * Snapshots as items {@code pk="SNAPSHOT", sk="ISIN#"+isin}; history entries live in the partition
- * {@code "SNAPSHOT#"+isin} (see {@link FindingHistoryItem}, {@link GroupHistoryItem}).
+ * {@code "SNAPSHOT#"+isin} (see {@link FindingHistoryItem}).
  *
  * <p>{@link #save} is one TransactWriteItems with a fixed layout: index 0 is the snapshot, then one item per
- * finding history entry, then (only with a group change) the group history entry, then the snapshot index item
+ * finding history entry, then the snapshot index item
  * ({@link SnapshotIndex}), and (only with a group change) the group's markReferenced update as the LAST item.
  * Cancellation reasons are mapped by those positions (snapshot first, markReferenced last), see
  * {@link #translate}; the history and index puts cannot fail on their own. The request is built at the low
@@ -84,9 +82,9 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
 
     @Override
     public CompanySnapshot save(CompanySnapshot snapshot, List<ResearchFindingHistory> findingHistory,
-                                Optional<StockGroupHistory> groupHistory) {
+                                boolean groupChanged) {
         String isin = snapshot.getIsin();
-        requireSameSnapshot(isin, findingHistory, groupHistory, snapshot.getGroupKey());
+        requireSameSnapshot(isin, findingHistory, groupChanged, snapshot.getGroupKey());
         Long expected = snapshot.version();
         long next = ItemConditions.nextVersion(expected);
 
@@ -96,11 +94,7 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
             items.add(historyPut(FindingHistoryItem.SCHEMA.itemToMap(
                     FindingHistoryItem.from(findingHistory.get(i), i), true)));
         }
-        String referencedGroup = null;
-        if (groupHistory.isPresent()) {
-            items.add(historyPut(GroupHistoryItem.SCHEMA.itemToMap(GroupHistoryItem.from(groupHistory.get()), true)));
-            referencedGroup = groupHistory.get().getNewGroupKey();
-        }
+        String referencedGroup = groupChanged ? snapshot.getGroupKey() : null;
         items.add(SnapshotIndex.put(tableName, isin, snapshot.getGroupKey()));
         if (referencedGroup != null) {
             items.add(StockGroupRepository.markReferenced(tableName, referencedGroup)); // LAST: see translate
@@ -143,17 +137,15 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
     }
 
     private static void requireSameSnapshot(String isin, List<ResearchFindingHistory> findingHistory,
-                                            Optional<StockGroupHistory> groupHistory, String groupKey) {
+                                            boolean groupChanged, String groupKey) {
         for (ResearchFindingHistory h : findingHistory) {
             if (!isin.equals(h.getSnapshotIsin())) {
                 throw new IllegalArgumentException("history entry belongs to snapshot " + h.getSnapshotIsin());
             }
         }
-        groupHistory.ifPresent(h -> {
-            if (!isin.equals(h.getSnapshotIsin()) || !h.getNewGroupKey().equals(groupKey)) {
-                throw new IllegalArgumentException("group history entry does not match the snapshot's group");
-            }
-        });
+        if (groupChanged && groupKey == null) {
+            throw new IllegalArgumentException("a group change needs a group on the snapshot");
+        }
     }
 
     private TransactWriteItem snapshotPut(SnapshotItem item, Long expectedVersion) {

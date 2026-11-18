@@ -2,6 +2,33 @@
 
 Letztes Update: 2026-11-18
 
+## Backlog for later plans (2026-11-18)
+
+Collected from the reviews of part 1 and the package cleanup. Not done now on purpose; each item goes into the
+plan named here. Dead code (`HistoryQuery.count`, `IpState.expired`) was removed in the small-improvements commit.
+
+- **Part 3, first task (session hardening, before anything goes live):**
+  - `DynamoSessionRepository.save`: a transaction conflict on the conditional put / id-change transaction
+    currently ends in a 500; skip the write silently like the condition-failed case (never revive).
+  - `findById`: an item without `created`/`lastAccessed`/`maxInactiveSeconds` should read as absent, not 500.
+  - `SerializationSupport` filter: add `maxdepth`/`maxrefs`/`maxbytes`/`maxarray` limits in front of the
+    allow-list (a real security context is ~1.3 KB).
+  - New sessions: put with `attribute_not_exists(pk)`; on a condition failure check whether the stored item is
+    our own (same `created`, i.e. an SDK retry) before treating it as a collision.
+  - End-to-end assertion that a stored session has `maxInactiveSeconds` = 7200.
+- **Before research sync goes live:** lighter list endpoint for the research overview (it still reads all
+  snapshots once per load; needs a frontend change).
+- **Next plan that touches persistence/groups (general cleanup):**
+  - Rename `persistence/HistoryQuery` → `PartitionQueries` (it reads snapshot, index and history partitions).
+  - `app.dynamodb.seed-groups` as a field of `DynamoProperties` instead of two `@Value`s.
+  - `Ttl.epochSeconds`: round up instead of truncating (an item can read as expired up to <1 s early).
+  - Group delete with a stale version: answer with the conflict body instead of "was assigned to a stock".
+  - `ItemConditions.versionEquals(null)`: `IllegalStateException` instead of `IllegalArgumentException`.
+
+**Deutsche Kurzfassung:** Offene Punkte aus den Reviews, bewusst nicht jetzt umgesetzt: Session-Härtung als
+erster Task von Teil 3, schlankere Research-Liste vor dem Research-Sync, kleine Aufräumarbeiten im nächsten Plan,
+der Persistenz oder Gruppen berührt. Toter Code ist bereits entfernt.
+
 ## Package structure cleanup (2026-11-18)
 
 Pure moves, no behaviour change; the existing backend suite (541 tests) stays green.
@@ -179,7 +206,8 @@ und Plan Teil 1
   - **Recherche-Historie:** In zwei Tabellen wird nur geschrieben, nie geändert (Migrationen V5 und
     V6 für die These). Geänderte Befunde und Gruppenwechsel werden mit Herkunft festgehalten
     (INGEST, SYNC oder MANUAL). Auf der Detailseite gibt es „Verlauf (n)“ und einen
-    „Gruppenverlauf“.
+    „Gruppenverlauf“. *(Der Gruppenverlauf wurde am 2026-11-18 entfernt, nur der Befund-Verlauf
+    bleibt.)*
     - Zahlen werden auf 4 Nachkommastellen gerundet, damit keine falschen Verlaufseinträge
       entstehen.
     - Eine Gruppe, die im Verlauf vorkommt, kann nicht gelöscht werden.
