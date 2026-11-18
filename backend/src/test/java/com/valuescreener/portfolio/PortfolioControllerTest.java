@@ -11,7 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.valuescreener.research.ThesisTooLongException;
+import com.valuescreener.thesis.ThesisTooLongException;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
@@ -86,7 +86,7 @@ class PortfolioControllerTest {
     @Test
     void userViewHasGroupButNoHoldings() throws Exception {
         when(portfolioService.listForUser()).thenReturn(List.of(new PortfolioPositionView(
-                "AAPL", "US0378331005", "Apple Inc.", new com.valuescreener.research.StockGroupRef("SEMICONDUCTORS", "Semiconductors"))));
+                "AAPL", "US0378331005", "Apple Inc.", new com.valuescreener.research.group.StockGroupRef("SEMICONDUCTORS", "Semiconductors"))));
 
         mockMvc.perform(get("/api/portfolio").principal(USER))
                 .andExpect(status().isOk())

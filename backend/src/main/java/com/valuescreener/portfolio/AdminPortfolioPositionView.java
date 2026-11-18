@@ -1,6 +1,6 @@
 package com.valuescreener.portfolio;
 
-import com.valuescreener.research.StockGroupRef;
+import com.valuescreener.research.group.StockGroupRef;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

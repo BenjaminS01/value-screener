@@ -6,9 +6,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.valuescreener.research.InvestmentThesis;
-import com.valuescreener.research.InvestmentThesisService;
-import com.valuescreener.research.ThesisTooLongException;
+import com.valuescreener.thesis.InvestmentThesis;
+import com.valuescreener.thesis.InvestmentThesisService;
+import com.valuescreener.thesis.ThesisTooLongException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,7 +30,7 @@ class PortfolioServiceTest {
     private PortfolioPositionRepository repository;
 
     @Mock
-    private com.valuescreener.research.StockGroupLookup lookup;
+    private com.valuescreener.research.group.StockGroupLookup lookup;
 
     @Mock
     private InvestmentThesisService theses;
@@ -137,7 +137,7 @@ class PortfolioServiceTest {
         PortfolioPosition aapl = new PortfolioPosition(
                 "AAPL", "US0378331005", "Apple Inc.", new BigDecimal("1"), new BigDecimal("100.00"), LocalDate.of(2026, 2, 1));
         when(repository.findAll()).thenReturn(List.of(msft, aapl));
-        com.valuescreener.research.StockGroupRef software = new com.valuescreener.research.StockGroupRef("SOFTWARE", "Software");
+        com.valuescreener.research.group.StockGroupRef software = new com.valuescreener.research.group.StockGroupRef("SOFTWARE", "Software");
         when(lookup.groupsByIsin(List.of("US5949181045", "US0378331005")))
                 .thenReturn(java.util.Map.of("US5949181045", software));
 

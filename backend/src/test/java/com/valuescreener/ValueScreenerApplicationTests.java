@@ -1,7 +1,7 @@
 package com.valuescreener;
 
 import com.valuescreener.persistence.DynamoTestSupport;
-import com.valuescreener.research.StockGroupRepository;
+import com.valuescreener.research.group.StockGroupRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

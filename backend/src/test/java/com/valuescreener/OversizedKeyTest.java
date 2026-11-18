@@ -4,19 +4,19 @@ import com.valuescreener.portfolio.PortfolioController;
 import com.valuescreener.portfolio.PortfolioPositionRepository;
 import com.valuescreener.portfolio.PortfolioService;
 import com.valuescreener.portfolio.PurchaseWriter;
-import com.valuescreener.research.CompanySnapshotController;
-import com.valuescreener.research.CompanySnapshotRepository;
-import com.valuescreener.research.CompanySnapshotService;
-import com.valuescreener.research.InvestmentThesisController;
-import com.valuescreener.research.InvestmentThesisRepository;
-import com.valuescreener.research.InvestmentThesisService;
-import com.valuescreener.research.ResearchFindingHistoryRepository;
-import com.valuescreener.research.ResearchFreshness;
-import com.valuescreener.research.StockGroupController;
-import com.valuescreener.research.StockGroupHistoryRepository;
-import com.valuescreener.research.StockGroupLookup;
-import com.valuescreener.research.StockGroupRepository;
-import com.valuescreener.research.StockGroupService;
+import com.valuescreener.research.snapshot.CompanySnapshotController;
+import com.valuescreener.research.snapshot.CompanySnapshotRepository;
+import com.valuescreener.research.snapshot.CompanySnapshotService;
+import com.valuescreener.thesis.InvestmentThesisController;
+import com.valuescreener.thesis.InvestmentThesisRepository;
+import com.valuescreener.thesis.InvestmentThesisService;
+import com.valuescreener.research.history.ResearchFindingHistoryRepository;
+import com.valuescreener.research.snapshot.ResearchFreshness;
+import com.valuescreener.research.group.StockGroupController;
+import com.valuescreener.research.history.StockGroupHistoryRepository;
+import com.valuescreener.research.group.StockGroupLookup;
+import com.valuescreener.research.group.StockGroupRepository;
+import com.valuescreener.research.group.StockGroupService;
 import com.valuescreener.security.LoginThrottleWebConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -100,7 +100,7 @@ class OversizedKeyTest {
     @Test
     void assigningAnOversizedGroupKeyReturns422WithoutGroupLookup() throws Exception {
         org.mockito.Mockito.when(snapshots.findByIsin("US0378331005")).thenReturn(java.util.Optional.of(
-                new com.valuescreener.research.CompanySnapshot("AAPL", "US0378331005", "Apple", "USA", "x")));
+                new com.valuescreener.research.snapshot.CompanySnapshot("AAPL", "US0378331005", "Apple", "USA", "x")));
 
         mockMvc.perform(put("/api/research/snapshots/US0378331005/group").contentType("application/json")
                 .content("{\"groupKey\":\"" + LONG + "\"}")).andExpect(status().isUnprocessableEntity());

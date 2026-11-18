@@ -1,10 +1,10 @@
 package com.valuescreener.portfolio;
 
-import com.valuescreener.research.CompanySnapshot;
-import com.valuescreener.research.InvestmentThesis;
-import com.valuescreener.research.InvestmentThesisService;
-import com.valuescreener.research.StockGroupLookup;
-import com.valuescreener.research.StockGroupRef;
+import com.valuescreener.research.snapshot.CompanySnapshot;
+import com.valuescreener.thesis.InvestmentThesis;
+import com.valuescreener.thesis.InvestmentThesisService;
+import com.valuescreener.research.group.StockGroupLookup;
+import com.valuescreener.research.group.StockGroupRef;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;

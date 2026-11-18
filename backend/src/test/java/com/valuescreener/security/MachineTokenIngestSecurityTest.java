@@ -2,10 +2,10 @@ package com.valuescreener.security;
 
 import com.valuescreener.portfolio.PortfolioController;
 import com.valuescreener.portfolio.PortfolioService;
-import com.valuescreener.research.CompanySnapshotService;
-import com.valuescreener.research.CompanySnapshotView;
-import com.valuescreener.research.ResearchIngestController;
-import com.valuescreener.research.StockGroupService;
+import com.valuescreener.research.snapshot.CompanySnapshotService;
+import com.valuescreener.research.snapshot.CompanySnapshotView;
+import com.valuescreener.research.ingest.ResearchIngestController;
+import com.valuescreener.research.group.StockGroupService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;

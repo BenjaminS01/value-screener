@@ -1,6 +1,6 @@
 package com.valuescreener.portfolio;
 
-import com.valuescreener.research.InvestmentThesis;
+import com.valuescreener.thesis.InvestmentThesis;
 
 /** Writes a purchase's position and its thesis paragraph as one all-or-nothing unit. */
 public interface PurchaseWriter {

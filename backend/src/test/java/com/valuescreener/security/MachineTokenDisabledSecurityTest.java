@@ -2,10 +2,10 @@ package com.valuescreener.security;
 
 import com.valuescreener.portfolio.PortfolioController;
 import com.valuescreener.portfolio.PortfolioService;
-import com.valuescreener.research.CompanySnapshotService;
-import com.valuescreener.research.ResearchIngestController;
-import com.valuescreener.research.ResearchSyncController;
-import com.valuescreener.research.StockGroupService;
+import com.valuescreener.research.snapshot.CompanySnapshotService;
+import com.valuescreener.research.ingest.ResearchIngestController;
+import com.valuescreener.research.ingest.ResearchSyncController;
+import com.valuescreener.research.group.StockGroupService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
