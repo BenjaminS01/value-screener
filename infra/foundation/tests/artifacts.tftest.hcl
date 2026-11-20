@@ -7,6 +7,10 @@ mock_provider "aws" {
   }
 }
 
+variables {
+  alert_email = "alerts@example.com"
+}
+
 run "artifact_bucket_is_private_and_cleans_up_old_versions" {
   command = plan
 

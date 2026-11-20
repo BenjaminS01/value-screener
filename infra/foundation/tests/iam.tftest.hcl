@@ -7,6 +7,10 @@ mock_provider "aws" {
   }
 }
 
+variables {
+  alert_email = "alerts@example.com"
+}
+
 run "github_oidc_provider_trusts_only_sts_audience" {
   command = plan
 
