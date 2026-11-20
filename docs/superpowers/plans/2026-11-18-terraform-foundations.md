@@ -1,8 +1,15 @@
 # Terraform Foundations (Part 2) Implementation Plan
 
 > **Execution:** teaching session, inline (superpowers:executing-plans), no subagents. Claude writes each file and
-> explains every block in German; **the user runs every `terraform`, `aws` and git command**. No AWS change without
-> the user's explicit go per apply. Steps use checkbox (`- [ ]`) syntax.
+> explains every block in German. No AWS change without the user's explicit go per apply. Steps use checkbox
+> (`- [ ]`) syntax.
+>
+> **Two environments (decided 2026-11-19):**
+> - **Sandbox** (this WSL, Claude): Terraform only, **no AWS CLI, no AWS credentials** (no `~/.aws`, no `AWS_*`
+>   variables). Claude runs `terraform init -backend=false`, `fmt`, `validate` and `terraform test` with
+>   `mock_provider "aws"` here (test first, then code).
+> - **Ops environment** (user only): AWS CLI, `aws login`, `terraform init` with backend, `plan`, `apply`. The user
+>   gets the files via git and sends the plan/apply output back for review.
 
 **Goal:** an S3 state bucket (`infra/bootstrap`) and the account foundation (`infra/foundation`): budget brake,
 GitHub OIDC deploy role, backend Lambda role shell, artifact bucket.
@@ -27,6 +34,9 @@ files with committed `*.example` copies.
 - Budget: monthly, `5` USD; e-mail alerts at `1` USD actual and `3` USD forecast; automatic deny action at `5` USD
   actual. The deny policy is never attached to the `Admin` role.
 - Buckets: versioning on, SSE-S3, all four public-access blocks on, bucket policy denies non-TLS access.
+- Tests: `infra/<stack>/tests/*.tftest.hcl`, `command = plan`, `mock_provider "aws"` (with `mock_data` for
+  `aws_caller_identity`); each task writes its failing test first. Sandbox check before every commit:
+  `terraform fmt -check -recursive infra && terraform validate && terraform test` in each stack.
 
 ## Decisions taken in this plan (please confirm)
 
