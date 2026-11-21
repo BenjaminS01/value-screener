@@ -1,6 +1,36 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-18
+Letztes Update: 2026-11-21
+
+## Serverless rewrite part 2 done: Terraform foundations (2026-11-21)
+
+Plan: `docs/superpowers/plans/2026-11-18-terraform-foundations.md`. Branch `feature/terraform-foundations`.
+
+- **Two environments:** this WSL is the credential-free sandbox (Terraform only; Claude runs `fmt`, `validate`,
+  `terraform test` with `mock_provider`). The user's ops environment has the AWS CLI and runs `plan`/`apply`.
+- **Sign-in (tested):** the `admin` role trust requires MFA present and MFA age < 1200 s. Profile `vs-admin` needs
+  `mfa_serial`; right after a fresh `aws login --profile vs-login`, Terraform gets credentials via
+  `eval "$(aws configure export-credentials --profile vs-admin --format env)"` (valid about 1 h).
+- **Applied in AWS:**
+  - `infra/bootstrap` (local state, backup outside the repo): state bucket `value-screener-tfstate-<account>`.
+  - `infra/foundation` (S3 backend, key `foundation/terraform.tfstate`, `use_lockfile`): artifact bucket
+    `value-screener-artifacts-<account>` (old versions expire after 30 days), GitHub OIDC provider, deploy role
+    `value-screener-github-deploy` (only `refs/tags/v*` of `BenjaminS01/value-screener`; artifact bucket rights
+    only), empty backend role `value-screener-backend`, budget `value-screener-monthly` (5 USD; alerts at 1 USD
+    actual and 3 USD forecast) with automatic deny action at 5 USD on the backend and deploy role (status
+    `STANDBY`; policy simulator shows `explicitDeny`).
+- **Decisions:** Lambda concurrency quota is 10 → no reserved concurrency in part 3. Backend role lives in
+  `foundation`; `app` attaches permissions to it and to the deploy role.
+- **Account cleanup:** old OIDC provider, old budget, old roles (ECR push, ECS, EC2, budget action, Lambda test
+  roles) and old customer-managed policies deleted by hand.
+- `docs/aws/budget-deny-policy.json` removed (now in `infra/foundation/budget.tf`).
+- **Next:** part 3 (`data`, `app`). Entry point:
+  [`docs/superpowers/plans/2026-11-21-terraform-app-handoff.md`](docs/superpowers/plans/2026-11-21-terraform-app-handoff.md).
+
+**Deutsche Kurzfassung:** Teil 2 ist fertig und in AWS angelegt: State-Bucket, Artefakt-Bucket, GitHub-Zugang mit
+Deploy-Rolle (nur Versions-Tags), leere Backend-Rolle und Budget 5 $ mit automatischer Sperre (getestet). Die
+Anmeldung braucht frische MFA (unter 20 Minuten). Lambda-Quote ist 10, deshalb keine festen Obergrenzen. Alte Reste
+im Konto sind gelöscht. Nächster Schritt: Teil 3.
 
 ## Small improvements (2026-11-18, PR #7)
 

@@ -99,6 +99,11 @@ files with committed `*.example` copies.
   `token.actions.githubusercontent.com`. Billing → Budgets: none. IAM → Roles: no old deploy role. Found leftovers are
   deleted by hand.
 - [ ] Result (quota value, MFA behaviour) goes into `PROJECT-STATUS.md` in Task 7.
+- Results (2026-11-21): the role `Admin` trust requires MFA present and MFA age < 1200 s. `aws login` alone is not
+  enough; `vs-admin` needs `mfa_serial` (CLI asks for the code), right after a fresh `aws login`. Terraform gets the
+  credentials via `eval "$(aws configure export-credentials --profile vs-admin --format env)"`.
+  Lambda "Concurrent executions" = 10 → **user decided: no reserved concurrency in part 3** (account cap of 10,
+  app limits and API Gateway throttling remain).
 
 ### Task 3: `infra/bootstrap` (state bucket)
 
