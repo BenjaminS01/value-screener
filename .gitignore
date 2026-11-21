@@ -7,3 +7,11 @@
 .env
 logs/
 /.claude/settings.local.json
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backend.hcl

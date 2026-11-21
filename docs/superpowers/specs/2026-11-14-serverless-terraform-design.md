@@ -312,6 +312,13 @@ least 10 unreserved, so reserved concurrency may be impossible. First step of th
 user checks the quota "Concurrent executions" in Service Quotas. If it is 10, either request an
 increase (free) or drop reserved concurrency and rely on the app limits plus API Gateway throttling;
 the user decides then.
+**Decided 2026-11-21:** the quota is 10; the user dropped reserved concurrency for both Lambdas (the account
+cap of 10 itself limits concurrency). The two "reserved concurrency" rows above do not apply.
+
+**Built in part 2 (2026-11-21):** the backend Lambda role `value-screener-backend` is created empty in
+`foundation` so the budget action can target it from the start; `app` attaches its permissions to it by name.
+The deny policy also denies `lambda:UpdateFunctionCode`, `PublishVersion`, `UpdateAlias`,
+`dynamodb:CreateTable`, `cloudfront:CreateInvalidation` and `s3:PutObject`.
 
 ## 11. Terraform layout and operation
 
