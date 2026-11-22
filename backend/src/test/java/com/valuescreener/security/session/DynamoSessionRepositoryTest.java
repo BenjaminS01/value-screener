@@ -5,14 +5,22 @@ import com.valuescreener.persistence.DynamoTableInitializer;
 import com.valuescreener.persistence.DynamoTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.session.MapSession;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.CancellationReason;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+import software.amazon.awssdk.services.dynamodb.model.TransactionConflictException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +29,10 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import com.valuescreener.MutableClock;
 
 class DynamoSessionRepositoryTest extends DynamoTestSupport {
@@ -271,6 +283,92 @@ class DynamoSessionRepositoryTest extends DynamoTestSupport {
     @Test
     void unknownIdIsNull() {
         assertThat(repoA.findById("nope")).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"created", "lastAccessed", "maxInactiveSeconds"})
+    void itemWithoutATimestampAttributeIsTreatedAsMissing(String missing) {
+        DynamoSession session = savedSession();
+        Map<String, AttributeValue> damaged = new HashMap<>(item(session.getId()));
+        damaged.remove(missing);
+        client.putItem(b -> b.tableName(dynamo.tableName()).item(damaged));
+        assertThat(repoA.findById(session.getId())).isNull();
+    }
+
+    /** The same session as {@code original}, but as a fresh object that was never stored. */
+    private DynamoSession unstoredCopy(DynamoSession original, Instant created) {
+        MapSession map = new MapSession(original.getId());
+        map.setCreationTime(created);
+        map.setLastAccessedTime(original.getLastAccessedTime());
+        map.setMaxInactiveInterval(MAX_INACTIVE);
+        DynamoSession copy = new DynamoSession(map);
+        copy.setAttribute("k", "v");
+        return copy;
+    }
+
+    @Test
+    void newSessionWhoseFirstPutAlreadyArrivedCountsAsSaved() {
+        // An SDK retry after a lost response finds its own item: same id and same creation time.
+        DynamoSession session = savedSession();
+        DynamoSession retry = unstoredCopy(session, session.getCreationTime());
+        repoB.save(retry);
+        assertThat(retry.isStored()).isTrue();
+        assertThat(repoA.findById(session.getId())).isNotNull();
+    }
+
+    @Test
+    void newSessionNeverOverwritesAForeignItemWithTheSameId() {
+        DynamoSession session = savedSession();
+        Map<String, AttributeValue> before = item(session.getId());
+        DynamoSession intruder = unstoredCopy(session, session.getCreationTime().minusSeconds(60));
+        intruder.setAttribute("k", "intruder");
+        assertThatThrownBy(() -> repoB.save(intruder)).isInstanceOf(IllegalStateException.class);
+        assertThat(item(session.getId())).isEqualTo(before);
+    }
+
+    /** A stored session for a repository on a mocked client (no DynamoDB call needed to set it up). */
+    private static DynamoSession storedSession(String id, Instant at) {
+        MapSession map = new MapSession(id);
+        map.setCreationTime(at);
+        map.setLastAccessedTime(at);
+        map.setMaxInactiveInterval(MAX_INACTIVE);
+        DynamoSession session = new DynamoSession(map);
+        session.storedId = id;
+        session.storedLastAccessed = at;
+        session.storedAttributes = new byte[0];
+        return session;
+    }
+
+    @Test
+    void idChangeThatCollidesWithAnInFlightTransactionIsSkipped() {
+        DynamoDbClient conflicting = mock(DynamoDbClient.class);
+        when(conflicting.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                .thenThrow(TransactionCanceledException.builder().cancellationReasons(
+                        CancellationReason.builder().code("TransactionConflict").build(),
+                        CancellationReason.builder().code("None").build()).build());
+        DynamoSessionRepository repo = new DynamoSessionRepository(conflicting, dynamo, clock, MAX_INACTIVE, REFRESH);
+        DynamoSession session = storedSession("old-id", clock.instant());
+        session.changeSessionId();
+
+        repo.save(session);
+
+        assertThat(session.storedId).isEqualTo("old-id");
+    }
+
+    @Test
+    void refreshThatCollidesWithAnInFlightTransactionIsSkipped() {
+        DynamoDbClient conflicting = mock(DynamoDbClient.class);
+        when(conflicting.putItem(any(PutItemRequest.class)))
+                .thenThrow(TransactionConflictException.builder().message("conflict").build());
+        DynamoSessionRepository repo = new DynamoSessionRepository(conflicting, dynamo, clock, MAX_INACTIVE, REFRESH);
+        Instant loaded = clock.instant();
+        DynamoSession session = storedSession("some-id", loaded);
+        clock.advance(REFRESH);
+        session.setLastAccessedTime(clock.instant());
+
+        repo.save(session);
+
+        assertThat(session.storedLastAccessed).isEqualTo(loaded);
     }
 
     private static SecurityContext context() {

@@ -19,6 +19,7 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+import software.amazon.awssdk.services.dynamodb.model.TransactionConflictException;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -40,7 +41,9 @@ import java.util.TreeSet;
  * transaction), an attribute changed, or the stored lastAccessed is at least {@code refreshInterval} old.
  * Expiry is therefore sliding with a granularity of the refresh interval: the stored ttl can be up to that
  * much earlier than the true last access. Writes of already stored sessions are conditional on the item
- * still existing, so a save that races with a logout on another instance is dropped instead of reviving it. MapSession does not track attribute changes, so
+ * still existing, so a save that races with a logout on another instance is dropped instead of reviving it; a
+ * write that collides with a running transaction on the same item is dropped the same way. A new session is put
+ * only if its id is free. MapSession does not track attribute changes, so
  * {@link DynamoSession} remembers the serialized attributes at load time, to compare at save.
  */
 public class DynamoSessionRepository implements SessionRepository<DynamoSession> {
@@ -94,19 +97,25 @@ public class DynamoSessionRepository implements SessionRepository<DynamoSession>
                         TransactWriteItem.builder().put(Put.builder().tableName(table).item(item)
                                 .conditionExpression("attribute_not_exists(pk)").build()).build()
                 ).build());
+            } else if (session.isStored()) {
+                // A stored session that vanished was logged out (or expired) meanwhile: never revive it.
+                dynamo.putItem(PutItemRequest.builder().tableName(table).item(item)
+                        .conditionExpression("attribute_exists(pk)").build());
             } else {
-                PutItemRequest.Builder put = PutItemRequest.builder().tableName(table).item(item);
-                if (session.isStored()) {
-                    // A stored session that vanished was logged out (or expired) meanwhile: never revive it.
-                    put.conditionExpression("attribute_exists(pk)");
-                }
-                dynamo.putItem(put.build());
+                putNew(session, item);
             }
         } catch (ConditionalCheckFailedException e) {
             return; // invalidated by another instance
+        } catch (TransactionConflictException e) {
+            log.warn("Session write skipped: it collided with a running transaction on the same item");
+            return; // never revive; the next request saves again if needed
         } catch (TransactionCanceledException e) {
             if (e.cancellationReasons().stream().anyMatch(r -> "ConditionalCheckFailed".equals(r.code()))) {
                 return; // invalidated by another instance
+            }
+            if (e.cancellationReasons().stream().anyMatch(r -> "TransactionConflict".equals(r.code()))) {
+                log.warn("Session id change skipped: it collided with a running transaction");
+                return;
             }
             throw e;
         }
@@ -115,11 +124,32 @@ public class DynamoSessionRepository implements SessionRepository<DynamoSession>
         session.storedAttributes = attributes;
     }
 
+    /**
+     * First write of a new session: never overwrite an existing item. If the item exists, it is either our own
+     * (an SDK retry after a lost response: same creation time) or a real id collision.
+     */
+    private void putNew(DynamoSession session, Map<String, AttributeValue> item) {
+        try {
+            dynamo.putItem(PutItemRequest.builder().tableName(table).item(item)
+                    .conditionExpression("attribute_not_exists(pk)").build());
+        } catch (ConditionalCheckFailedException e) {
+            AttributeValue storedCreated = dynamo.getItem(GetItemRequest.builder()
+                    .tableName(table).key(key(session.getId())).consistentRead(true).build()).item().get("created");
+            if (storedCreated == null || !storedCreated.equals(item.get("created"))) {
+                throw new IllegalStateException("A new session id is already in use by another session");
+            }
+        }
+    }
+
     @Override
     public DynamoSession findById(String id) {
         Map<String, AttributeValue> item = dynamo.getItem(GetItemRequest.builder()
                 .tableName(table).key(key(id)).consistentRead(true).build()).item();
         if (item.isEmpty()) {
+            return null;
+        }
+        if (!item.containsKey("created") || !item.containsKey("lastAccessed") || !item.containsKey("maxInactiveSeconds")) {
+            log.warn("A stored session without its time attributes is treated as missing");
             return null;
         }
         Instant lastAccessed = Instant.ofEpochMilli(Long.parseLong(item.get("lastAccessed").n()));
