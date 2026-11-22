@@ -173,6 +173,12 @@ a state check needs `apply -refresh-only` first.
   `aws lambda invoke --function-name deep-analysis-demo:live` with `{"isin":"US0378331005"}` (payload from a file)
   → expected "Noch nicht implementiert". Commit.
 
+**Result Task 4 (2026-11-22):** applied (5 resources). Zip hand-over: the user builds in the sandbox, copies to
+`~/dev/transfer` (seen in aws-ops as `/home/ops/transfer`, read-only), compares `sha256sum` on both sides, then
+`aws s3 cp` to the artifact bucket in aws-ops (user chose this over Terraform reading the file directly: 50 MB
+direct-upload limit, CI fit). `aws lambda invoke --region eu-central-1 deep-analysis-demo:live` → 200, version 1,
+`NOT_IMPLEMENTED` answer. Note: with credentials from `export-credentials`, AWS CLI calls need `--region eu-central-1`.
+
 ### Task 5: Backend Lambda + its permissions + origin secret
 
 **Files:** Create: `infra/app/backend.tf` (log group, function, alias, inline policies on the foundation role),
