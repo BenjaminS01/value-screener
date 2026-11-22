@@ -42,7 +42,9 @@ existing state bucket. `app` finds `data` and `foundation` resources **by their 
 2. **One table** `value-screener` (as in `TableDefinition.java`): `pk`/`sk` String, provisioned **20/20**, TTL on
    `ttl`, PITR, deletion protection, `prevent_destroy`, auto scaling off. Drift guard (design 6.3): a backend test
    reads `infra/data/dynamodb.tf` and compares name, keys, TTL attribute and capacity with `TableDefinition`.
-3. **SSM in `data`** (user-supplied, placeholder `CHANGE_ME` + `ignore_changes = [value]`, `SecureString`):
+3. **SSM in `data`** (user-supplied, placeholder `CHANGE_ME` written via the write-only `value_wo` with `value_wo_version = 1`, `SecureString`;
+   changed 2026-11-22 from `ignore_changes = [value]`, because a refresh would still copy the real console value
+   into state, while with `value_wo` the provider stores no value at all):
    `/value-screener/app.admin.password-hash`, and per extra user `<n>` < `var.extra_user_count` (default `1`, the
    USER account for the smoke test) `/value-screener/app.users.<n>.username` and `.password-hash`.
    **Origin secret in `app`:** `random_password` (48 chars, no special characters) → SSM
@@ -143,8 +145,8 @@ existing state bucket. `app` finds `data` and `foundation` resources **by their 
 `tests/ssm.tftest.hcl`.
 
 - [ ] Failing tftest: with `extra_user_count = 1` exactly 3 parameters with the names from decision 3, all
-  `SecureString`, value `CHANGE_ME`; with `0` only the admin hash.
-- [ ] Write `ssm.tf` (`ignore_changes = [value]`); sandbox checks green.
+  `SecureString`, `value_wo_version = 1`; with `0` only the admin hash; `-1` rejected.
+- [ ] Write `ssm.tf` (`value_wo`); sandbox checks green.
 - [ ] User: `plan` (expected `3 to add`) → go → `apply`.
 - [ ] User enters the real values in the console (Systems Manager → Parameter Store → edit), one parameter per
   message. Hashes from `AdminPasswordHashGenerator` (see `README.md`), never pasted into chat. Commit.
