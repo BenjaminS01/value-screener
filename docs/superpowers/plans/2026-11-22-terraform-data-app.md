@@ -151,11 +151,18 @@ existing state bucket. `app` finds `data` and `foundation` resources **by their 
 - [ ] User enters the real values in the console (Systems Manager → Parameter Store → edit), one parameter per
   message. Hashes from `AdminPasswordHashGenerator` (see `README.md`), never pasted into chat. Commit.
 
+**Results Tasks 1–3 (2026-11-22):** session hardening done (backend 548 → 552 tests with the drift test). Table and
+3 parameters applied. User generated the bcrypt hashes with `htpasswd -nBC 12` (own tool, `$2y$`, accepted by
+`AccountRegistry`) and entered all values in the console. Proof that no value is in state: after
+`terraform apply -refresh-only` (parameter versions 1 → 2 in state) the state holds `value = ""` for all three and
+no 60-character string (counted by length only, nothing printed). Lesson: `terraform plan` refreshes in memory only;
+a state check needs `apply -refresh-only` first.
+
 ### Task 4: `infra/app` skeleton, log groups, deep-analysis Lambda
 
 **Files:** Create: `infra/app/versions.tf` (key `app/terraform.tfstate`, providers `aws`, `random`),
-`backend.hcl.example`, `terraform.tfvars.example`, `variables.tf` (`admin_username`), `lookups.tf` (data sources,
-decision 1), `deep_analysis.tf` (role, log-group policy, log group, function, alias), `tests/deep_analysis.tftest.hcl`.
+`backend.hcl.example`, `lookups.tf` (data sources, decision 1; `variables.tf` with `admin_username` and
+`terraform.tfvars.example` moved to Task 5, the first task that needs them), `deep_analysis.tf` (role, log-group policy, log group, function, alias), `tests/deep_analysis.tftest.hcl`.
 
 - [ ] Failing tftest: function `deep-analysis-demo`, runtime `java21`, handler from decision 5, memory `512`,
   timeout `10`, no `reserved_concurrent_executions`, `publish = true`, log group `/aws/lambda/deep-analysis-demo`
