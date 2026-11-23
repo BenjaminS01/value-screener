@@ -62,7 +62,7 @@ existing state bucket. `app` finds `data` and `foundation` resources **by their 
    `java21`, handler `io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest`, 512 MB, 10 s, no
    SnapStart, alias `live`.
 6. **HTTP API:** routes `ANY /api/{proxy+}` → backend alias `live` (payload 2.0); stage `$default`, auto-deploy,
-   throttling rate `10`, burst `20`; no access logs. Lambda permission scoped to the alias and this API.
+   throttling rate `5`, burst `10` (user decision 2026-11-23, see Task 6 result); no access logs. Lambda permission scoped to the alias and this API.
 7. **CloudFront:** one distribution, default certificate, `PriceClass_100`, `default_root_object = "index.html"`.
    - Default behaviour → frontend bucket `value-screener-frontend-<account>` via OAC, managed policy
      `CachingOptimized`.
@@ -192,13 +192,18 @@ direct-upload limit, CI fit). `aws lambda invoke --region eu-central-1 deep-anal
   go → `apply` (SnapStart publish takes a few minutes) → CloudWatch log of version 1 shows Spring started without
   errors. Commit.
 
+**Result Task 5 (2026-11-23):** applied (6 resources); backend zip 45.7 MB via the transfer folder + `aws s3 cp`.
+Version 1 went `Pending` → `Active` (SnapStart snapshot takes a few minutes after the apply). Init log: Spring
+started in 7.5 s, `Seeded 35 stock groups`. Note: `ADMIN_USERNAME` appears in plan output and state (not secret by
+design).
+
 ### Task 6: HTTP API
 
 **Files:** Create: `infra/app/api.tf` (`aws_apigatewayv2_api`, integration on the backend alias ARN, route,
 stage, `aws_lambda_permission` with `qualifier = "live"`), `tests/api.tftest.hcl`; output `api_endpoint`.
 
 - [ ] Failing tftest: protocol `HTTP`, payload `2.0`, route key `ANY /api/{proxy+}`, stage `$default` with
-  `throttling_rate_limit = 10`, `throttling_burst_limit = 20`, permission qualifier `live`.
+  `throttling_rate_limit = 5`, `throttling_burst_limit = 10`, permission qualifier `live`.
 - [ ] **Cost check (flood on the `execute-api` URL):** brute-forcing the origin secret is not a risk (48 random
   alphanumeric chars ≈ 2²⁸⁶, constant-time compare), but a flood of requests that only get 403 is still billed. At
   rate 10 req/s that is ≈ 26 M requests/month, roughly 20–30 $ (HTTP API + Lambda); the budget deny action stops
@@ -207,6 +212,14 @@ stage, `aws_lambda_permission` with `qualifier = "live"`), `tests/api.tftest.hcl
   `PROJECT-STATUS.md`.
 - [ ] Write; sandbox checks green. User: `plan` → go → `apply` → `curl -i <api_endpoint>/api/auth/me` → `403`
   (no origin header: proves the filter). Commit.
+
+**Result Task 6 cost check (2026-11-23):** AWS docs do not say whether HTTP API bills requests rejected by
+throttling (pricing: "API calls you receive"; throttles are "targets", best effort), so assume yes. Month-long flood
+estimate incl. Lambda: ~35 $ at 10/s, ~17 $ at 5/s → user chose rate 5 / burst 10. The flood risk is the same via
+CloudFront; the direct `execute-api` URL is not revealed by CloudFront. Budget alert at 1 $ fires within about a day.
+Emergency switch (documented in `api.tf`): `terraform destroy -target=aws_apigatewayv2_api.main` (new URL on
+re-create). Later option (backlog): CloudFront flat-rate Free plan with WAF; Free-tier account eligibility is
+contradictory in the docs.
 
 ### Task 7: Frontend bucket + CloudFront, first live test
 
