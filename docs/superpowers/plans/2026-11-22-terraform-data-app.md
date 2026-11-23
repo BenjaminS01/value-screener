@@ -77,8 +77,8 @@ existing state bucket. `app` finds `data` and `foundation` resources **by their 
 8. **Deploy role rights (attached in `app`):** on both functions `lambda:GetFunction`,
    `GetFunctionConfiguration`, `UpdateFunctionCode`, `PublishVersion`, `UpdateAlias`; frontend bucket
    `s3:ListBucket`, `GetObject`, `PutObject`, `DeleteObject`; `cloudfront:CreateInvalidation` on the distribution.
-   **Backend role rights:** DynamoDB `GetItem`, `PutItem`, `UpdateItem`, `DeleteItem`, `Query`, `Scan`,
-   `ConditionCheckItem`, `DescribeTable` on the table; SSM `GetParametersByPath`, `GetParameter(s)` on
+   **Backend role rights** (narrowed 2026-11-22 to what the code calls with `create-table: false`): DynamoDB
+   `GetItem`, `PutItem`, `UpdateItem`, `DeleteItem`, `Query` on the table; SSM `GetParametersByPath` on
    `parameter/value-screener` and `parameter/value-screener/*`; `lambda:InvokeFunction` on `deep-analysis-demo:live`
    only; logs `CreateLogStream`/`PutLogEvents` on its log group. (No `kms:Decrypt` needed with the `aws/ssm` key.)
 9. **Secrets before the backend's first published version:** values read at SnapStart init are in the snapshot. The

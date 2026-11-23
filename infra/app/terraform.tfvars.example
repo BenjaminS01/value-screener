@@ -1,0 +1,2 @@
+# Copy to terraform.tfvars (gitignored). Must differ from the USER name in SSM (case-insensitive).
+admin_username = "<admin login name>"

@@ -14,6 +14,27 @@ mock_provider "aws" {
       account_id = "123456789012"
     }
   }
+
+  # Lookups for the backend (same stack): valid ARNs so the plan of the whole stack works.
+  mock_data "aws_iam_role" {
+    defaults = {
+      name = "value-screener-backend"
+      arn  = "arn:aws:iam::123456789012:role/value-screener-backend"
+    }
+  }
+
+  mock_data "aws_dynamodb_table" {
+    defaults = {
+      name = "value-screener"
+      arn  = "arn:aws:dynamodb:eu-central-1:123456789012:table/value-screener"
+    }
+  }
+}
+
+mock_provider "random" {}
+
+variables {
+  admin_username = "admin-test"
 }
 
 run "deep_analysis_lambda_is_small_short_and_logs_14_days" {
