@@ -72,8 +72,11 @@ existing state bucket. `app` finds `data` and `foundation` resources **by their 
    - **No custom error responses / SPA fallback:** the app has no router, and a distribution-wide 403/404 rewrite
      would also turn API 403/404 into `index.html`.
    - Response headers policy: HSTS (1 year), `nosniff`, frame `DENY`, referrer `same-origin`, a CSP checked against
-     the built `dist/index.html` (start: `default-src 'self'; img-src 'self' data:; style-src 'self'
-     'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`).
+     the built `dist/index.html`. Checked 2026-11-23: one module script from `/assets`, no inline script/style,
+     no images, nothing external → strict CSP `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self';
+     connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors
+     'none'` (React `style={}` props set styles via the DOM, which CSP allows). Managed cache policies by their fixed
+     AWS ids, not looked up.
 8. **Deploy role rights (attached in `app`):** on both functions `lambda:GetFunction`,
    `GetFunctionConfiguration`, `UpdateFunctionCode`, `PublishVersion`, `UpdateAlias`; frontend bucket
    `s3:ListBucket`, `GetObject`, `PutObject`, `DeleteObject`; `cloudfront:CreateInvalidation` on the distribution.
@@ -220,6 +223,9 @@ CloudFront; the direct `execute-api` URL is not revealed by CloudFront. Budget a
 Emergency switch (documented in `api.tf`): `terraform destroy -target=aws_apigatewayv2_api.main` (new URL on
 re-create). Later option (backlog): CloudFront flat-rate Free plan with WAF; Free-tier account eligibility is
 contradictory in the docs.
+
+**Result Task 6 (2026-11-23):** applied (5 resources). `curl` on `<api_endpoint>/api/auth/me` without the origin
+header → `403` from the backend (proves route, permission, alias, SnapStart restore and the origin filter).
 
 ### Task 7: Frontend bucket + CloudFront, first live test
 
