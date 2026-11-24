@@ -1,6 +1,32 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-21
+Letztes Update: 2026-11-24
+
+## Serverless rewrite part 3: app live (2026-11-24, Tasks 1–7 of 9)
+
+Plan: `docs/superpowers/plans/2026-11-22-terraform-data-app.md` (the "Result" notes per task hold every detail).
+Branch `feature/terraform-data-app`.
+
+- **Session hardening** (backend): transaction conflicts skipped instead of 500, items without time attributes read as
+  absent, size limits on deserialization (16 KB, depth 20, ...), new sessions only with `attribute_not_exists`.
+- **`infra/data`** (applied): table `value-screener` (20/20, TTL, PITR, deletion protection, `prevent_destroy`; a
+  backend test compares it with `TableDefinition`), SSM user secrets via write-only `value_wo` (proved: no value in
+  state). The user generated the bcrypt hashes with `htpasswd -nBC 12` and entered them in the console.
+- **`infra/app`** (applied): deep-analysis Lambda (512 MB, 10 s), backend Lambda (1024 MB, 29 s, SnapStart, minimal
+  policy), origin secret, HTTP API (rate 5 / burst 10, user decision after a cost check), private frontend bucket,
+  CloudFront (origin secret header, viewer address, strict CSP, HSTS). `app` finds `data`/`foundation` by fixed names.
+- **Live bug fixed:** with HTTP API payload 2.0 the Java adapter kept only the first `Set-Cookie`, so the login lost
+  `JSESSIONID`. Now payload **1.0** (`getAwsProxyHandler`); a handler test logs in end to end. Backend 553 tests.
+- **Live checks:** direct API 403, via CloudFront 401; USER and ADMIN log in; buy works; security headers present.
+- **Hand-over of artifacts:** built in the sandbox → `~/dev/transfer` → `sha256sum` on both sides → `aws s3 cp`.
+- **Next:** Task 8 (CI deploy workflow), Task 9 (docs). Entry point:
+  [`docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md`](docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md).
+  No `v*` tag before the new workflow exists.
+
+**Deutsche Kurzfassung:** Die App läuft live über CloudFront: Tabelle und Geheimnisse in `data`, Lambdas, API,
+Frontend-Bucket und CloudFront in `app`. Ein Fehler im Live-Test (Session-Cookie ging verloren) ist behoben, indem die
+API auf Format 1.0 umgestellt wurde. Login als USER und ADMIN funktioniert. Als Nächstes kommen der GitHub-Deploy und
+die Doku. Bis dahin keinen Versions-Tag pushen.
 
 ## Serverless rewrite part 2 done: Terraform foundations (2026-11-21)
 
