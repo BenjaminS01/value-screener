@@ -1,0 +1,152 @@
+name: Deploy
+
+# A version tag (v*) tests everything, then ships both Lambdas and the frontend:
+# zip → artifact bucket → update-function-code → publish-version → alias live; dist → S3 → CloudFront invalidation.
+# Terraform owns the configuration, this workflow owns the code (Terraform ignores code and alias version).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write # OIDC token for the AWS role
+  contents: read
+
+# Never two deploys at the same time; a second tag waits for the first.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run backend tests
+        working-directory: backend
+        run: mvn -B test
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+  deep-analysis-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run deep-analysis tests
+        working-directory: deep-analysis
+        run: mvn -B test
+
+  deploy:
+    needs: [backend-tests, frontend-tests, deep-analysis-tests]
+    runs-on: ubuntu-latest
+    # No "environment:" here: it would change the OIDC subject, and the role only trusts
+    # repo:<owner>/<repo>:ref:refs/tags/v*.
+    env:
+      AWS_REGION: eu-central-1
+      # Repository variables (Settings → Secrets and variables → Actions → Variables), not secrets.
+      ARTIFACT_BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+      FRONTEND_BUCKET: ${{ vars.FRONTEND_BUCKET }}
+      DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+    steps:
+      - name: Check repository variables
+        env:
+          ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          missing=0
+          for name in ROLE_ARN ARTIFACT_BUCKET FRONTEND_BUCKET DISTRIBUTION_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository variable for $name is not set"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Tests ran in the jobs above; here only build.
+      - name: Build backend zip
+        working-directory: backend
+        run: mvn -B package -DskipTests
+
+      - name: Build deep-analysis zip
+        working-directory: deep-analysis
+        run: mvn -B package -DskipTests
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Upload Lambda zips
+        run: |
+          aws s3 cp deep-analysis/target/function.zip "s3://$ARTIFACT_BUCKET/deep-analysis/deep-analysis.zip"
+          aws s3 cp backend/target/value-screener-backend-lambda.zip "s3://$ARTIFACT_BUCKET/backend/backend.zip"
+
+      # deep-analysis first: the backend calls it, so the callee is new before the caller.
+      - name: Deploy Lambdas
+        run: |
+          set -euo pipefail
+          deploy_lambda() {
+            local fn="$1" key="$2" version
+            echo "== $fn"
+            aws lambda update-function-code --function-name "$fn" \
+              --s3-bucket "$ARTIFACT_BUCKET" --s3-key "$key" --query LastUpdateStatus --output text
+            aws lambda wait function-updated --function-name "$fn"
+            version=$(aws lambda publish-version --function-name "$fn" --query Version --output text)
+            echo "published version $version"
+            # With SnapStart the version stays Pending for some minutes while the snapshot is taken.
+            aws lambda wait published-version-active --function-name "$fn" --qualifier "$version"
+            aws lambda update-alias --function-name "$fn" --name live --function-version "$version" \
+              --query FunctionVersion --output text
+          }
+          deploy_lambda deep-analysis-demo deep-analysis/deep-analysis.zip
+          deploy_lambda value-screener-backend backend/backend.zip
+
+      - name: Deploy frontend
+        run: |
+          aws s3 sync frontend/dist/ "s3://$FRONTEND_BUCKET/" --delete
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' \
+            --query Invalidation.Id --output text

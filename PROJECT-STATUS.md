@@ -19,14 +19,15 @@ Branch `feature/terraform-data-app`.
   `JSESSIONID`. Now payload **1.0** (`getAwsProxyHandler`); a handler test logs in end to end. Backend 553 tests.
 - **Live checks:** direct API 403, via CloudFront 401; USER and ADMIN log in; buy works; security headers present.
 - **Hand-over of artifacts:** built in the sandbox → `~/dev/transfer` → `sha256sum` on both sides → `aws s3 cp`.
-- **Next:** Task 8 (CI deploy workflow), Task 9 (docs). Entry point:
+- **Next:** Task 8 (CI deploy workflow), then Task 10 (research sync live: bring locally researched snapshots into
+  the live system), Task 9 (docs). Entry point:
   [`docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md`](docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md).
   No `v*` tag before the new workflow exists.
 
 **Deutsche Kurzfassung:** Die App läuft live über CloudFront: Tabelle und Geheimnisse in `data`, Lambdas, API,
 Frontend-Bucket und CloudFront in `app`. Ein Fehler im Live-Test (Session-Cookie ging verloren) ist behoben, indem die
-API auf Format 1.0 umgestellt wurde. Login als USER und ADMIN funktioniert. Als Nächstes kommen der GitHub-Deploy und
-die Doku. Bis dahin keinen Versions-Tag pushen.
+API auf Format 1.0 umgestellt wurde. Login als USER und ADMIN funktioniert. Als Nächstes kommen der GitHub-Deploy, dann
+der Research-Sync (lokal recherchierte Daten ins Live-System) und die Doku. Bis dahin keinen Versions-Tag pushen.
 
 ## Serverless rewrite part 2 done: Terraform foundations (2026-11-21)
 
