@@ -248,6 +248,16 @@ Evidence: browser kept only `XSRF-TOKEN`; the login response had one `set-cookie
 payload format 1.0 in `api.tf` and `getAwsProxyHandler` in `StreamLambdaHandler`; `StreamLambdaHandlerTest` now sends
 1.0 events and logs in end-to-end (both cookies present, `/api/auth/me` 200 with the session). Backend 553 tests.
 
+**Result Task 7 (2026-11-24):** applied (10 resources + payload change). Frontend built in the sandbox, handed over as
+`frontend-dist.tar.gz` via the transfer folder, extracted in aws-ops into a fresh `~/frontend-dist`, `aws s3 sync
+--delete`. Backend fix deployed by hand: `update-function-code` → `publish-version` (version 2, SnapStart) →
+`update-alias live` → 2. Checks: direct API 403, via CloudFront 401; login as USER and ADMIN works (`JSESSIONID` and
+`XSRF-TOKEN` set), buying a position works; `/api/gibt-es-nicht` → 401 JSON (no index.html); HSTS, CSP, frame DENY,
+nosniff, referrer same-origin present; 35 groups in the table (they show in the UI only once research snapshots
+exist: by design of `grouping.ts` and the portfolio group column).
+**Backlog (later, not this plan):** viewer TLS minimum is `TLSv1` with the default `*.cloudfront.net` certificate
+(only changeable with an own domain + ACM certificate); CloudFront flat-rate Free plan with WAF (eligibility unclear).
+
 ### Task 8: CI deploy workflow
 
 **Files:** Create: `infra/app/deploy_role.tf` (inline policy on the foundation deploy role, decision 8),
