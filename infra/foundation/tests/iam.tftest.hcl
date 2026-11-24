@@ -42,10 +42,10 @@ run "deploy_role_only_for_version_tags_of_this_repo" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike   = { "token.actions.githubusercontent.com:sub" = "repo:BenjaminS01/value-screener:ref:refs/tags/v*" }
+        StringLike   = { "token.actions.githubusercontent.com:sub" = "repo:BenjaminS01@56607010/value-screener@1307944384:ref:refs/tags/v*" }
       }
     }]
-    error_message = "Deploy role may only be assumed by version tags (v*) of BenjaminS01/value-screener."
+    error_message = "Deploy role may only be assumed by version tags (v*) of BenjaminS01/value-screener (subject with owner and repo ids, as GitHub sends it)."
   }
 
   assert {
@@ -95,6 +95,17 @@ run "github_repository_must_be_owner_slash_name" {
 
   variables {
     github_repository = "value-screener"
+  }
+
+  expect_failures = [var.github_repository]
+}
+
+# GitHub's token subject carries the ids (seen in CloudTrail 2026-11-24); a plain owner/name never matches.
+run "github_repository_without_ids_is_rejected" {
+  command = plan
+
+  variables {
+    github_repository = "BenjaminS01/value-screener"
   }
 
   expect_failures = [var.github_repository]
