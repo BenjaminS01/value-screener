@@ -70,6 +70,10 @@ resource "aws_lambda_function" "backend" {
       SPRING_PROFILES_ACTIVE  = "aws"
       ADMIN_USERNAME          = var.admin_username
       APP_DYNAMODB_TABLE_NAME = data.aws_dynamodb_table.main.name
+      # POST /api/research/sync/snapshots (scripts/push-research.sh). Needs the real hash in SSM
+      # /value-screener/app.research-sync.token-hash (infra/data), else the backend refuses to start.
+      # Reaches live only with the next CI deploy (new version), like every config change here.
+      APP_RESEARCH_SYNC_ENABLED = "true"
     }
   }
 

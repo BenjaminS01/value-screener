@@ -590,9 +590,12 @@ auf dem Host, nie in der Sandbox (dort bricht es mit Fehler ab).
 1. **Sync-Token erzeugen** (wie im Abschnitt "Token erzeugen"): `MachineTokenGenerator` ausführen. `sha256` ist
    für das Live-System, `token` für deinen Rechner. Das Skript verweigert die Arbeit, wenn Sync- und
    Ingest-Token identisch sind.
-2. **Live-System**: nur der Hash geht nach SSM, als `APP_RESEARCH_SYNC_TOKEN_HASH=<sha256>` zusammen mit
-   `APP_RESEARCH_SYNC_ENABLED=true`. Ist der Sync nicht aktiviert, antwortet `/api/research/sync/snapshots`
-   mit `404`; ist er aktiviert, aber der Hash fehlt oder ist ungültig, startet das Backend nicht.
+2. **Live-System**: nur der Hash geht nach AWS, in der Konsole als Wert des SSM-Parameters
+   `/value-screener/app.research-sync.token-hash` (angelegt von `infra/data` mit Platzhalter). Eingeschaltet wird
+   der Sync von `infra/app` (Lambda-Umgebungsvariable `APP_RESEARCH_SYNC_ENABLED=true`). Beides wirkt erst mit
+   dem nächsten Deploy (neuer `v*`-Tag), weil das Backend SSM beim SnapStart-Snapshot liest. Ist der Sync nicht
+   aktiviert, antwortet `/api/research/sync/snapshots` mit `404`; ist er aktiviert, aber der Hash fehlt oder ist
+   ungültig, startet das Backend nicht (live bleibt dann auf der alten Version).
 3. **Zugangsdaten auf dem Rechner**: Datei `~/.config/value-screener/live.env` anlegen (außerhalb des Repos,
    nur für dich lesbar) und mit einem Editor füllen, damit kein Token in der Shell-History landet:
    ```bash

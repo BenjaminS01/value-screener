@@ -77,11 +77,12 @@ run "backend_lambda_runs_spring_with_snapstart" {
 
   assert {
     condition = aws_lambda_function.backend.environment[0].variables == tomap({
-      SPRING_PROFILES_ACTIVE  = "aws"
-      ADMIN_USERNAME          = "admin-test"
-      APP_DYNAMODB_TABLE_NAME = "value-screener"
+      SPRING_PROFILES_ACTIVE    = "aws"
+      ADMIN_USERNAME            = "admin-test"
+      APP_DYNAMODB_TABLE_NAME   = "value-screener"
+      APP_RESEARCH_SYNC_ENABLED = "true"
     })
-    error_message = "Exactly these three environment variables; secrets come from SSM, never from env."
+    error_message = "Exactly these four environment variables; secrets (incl. the sync token hash) come from SSM, never from env."
   }
 
   assert {
