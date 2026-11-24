@@ -271,6 +271,12 @@ exist: by design of `grouping.ts` and the portfolio group column).
 - [ ] User sets the repository variables, merges, pushes tag `v3.0.0` → workflow green → live app still works →
   `terraform plan` in `app` shows `No changes` (Review Focus).
 
+### Task 10 (added 2026-11-24): research sync live
+
+User request: bring locally researched snapshots into the live system via the existing research sync. Runs after
+Task 8 (one tag per deploy). Details and steps: handoff `2026-11-24-terraform-ci-handoff.md`, section 3a. Its own
+short plan first.
+
 ### Task 9: Docs and handoff
 
 **Files:** Modify: `PROJECT-STATUS.md` (top section, English + German summary), `README.md` (deploy),

@@ -36,6 +36,27 @@ docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md komplett. Wir machen T
 - Delete `build-and-push-backend.yml`.
 - First tag `v3.0.0`; afterwards `terraform plan` in `app` must show `No changes` (alias and code are ignored).
 
+## 3a. After Task 8: research sync live (Task 10, user request 2026-11-24)
+
+The user researched data locally and wants it in the live system. The mechanism exists (`ResearchSyncController`,
+`scripts/push-research.sh`, README "Recherchedaten ins Live-System übertragen"); in AWS it is off. Order decided:
+Task 8 first, so the sync deploys (and a possible frontend change) go out with one tag instead of manual deploys.
+The user may swap the order if the data is urgent and the snapshot count is small.
+
+1. Clarify first: how many snapshots exist locally? Backlog item "lighter list endpoint for the research overview"
+   (the overview reads all snapshots; about 128 RCU at 100 snapshots vs. 20 RCU) is needed before the sync at larger
+   counts and changes backend + frontend.
+2. `infra/data`: SSM parameter `/value-screener/app.research-sync.token-hash` (write-only placeholder like the user
+   secrets); the user generates the token with `MachineTokenGenerator` and enters only the hash in the console.
+3. `infra/app`: Lambda env `APP_RESEARCH_SYNC_ENABLED=true` (the role already reads `/value-screener/*`).
+4. Deploy a new backend version (SnapStart reads SSM at snapshot time; Terraform ignores the alias).
+5. The user creates `~/.config/value-screener/live.env` (`LIVE_BACKEND_URL=https://<cloudfront_domain>`, tokens;
+   never in chat or on the command line) and runs `scripts/push-research.sh <ISIN>` on the host, never in the
+   sandbox. Rate limit 5/s is enough for one ISIN per call.
+6. Check: overview shows the groups with snapshots; `terraform plan` in `app` shows only the intended change.
+
+Short plan first (writing-plans), then test-first as usual.
+
 ## 4. Working mode (binding, unchanged)
 
 - Teaching session in simple German, **exactly one user step per message**, then wait.
@@ -52,6 +73,7 @@ docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md komplett. Wir machen T
 ## Deutsche Kurzfassung
 
 Die App läuft live über CloudFront und ist als USER und ADMIN getestet. Offen sind Task 8, der GitHub-Workflow,
-der bei einem Versions-Tag testet, baut und deployt, genau die Schritte, die wir von Hand gemacht haben, und Task 9,
-die Doku. Bis der neue Workflow steht, keinen `v…`-Tag pushen. Arbeitsweise unverändert: ein Schritt pro Nachricht,
+der bei einem Versions-Tag testet, baut und deployt, genau die Schritte, die wir von Hand gemacht haben. Danach
+Task 10, der Research-Sync: lokal recherchierte Daten ins Live-System bringen (Mechanismus existiert, in AWS noch
+aus; zuerst klären, ob die schlankere Research-Liste nötig ist). Zum Schluss Task 9, die Doku. Bis der neue Workflow steht, keinen `v…`-Tag pushen. Arbeitsweise unverändert: ein Schritt pro Nachricht,
 Claude nur im Projektordner, Dateien nach aws-ops nur über den Transferordner.
