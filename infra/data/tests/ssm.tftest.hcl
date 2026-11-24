@@ -13,8 +13,9 @@ run "one_extra_user_gives_admin_hash_and_both_user_parameters" {
       "/value-screener/app.admin.password-hash",
       "/value-screener/app.users.0.username",
       "/value-screener/app.users.0.password-hash",
+      "/value-screener/app.research-sync.token-hash",
     ])
-    error_message = "Expected the admin hash plus username and hash of user 0 (names from application-aws.yml)."
+    error_message = "Expected the admin hash, username and hash of user 0 and the sync token hash (names from application-aws.yml / MachineTokenProperties)."
   }
 
   assert {
@@ -35,7 +36,7 @@ run "one_extra_user_gives_admin_hash_and_both_user_parameters" {
   }
 }
 
-run "no_extra_user_gives_only_the_admin_hash" {
+run "no_extra_user_gives_admin_and_sync_hash" {
   command = plan
 
   variables {
@@ -43,8 +44,11 @@ run "no_extra_user_gives_only_the_admin_hash" {
   }
 
   assert {
-    condition     = keys(aws_ssm_parameter.user_supplied) == ["/value-screener/app.admin.password-hash"]
-    error_message = "Without extra users only the admin hash is created."
+    condition = toset(keys(aws_ssm_parameter.user_supplied)) == toset([
+      "/value-screener/app.admin.password-hash",
+      "/value-screener/app.research-sync.token-hash",
+    ])
+    error_message = "Without extra users only the admin hash and the sync token hash are created."
   }
 }
 

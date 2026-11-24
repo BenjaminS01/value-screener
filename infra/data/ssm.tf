@@ -1,8 +1,10 @@
 locals {
   # Names the backend reads at startup (application-aws.yml: import prefix /value-screener/, the rest is the
   # Spring property name). Both parameters of a user index must exist: a list comes from one property source.
+  # The research sync token hash (SHA-256 of the token from MachineTokenGenerator) must hold the real value before
+  # a backend with APP_RESEARCH_SYNC_ENABLED=true is published, otherwise the backend refuses to start.
   user_supplied_parameters = concat(
-    ["/value-screener/app.admin.password-hash"],
+    ["/value-screener/app.admin.password-hash", "/value-screener/app.research-sync.token-hash"],
     flatten([for n in range(var.extra_user_count) : [
       "/value-screener/app.users.${n}.username",
       "/value-screener/app.users.${n}.password-hash",
