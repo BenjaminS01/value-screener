@@ -2,32 +2,43 @@
 
 Letztes Update: 2026-11-24
 
-## Serverless rewrite part 3: app live (2026-11-24, Tasks 1–7 of 9)
+## Serverless rewrite part 3 done: app live, CI deploy, research sync (2026-11-24)
 
-Plan: `docs/superpowers/plans/2026-11-22-terraform-data-app.md` (the "Result" notes per task hold every detail).
-Branch `feature/terraform-data-app`.
+Plans: `docs/superpowers/plans/2026-11-22-terraform-data-app.md` (Tasks 1–9, "Result" notes per task) and
+`docs/superpowers/plans/2026-11-24-research-sync-live.md` (Task 10). Tasks 1–7 on branch
+`feature/terraform-data-app` (PR #9), Task 8 via PR #10, the rest directly on `main`.
 
 - **Session hardening** (backend): transaction conflicts skipped instead of 500, items without time attributes read as
   absent, size limits on deserialization (16 KB, depth 20, ...), new sessions only with `attribute_not_exists`.
 - **`infra/data`** (applied): table `value-screener` (20/20, TTL, PITR, deletion protection, `prevent_destroy`; a
-  backend test compares it with `TableDefinition`), SSM user secrets via write-only `value_wo` (proved: no value in
-  state). The user generated the bcrypt hashes with `htpasswd -nBC 12` and entered them in the console.
+  backend test compares it with `TableDefinition`), SSM secrets via write-only `value_wo` (proved: no value in
+  state): admin hash, user 0, research sync token hash. Real values entered by the user in the console.
 - **`infra/app`** (applied): deep-analysis Lambda (512 MB, 10 s), backend Lambda (1024 MB, 29 s, SnapStart, minimal
-  policy), origin secret, HTTP API (rate 5 / burst 10, user decision after a cost check), private frontend bucket,
-  CloudFront (origin secret header, viewer address, strict CSP, HSTS). `app` finds `data`/`foundation` by fixed names.
+  policy, research sync on), origin secret, HTTP API (payload 1.0, rate 5 / burst 10), private frontend bucket,
+  CloudFront (origin secret header, viewer address, strict CSP, HSTS), deploy role rights (`deploy_role.tf`).
 - **Live bug fixed:** with HTTP API payload 2.0 the Java adapter kept only the first `Set-Cookie`, so the login lost
   `JSESSIONID`. Now payload **1.0** (`getAwsProxyHandler`); a handler test logs in end to end. Backend 553 tests.
-- **Live checks:** direct API 403, via CloudFront 401; USER and ADMIN log in; buy works; security headers present.
-- **Hand-over of artifacts:** built in the sandbox → `~/dev/transfer` → `sha256sum` on both sides → `aws s3 cp`.
-- **Next:** Task 8 (CI deploy workflow), then Task 10 (research sync live: bring locally researched snapshots into
-  the live system), Task 9 (docs). Entry point:
-  [`docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md`](docs/superpowers/plans/2026-11-24-terraform-ci-handoff.md).
-  No `v*` tag before the new workflow exists.
+- **CI deploy** (`.github/workflows/deploy.yml`): a `v*` tag runs the tests of all three modules, uploads both zips,
+  `update-function-code` → `publish-version` → wait until active → alias `live`, then frontend `s3 sync --delete` and
+  invalidation. Role ARN, buckets and distribution id are GitHub repository variables. The old ECR/ECS workflow is
+  gone. `v3.0.0` and `v3.1.0` deployed green; `terraform plan` in `app` afterwards: `No changes`.
+- **OIDC lesson:** GitHub's token subject carries ids, `repo:<owner>@<owner id>/<repo>@<repo id>:ref:...` (seen in
+  CloudTrail). The deploy role trusts exactly that form (`infra/foundation`, variable `github_repository`).
+- **Research sync live:** `scripts/push-research.sh <ISIN>` on the host sends one reviewed snapshot (group assigned)
+  from the local backend to live; tested with groups. The tokens live only in `~/.config/value-screener/live.env`.
+- **Live checks:** direct API 403, via CloudFront 401; USER and ADMIN log in; buy works; security headers present;
+  synced snapshots show in their groups.
+- **Next:** Task 11, lighter list endpoint for the research overview (backend + frontend, own plan), **before the
+  live table holds about 30 snapshots** (one overview load reads all snapshots: ~13 RCU at 10, ~128 at 100, table
+  has 20). Entry point:
+  [`docs/superpowers/plans/2026-11-24-part3-done-handoff.md`](docs/superpowers/plans/2026-11-24-part3-done-handoff.md).
 
-**Deutsche Kurzfassung:** Die App läuft live über CloudFront: Tabelle und Geheimnisse in `data`, Lambdas, API,
-Frontend-Bucket und CloudFront in `app`. Ein Fehler im Live-Test (Session-Cookie ging verloren) ist behoben, indem die
-API auf Format 1.0 umgestellt wurde. Login als USER und ADMIN funktioniert. Als Nächstes kommen der GitHub-Deploy, dann
-der Research-Sync (lokal recherchierte Daten ins Live-System) und die Doku. Bis dahin keinen Versions-Tag pushen.
+**Deutsche Kurzfassung:** Teil 3 ist fertig. Die App läuft live über CloudFront, Login als USER und ADMIN
+funktioniert. Deployt wird jetzt per Versions-Tag: GitHub testet, baut und bringt beide Lambdas und das Frontend
+live (`v3.0.0`, `v3.1.0` grün). Dabei gelernt: GitHub schickt im Anmelde-Token IDs statt nur den Namen, die Rolle
+vertraut jetzt genau dieser Form. Der Research-Sync ist eingeschaltet: Du überträgst geprüfte Snapshots mit
+`scripts/push-research.sh <ISIN>` von deinem Rechner aus ins Live-System. Nächster Schritt ist Task 11, die
+schlankere Research-Liste, bevor live etwa 30 Snapshots liegen.
 
 ## Serverless rewrite part 2 done: Terraform foundations (2026-11-21)
 
@@ -98,8 +109,9 @@ plan named here. Dead code (`HistoryQuery.count`, `IpState.expired`) was removed
   - New sessions: put with `attribute_not_exists(pk)`; on a condition failure check whether the stored item is
     our own (same `created`, i.e. an SDK retry) before treating it as a collision.
   - End-to-end assertion that a stored session has `maxInactiveSeconds` = 7200.
-- **Before research sync goes live:** lighter list endpoint for the research overview (it still reads all
-  snapshots once per load; needs a frontend change).
+- **Task 11, before the live table holds about 30 snapshots** (research sync is live since 2026-11-24 without it,
+  fewer than 10 snapshots): lighter list endpoint for the research overview (it still reads all snapshots once per
+  load; needs a frontend change).
 - **Next plan that touches persistence/groups (general cleanup):**
   - Rename `persistence/HistoryQuery` → `PartitionQueries` (it reads snapshot, index and history partitions).
   - `app.dynamodb.seed-groups` as a field of `DynamoProperties` instead of two `@Value`s.
@@ -108,7 +120,7 @@ plan named here. Dead code (`HistoryQuery.count`, `IpState.expired`) was removed
   - `ItemConditions.versionEquals(null)`: `IllegalStateException` instead of `IllegalArgumentException`.
 
 **Deutsche Kurzfassung:** Offene Punkte aus den Reviews, bewusst nicht jetzt umgesetzt: Session-Härtung als
-erster Task von Teil 3, schlankere Research-Liste vor dem Research-Sync, kleine Aufräumarbeiten im nächsten Plan,
+erster Task von Teil 3 (erledigt), schlankere Research-Liste (Task 11, vor etwa 30 Snapshots live), kleine Aufräumarbeiten im nächsten Plan,
 der Persistenz oder Gruppen berührt. Toter Code ist bereits entfernt.
 
 ## Package structure cleanup (2026-11-18)

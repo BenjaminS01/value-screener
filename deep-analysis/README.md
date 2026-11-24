@@ -24,4 +24,8 @@ The dev mock event server runs on port 8090 (8080 is used by the backend, dev-up
 
 ## Deployment
 
-Not part of this phase. Creating the Lambda, IAM role and permissions follows later with Terraform.
+Function, role (logs only), log group and alias `live` are created by Terraform (`infra/app/deep_analysis.tf`).
+The code ships with every version tag (`.github/workflows/deploy.yml`): `mvn -B package` builds
+`target/function.zip`, CI uploads it to `s3://value-screener-artifacts-<account>/deep-analysis/deep-analysis.zip`,
+updates the function code, publishes a version and moves alias `live` to it. The backend invokes only
+`deep-analysis-demo:live`.

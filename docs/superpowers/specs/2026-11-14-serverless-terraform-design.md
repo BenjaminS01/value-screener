@@ -422,6 +422,10 @@ setup is designed so that this changes the bill by cents.
 "superseded" note in the 2026-09-20 deployment design/plan. Curriculum topic 14 ("AWS CDK"): open, not
 part of this design.
 
+Done 2026-11-24 (part 3, Task 9): `PROJECT-STATUS.md`, `README.md`, `docs/aws/aws-architecture-overview.md`
+(rewritten), handoff `docs/superpowers/plans/2026-11-24-part3-done-handoff.md`, "superseded" notes in the 2026-09-20
+design and plan. `.env.example` and the DynamoDB Local setup were updated in part 1.
+
 ## Deutsche Kurzfassung
 
 Die gesamte AWS-Infrastruktur wird neu und vollständig mit Terraform aufgebaut. Die alte, von Hand

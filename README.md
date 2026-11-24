@@ -417,59 +417,38 @@ Dazu kommen:
 **Bewusste Grenze:** Wer einen Benutzernamen kennt, kann diesen Nutzer für 15 Minuten aussperren. Das
 wird in Kauf genommen, weil es nur eine Handvoll persönlich vergebener Konten gibt.
 
-## AWS-Infrastruktur (Zielbild, grob)
+## AWS-Infrastruktur (live seit 2026-11-24)
 
-> **Überholt:** Dieses Zielbild mit RDS und ECS ist durch das Serverless-Design ersetzt (DynamoDB, Lambda, CloudFront): [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](docs/superpowers/specs/2026-11-14-serverless-terraform-design.md). Der Text unten bleibt als Historie stehen.
-
-Region `eu-central-1`.
+Serverless, komplett mit Terraform gebaut (`infra/`), Region `eu-central-1`:
 
 ```
-                                   Browser
-                                      │  HTTPS
-                                      ▼
-                    CloudFront ── S3 (Frontend: React-App)
-                         │  /api/*
-                         ▼
-                 API Gateway (HTTP API, Drosselung)
-                         │  VPC Link
-   ═════════════ VPC (privat, kein Internet-Gateway, kein NAT) ═════════════
-   ║  ECS Fargate: Backend (Spring Boot)                                     ║
-   ║    Login und Rollen, Tageslimits, Portfolio, Recherchedaten,            ║
-   ║    Gruppen, Berichts-Metadaten                                          ║
-   ║       │                 │ S3-Gateway-Endpoint      │ DynamoDB-Gateway-  ║
-   ║       ▼                 │ (kostenlos)              │ Endpoint (kostenl.)║
-   ║  RDS PostgreSQL         │                          │                    ║
-   ═════════════════════════════════════════════════════════════════════════
-                             ▼                          ▼
-               S3: Quartalsberichte (privat)    DynamoDB: Jobs + Chatverlauf
-                    │ S3-Events                       │ Stream
-                    ▼                                 ▼
-   ┌─ Lambdas außerhalb der VPC ────────────────────────────────────────────┐
-   │ report-intelligence (Quarkus): ingest · cleanup · evaluate · chat      │
-   │   → Bedrock Titan Embeddings · S3 Vectors · Anthropic API (Claude)     │
-   │ deep-analysis-demo (klein, ohne KI)                                    │
-   └────────────────────────────────────────────────────────────────────────┘
+            Browser
+               │  HTTPS
+               ▼
+   CloudFront ── S3 (Frontend: React-App)
+               │  /api/*  (+ geheimer Origin-Header)
+               ▼
+   API Gateway (HTTP API, Drosselung 5/s)
+               │
+               ▼
+   Lambda: Backend (Spring Boot, SnapStart) ──► Lambda: deep-analysis-demo
+       │                     │
+       ▼                     ▼
+   DynamoDB (eine Tabelle)   SSM Parameter Store (Hashes, Origin-Secret)
 
-   Rundherum: IAM (MFA, keine Access Keys, OIDC für GitHub Actions) · AWS Budgets mit
-   automatischer Kostenbremse · SSM Parameter Store (Konten, Tokens, API-Key) · SQS-DLQs ·
-   CloudWatch-Logs · CI/CD: GitHub Actions → ECR → ECS
+   Deploy: Git-Tag v* → GitHub Actions (OIDC, keine Schlüssel) → Lambdas + Frontend
 ```
 
 **Warum so:**
 
-- **Kein NAT Gateway:** Das Backend hat bewusst keinen Internetzugang. Es spricht mit S3 und DynamoDB
-  nur über die kostenlosen Gateway-Endpoints.
-- **KI-Arbeit in Lambdas außerhalb der VPC:** Embeddings, Vektorsuche und Claude laufen dort und
-  kosten im Leerlauf fast nichts.
-- **Asynchrone Jobs:** Chat und Auswertung laufen über DynamoDB als Jobs, weil API Gateway Anfragen
-  nach 30 s abbricht.
+- **Im Ruhezustand fast 0 $:** keine laufenden Server, kein VPC, kein NAT. DynamoDB im kostenlosen Rahmen,
+  Lambdas kosten nur bei Aufrufen. Budget 5 $/Monat mit automatischer Sperre.
+- **Eine Adresse für alles:** CloudFront liefert Frontend und `/api/*` aus, daher kein CORS. Der direkte Weg zur
+  API ist gesperrt (403 ohne den geheimen Header).
+- **Daten getrennt von der App:** Tabelle und Secrets liegen im Stack `data`; ein Abriss von `app` löscht nichts.
 
-Ausführlich:
-
-- [`docs/aws/aws-architecture-overview.md`](docs/aws/aws-architecture-overview.md) (Stand des
-  Deployments)
-- [`docs/superpowers/specs/2026-09-20-aws-deployment-design.md`](docs/superpowers/specs/2026-09-20-aws-deployment-design.md)
-- [`docs/superpowers/specs/2026-11-03-quarterly-report-rag-design.md`](docs/superpowers/specs/2026-11-03-quarterly-report-rag-design.md)
+Ausführlich: [`docs/aws/aws-architecture-overview.md`](docs/aws/aws-architecture-overview.md) und das Design
+[`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](docs/superpowers/specs/2026-11-14-serverless-terraform-design.md).
 
 ---
 
@@ -478,7 +457,8 @@ Ausführlich:
 | Baustein | Stand |
 |---|---|
 | Portfolio (Grundfunktion), Recherchedaten-Speicherung, Recherche-Skill | ✅ vorhanden, v1-Stand |
-| AWS-Basis: Account, Budgets, VPC, RDS, ECS-Backend, API Gateway, CI/CD | ✅ gebaut. ECS, RDS und Interface-Endpoints sind seit 2026-11-03 gestoppt, um Guthaben zu sparen |
+| AWS serverless mit Terraform (DynamoDB, Lambda, API Gateway, CloudFront, S3), Deploy per Git-Tag | ✅ live seit 2026-11-24 (die alte ECS/RDS-Umgebung ist gelöscht) |
+| Research-Sync (geprüfte Snapshots ins Live-System) | ✅ live seit 2026-11-24 |
 | **v2 Phase 1:** Login mit Rollen, Portfolio nach Rolle, lokale Recherche mit Push, Gruppen (Backend) | 🔄 in Arbeit, Plan: [`docs/superpowers/plans/2026-11-04-v2-phase1-backend-login-research-groups.md`](docs/superpowers/plans/2026-11-04-v2-phase1-backend-login-research-groups.md) |
 | Frontend für v2 (Login, Portfolio, Research-Seite) | ⏳ geplant |
 | Job-Tabelle, Tiefenanalyse-Platzhalter, Tageslimits | ⏳ geplant |
@@ -491,8 +471,7 @@ Laufender Projektstand: [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
 
 # Entwicklung
 
-Die folgenden Abschnitte beschreiben Einrichtung und Abläufe für Entwickler. Die Sandbox und die
-Übertragung von Recherchedaten werden im Rahmen von v2 Phase 1 umgestellt.
+Die folgenden Abschnitte beschreiben Einrichtung und Abläufe für Entwickler.
 
 ## Sandbox für Web-Recherche-Skills
 
@@ -506,9 +485,12 @@ das restliche Home-Verzeichnis (der Skill weist in seinem Security-Abschnitt sel
 ab, falls er außerhalb der Sandbox gestartet wird):
 
 ```bash
-export RESEARCH_INGEST_TOKEN='<token aus MachineTokenGenerator>'
+export RESEARCH_INGEST_TOKEN="$(grep '^RESEARCH_INGEST_TOKEN=' ~/.config/value-screener/live.env | cut -d= -f2-)"
 ./docker/claude-sandbox/run.sh
 ```
+
+Der Token kommt aus `~/.config/value-screener/live.env` (siehe "Recherchedaten ins Live-System übertragen") und
+landet so weder in der Shell-History noch auf dem Bildschirm.
 
 Was die Sandbox dabei bekommt und was nicht:
 
@@ -543,8 +525,9 @@ Ausgabe: zwei Zeilen `token=<...>` und `sha256=<...>`.
 
 - `sha256` kommt als `APP_RESEARCH_INGEST_TOKEN_HASH=<sha256>` in die `.env` (siehe `.env.example`). Das
   lokale Backend (`dev-up.sh`, Profil `local`) startet nicht ohne diesen Wert.
-- `token` wird **nur** in der Shell exportiert, die die Sandbox startet: `export RESEARCH_INGEST_TOKEN='<token>'`.
-  Nicht in `.env`, nicht ins Repo.
+- `token` gehört als `RESEARCH_INGEST_TOKEN=<token>` in `~/.config/value-screener/live.env` (nur für dich lesbar)
+  und wird von dort in der Shell exportiert, die die Sandbox startet (siehe oben). Nicht in `.env`, nicht ins Repo.
+  Tipp: die Ausgabe des Generators direkt in eine Datei mit `umask 077` umleiten statt sie anzuzeigen.
 
 ### Manueller Testablauf für den `research-company`-Skill
 
@@ -559,7 +542,7 @@ Ausgabe: zwei Zeilen `token=<...>` und `sha256=<...>`.
    Endpoint aus).
 3. **Sandbox starten** (Terminal 2, im Projekt-Root):
    ```bash
-   export RESEARCH_INGEST_TOKEN='<token aus Schritt 1>'
+   export RESEARCH_INGEST_TOKEN="$(grep '^RESEARCH_INGEST_TOKEN=' ~/.config/value-screener/live.env | cut -d= -f2-)"
    ./docker/claude-sandbox/run.sh
    ```
    Beim allerersten Start fragt Claude Code im Container einmalig nach Login — separat vom Host-Login,
@@ -623,6 +606,10 @@ Hinweise:
 - Fehler `409` beim Export: dem Snapshot ist noch keine Gruppe zugewiesen. `422` beim Import: die Gruppe
   existiert live nicht, eine später lokal neu angelegte Gruppe muss also auch im Live-System angelegt werden.
 - Eine manuell gesetzte Gruppe (`MANUAL`) wird mit übertragen und live nicht von einem KI-Vorschlag überschrieben.
+- Für das Übertragen braucht es keinen Tag, kein Terraform und keine AWS-Anmeldung, nur das lokale Backend und das
+  Skript.
+- Die Research-Übersicht liest pro Aufruf alle Snapshots. Bevor live etwa 30 Snapshots liegen, kommt eine
+  schlankere Liste (Backlog Task 11, siehe `PROJECT-STATUS.md`).
 
 #### Lokaler End-to-End-Test mit einem zweiten Backend als "Live"
 
@@ -642,7 +629,7 @@ Das "Live"-Backend braucht eine **eigene Tabelle**, sonst beweist der Test nicht
    ```
 3. In `live.env` `LIVE_BACKEND_URL=http://localhost:8081` setzen, dann `scripts/push-research.sh <ISIN>`
    ausführen. Erwartet: zweimal `HTTP 200`.
-4. Optional: Gegenprobe direkt in der "Live"-Tabelle. Braucht die AWS CLI (wird erst in Teil 2 installiert) und
+4. Optional: Gegenprobe direkt in der "Live"-Tabelle. Braucht die AWS CLI (in der Sandbox nicht installiert) und
    läuft mit Dummy-Zugangsdaten **nur** gegen DynamoDB Local; `env -u` entfernt `AWS_PROFILE` und
    `AWS_SESSION_TOKEN`, damit kein echtes Profil greift:
    ```bash
@@ -714,7 +701,7 @@ mvn test
 
 ### Lambda-Zip bauen
 
-Für die spätere Bereitstellung als AWS Lambda baut Maven neben dem normalen Spring-Boot-Jar ein zweites Paket:
+Für die Bereitstellung als AWS Lambda baut Maven neben dem normalen Spring-Boot-Jar ein zweites Paket:
 
 ```bash
 cd backend
@@ -725,6 +712,26 @@ Ergebnis: `backend/target/value-screener-backend-lambda.zip` (Klassen im Wurzelv
 `lib/`, rund 46 MB). Handler: `com.valuescreener.lambda.StreamLambdaHandler::handleRequest`. Lokal ändert sich nichts:
 `mvn spring-boot:run` und `dev-up.sh` laufen wie bisher. Die AWS-Einstellungen stehen im Profil `aws`
 (`application-aws.yml`, Secrets aus SSM); ohne dieses Profil ist Spring Cloud AWS abgeschaltet.
+
+### Deployen (Version-Tag)
+
+Code geht nur über einen Git-Tag live, nie von Hand:
+
+```bash
+git switch main && git pull
+git tag -a v3.2.0 -m "v3.2.0: <was sich ändert>" && git push origin v3.2.0
+```
+
+Der Workflow `.github/workflows/deploy.yml` testet Backend, Frontend und Deep-Analysis, baut beide Lambda-Zips,
+lädt sie in den Artefakt-Bucket, veröffentlicht je eine neue Lambda-Version, stellt den Alias `live` um (SnapStart:
+das Backend braucht dafür einige Minuten) und bringt das Frontend nach S3 inkl. CloudFront-Invalidierung. Schlägt
+ein Schritt fehl, bleibt `live` auf der alten Version.
+
+- **Voraussetzung (einmalig erledigt):** GitHub-Repository-Variablen `AWS_DEPLOY_ROLE_ARN`, `ARTIFACT_BUCKET`,
+  `FRONTEND_BUCKET`, `CLOUDFRONT_DISTRIBUTION_ID` (Variablen, keine Secrets).
+- **Konfiguration** (Umgebungsvariablen, Rechte, API, CloudFront) ändert Terraform in `infra/app` (`plan`/`apply`
+  in der Ops-Umgebung). Eine geänderte Umgebungsvariable oder ein geänderter SSM-Wert wirkt erst mit dem nächsten
+  Tag, weil Terraform den Alias nicht anfasst. Nach einem Deploy zeigt `terraform plan` in `app` `No changes`.
 
 ### Frontend starten
 

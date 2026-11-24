@@ -1,5 +1,8 @@
 # Handoff: part 3, Tasks 8–9 (CI deploy workflow, docs) (2026-11-24)
 
+> **Superseded (2026-11-24):** Tasks 8, 10 and 9 are done. Current entry point:
+> [`2026-11-24-part3-done-handoff.md`](2026-11-24-part3-done-handoff.md).
+
 For a new Claude session. This file is the entry point; it replaces the 2026-11-21 handoff.
 
 Suggested opening: *"Projekt value-screener. Lies zuerst

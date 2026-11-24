@@ -271,11 +271,30 @@ exist: by design of `grouping.ts` and the portfolio group column).
 - [ ] User sets the repository variables, merges, pushes tag `v3.0.0` → workflow green → live app still works →
   `terraform plan` in `app` shows `No changes` (Review Focus).
 
+**Result Task 8 (2026-11-24):** `deploy_role.tf` applied (1 added, policy `app-deploy`). Deviation: Lambda resources
+also cover `<function arn>:*`, because publish, the waiters and `update-alias` address versions and the alias.
+`deploy.yml`: three test jobs in parallel, then one deploy job (`concurrency: deploy`; deep-analysis before backend;
+waits `function-updated` and `published-version-active`); repository variables `AWS_DEPLOY_ROLE_ARN`,
+`ARTIFACT_BUCKET`, `FRONTEND_BUCKET`, `CLOUDFRONT_DISTRIBUTION_ID`; no `environment:` on the job (it would change the
+OIDC subject). PR #10. **First tag `v3.0.0` failed at `Configure AWS credentials`** ("Not authorized to perform
+sts:AssumeRoleWithWebIdentity"): the live trust policy matched the code, but CloudTrail showed the token subject
+`repo:<owner>@<owner id>/<repo>@<repo id>:ref:refs/tags/v3.0.0`. Fix in `infra/foundation`: `github_repository`
+holds `owner@ownerId/name@repoId` and only that form validates (tests 11/11; applied, 1 changed). Re-run of the failed
+job green; USER and ADMIN log in; `terraform plan` in `app`: `No changes`.
+
 ### Task 10 (added 2026-11-24): research sync live
 
 User request: bring locally researched snapshots into the live system via the existing research sync. Runs after
 Task 8 (one tag per deploy). Details and steps: handoff `2026-11-24-terraform-ci-handoff.md`, section 3a. Its own
 short plan first.
+
+**Result Task 10 (2026-11-24):** own plan `2026-11-24-research-sync-live.md`. SSM parameter
+`/value-screener/app.research-sync.token-hash` in `data` (1 added; the user set the hash, parameter version 2), env
+`APP_RESEARCH_SYNC_ENABLED=true` in `app` (1 changed; Terraform published version 4 because of `publish = true`, the
+alias stayed), tag `v3.1.0` green, `plan` in `app`: `No changes`. Tokens generated on the host straight into files
+(never shown), `live.env` built from them; a new local ingest token was needed (the old one was not kept), its hash
+replaced in `.env`. First `push-research.sh` runs: two `HTTP 200`, snapshots show live in their groups. Decision:
+the lighter list endpoint becomes Task 11, before the live table holds about 30 snapshots (fewer than 10 today).
 
 ### Task 9: Docs and handoff
 
@@ -284,6 +303,11 @@ short plan first.
 list. Create: next handoff; update memory `project-entry-point`.
 
 - [ ] Claude writes; user reviews, commits, opens the PR; `aws logout`.
+
+**Result Task 9 (2026-11-24):** `PROJECT-STATUS.md`, `README.md` (architecture as built, deploy by tag, sandbox start
+with the token from `live.env`), `docs/aws/aws-architecture-overview.md` (rewritten), `deep-analysis/README.md`,
+design section 15, "superseded" notes in the 2026-09-20 design/plan, handoff
+`2026-11-24-part3-done-handoff.md`. Committed directly on `main` (user decision).
 
 ## Deutsche Kurzfassung
 

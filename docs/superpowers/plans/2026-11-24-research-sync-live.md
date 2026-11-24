@@ -83,6 +83,8 @@ Terraform env var).
 - [ ] Check live: the research overview shows the snapshot in its group; then the remaining ISINs one call each.
 - [ ] Result note into the parent plan (Task 8 and Task 10), backlog entry Task 11 in `PROJECT-STATUS.md`.
 
+**Result (2026-11-24):** all three parts done and live; details in the parent plan, "Result Task 10".
+
 ## Deutsche Kurzfassung
 
 Der Sync-Mechanismus existiert schon, in AWS ist er nur aus. Wir legen in `data` einen SSM-Parameter für den Hash

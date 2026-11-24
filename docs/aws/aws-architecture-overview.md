@@ -1,79 +1,64 @@
 # AWS Architecture Overview
 
-> **Superseded:** this ECS/RDS architecture is replaced by the serverless design (DynamoDB, Lambda with SnapStart, CloudFront, Terraform): [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](../superpowers/specs/2026-11-14-serverless-terraform-design.md). This file is rewritten in part 3 of the rewrite; until then it is kept for history only.
-
-Quick-reference sketch of the value-screener AWS deployment (Phase 4). For full reasoning and the
-Decision Log, see [`docs/superpowers/specs/2026-09-20-aws-deployment-design.md`](../superpowers/specs/2026-09-20-aws-deployment-design.md)
-and [`docs/superpowers/plans/2026-09-20-aws-deployment-plan.md`](../superpowers/plans/2026-09-20-aws-deployment-plan.md).
+Quick reference of the deployment **as built** (serverless, Terraform, live since 2026-11-24). Reasoning and
+decisions: [`docs/superpowers/specs/2026-11-14-serverless-terraform-design.md`](../superpowers/specs/2026-11-14-serverless-terraform-design.md);
+step-by-step history: the plans `2026-11-18-terraform-foundations.md` and `2026-11-22-terraform-data-app.md` in
+`docs/superpowers/plans/`. The earlier ECS/RDS setup (2026-09-20 design) is deleted; see git history.
 Region: `eu-central-1`.
 
 ```
-                         GITHUB (Code + CI/CD)
-                                 │
-                    git tag v1.0.0 → push
-                                 │
-                                 ▼
-                   GitHub Actions (Auth: OIDC → IAM-Rolle, kein Access Key)
-                    Docker-Image bauen → ECR-Push → ECS-Deploy auslösen
-                                 │
-                                 ▼
-                              ┌─────┐
-                              │ ECR │
-                              └──┬──┘
-                                 │
-                    ═══════════════════════════════
-                                  INTERNET
-                    ═══════════════════════════════
-                 │                                                │
-        (Browser: Frontend)                            (Browser/API: Backend)
-                 ▼                                                ▼
-          CloudFront + S3                          API Gateway (HTTP API)
-           (Frontend)                             ┌──────────┴──────────┐
-                                                    │                     │
-                                             VPC Link (ECS)      Lambda-Integration
-                                                    │             (Demo-Button, throttled)
-                                                    ▼                     │
-        ═══════════ VPC: value-screener-vpc (privat, kein IGW/NAT) ═══════════
-        ║  2 private Subnetze über 2 AZs                                      ║
-        ║  ECS-Task-SG → RDS-SG → RDS PostgreSQL (Single-AZ, verschlüsselt)   ║
-        ║  ECS Fargate Task (Backend-Container)                               ║
-        ║  VPC-Endpoints: Secrets Manager, ggf. Lambda                        ║
-        ═══════════════════════════════════════════════════════════════════
+                                  Browser
+                                     │ HTTPS (default *.cloudfront.net certificate)
+                                     ▼
+          ┌──────────────── CloudFront (PriceClass_100) ────────────────┐
+          │ default  → S3 value-screener-frontend-<account> (OAC, SPA)  │
+          │ /api/*   → HTTP API, no cache, adds X-Origin-Verify header  │
+          │ security headers: HSTS, strict CSP, frame DENY, nosniff     │
+          └──────────────────────────────┬──────────────────────────────┘
+                                         ▼
+                 API Gateway HTTP API (payload 1.0, rate 5 / burst 10)
+                                         │ ANY /api/{proxy+}
+                                         ▼
+                 Lambda value-screener-backend:live (Spring Boot, Java 21,
+                 1024 MB, 29 s, SnapStart; rejects requests without the
+                 origin header with 403)
+                    │                │                     │
+                    ▼                ▼                     ▼
+             DynamoDB table   SSM Parameter Store   Lambda deep-analysis-demo:live
+             value-screener   /value-screener/*     (Quarkus, 512 MB, 10 s)
+             (20/20, PITR,    (hashes, origin
+              TTL, protected)  secret, sync hash)
 
-   ── Separat, außerhalb der VPC ──────────────────────────────────────────
-   Company Research Agent (Lambda, echt)        Demo-Lambdas (2×, klein)
-   ← manueller Trigger, nie öffentlich           ← Button-Aufruf (ratenbegrenzt)
-   ← SQS Dead Letter Queue                       ← EventBridge (täglich) → schreibt
-                                                     Heartbeat nach DynamoDB
-                                                   ← 2. Lambda liest Heartbeat
-                                                     für die Landingpage-Anzeige
-   Beide: SQS DLQ bei Fehlern
+   CI/CD: git tag v* → GitHub Actions (OIDC → role value-screener-github-deploy, no keys)
+          tests → zips to S3 value-screener-artifacts-<account> → update code → publish version
+          → alias live; frontend dist → S3 sync → CloudFront invalidation
 ```
 
-## Rundherum, service-übergreifend
+## Terraform stacks (`infra/`)
 
-- **IAM** — Root/MFA, Alltags-User ohne Access Key, `Admin` nur mit frischer MFA (< 20 Min.),
-  GitHub-OIDC-Rolle für CI/CD
-- **AWS Budgets** — 40 %/80 %-Alarme + automatische Kosten-Notbremse (Deny-Policy bei 100 %)
-- **Secrets Manager** — RDS-Zugangsdaten (aktiv), später Anthropic-API-Key
-- **DynamoDB** — Rate-Limit-Zähler für den Demo-Button + EventBridge-Heartbeat
-- **SQS** — Dead Letter Queues für alle Lambdas (Zuverlässigkeit, kein Selbstzweck)
-- **CloudTrail, Cognito, KMS, X-Ray** — noch offene Themen
+| Stack | State | Holds |
+|---|---|---|
+| `bootstrap` | local | state bucket `value-screener-tfstate-<account>` |
+| `foundation` | S3 | artifact bucket, GitHub OIDC provider, deploy role (trust: `v*` tags, subject with owner/repo ids), empty backend role, budget 5 USD with alerts and automatic deny action |
+| `data` | S3 | DynamoDB table (`prevent_destroy`), SSM secrets with write-only placeholders |
+| `app` | S3 | both Lambdas + aliases + log groups (14 days), HTTP API, frontend bucket, CloudFront, origin secret, role policies |
 
-## Bewusst NICHT dauerhaft aktiv
+`app` finds `data` and `foundation` resources by fixed names (data sources), never through another stack's state.
+Terraform owns configuration; CI owns code (Lambda code and alias version are `ignore_changes`). A config change
+(env var, SSM value) reaches `live` only with the next tag deploy.
 
-WAF, GuardDuty, AWS Config, RDS Multi-AZ, NAT Gateway — echte laufende Kosten, nicht mit dem
-~20-€-Budget vereinbar im Dauerbetrieb. Siehe Design-Spec Abschnitt 9.
+## Around it
 
-## Baustand
+- **IAM:** no access keys. Humans: `aws login` + `admin` role with fresh MFA (< 20 min). CI: OIDC role, rights only
+  for the two functions, the frontend bucket, invalidations and the artifact bucket.
+- **Secrets:** SSM `SecureString` (AWS-managed key). Terraform writes only placeholders via `value_wo`; real values
+  are entered in the console and never land in state (exception by design: the origin secret).
+- **Costs:** idle ≈ 0 USD. DynamoDB provisioned 20/20 (free tier), no VPC, no NAT, no reserved concurrency (account
+  quota 10). Budget 5 USD/month, alerts at 1 USD actual and 3 USD forecast, deny action at 5 USD.
+- **Research data:** researched only locally (sandbox); reviewed snapshots go live with `scripts/push-research.sh`
+  (sync token, `POST /api/research/sync/snapshots`). The ingest endpoint does not exist in AWS.
 
-| Bereich | Status |
-|---|---|
-| Account-Setup (Root/MFA, IAM, Budget) | ✅ fertig |
-| VPC & Security Groups | ✅ fertig |
-| RDS | ✅ fertig |
-| ECS-Backend (Thema 4) | 🔄 in Arbeit — Dockerfile steht |
-| Lambda/EventBridge/Demo/SQS (Thema 5) | ⏳ offen |
-| Alles Weitere (Frontend-Hosting, Cognito, CloudTrail, X-Ray, CDK, ...) | ⏳ offen |
+## Deliberately not used
 
-Details und laufend aktualisierter Fortschritt: siehe die Plan-Datei (verlinkt oben).
+WAF, GuardDuty, AWS Config, own domain / ACM certificate (viewer TLS minimum stays `TLSv1` with the default
+certificate), access logs. Backlog: CloudFront flat-rate Free plan with WAF (eligibility unclear).

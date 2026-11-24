@@ -1,5 +1,8 @@
 # AWS Deployment Plan (Phase 4)
 
+> **Superseded (2026-11-24):** the ECS/RDS deployment described here is deleted. The app runs serverless, built
+> with Terraform: [`docs/aws/aws-architecture-overview.md`](../../aws/aws-architecture-overview.md). Kept for history.
+
 Companion to [`2026-09-20-aws-deployment-design.md`](../specs/2026-09-20-aws-deployment-design.md). Not a
 task-by-task implementation plan in the usual SDD sense (see
 [`2026-07-21-phase1-portfolio-foundation.md`](2026-07-21-phase1-portfolio-foundation.md) for that style) —

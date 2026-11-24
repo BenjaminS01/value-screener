@@ -1,5 +1,8 @@
 # AWS Deployment Design (Phase 4)
 
+> **Superseded (2026-11-24):** the ECS/RDS deployment described here is deleted. The app runs serverless, built
+> with Terraform: [`docs/aws/aws-architecture-overview.md`](../../aws/aws-architecture-overview.md). Kept for history.
+
 Status: in progress, built incrementally as a live teaching session (see Decision Log). Supersedes the
 "Tech-Stack & Deployment" section (Section 7) of
 [`2026-07-21-value-screener-design.md`](2026-07-21-value-screener-design.md) with concrete, verified
