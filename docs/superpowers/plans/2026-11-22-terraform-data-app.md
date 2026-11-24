@@ -61,7 +61,7 @@ existing state bucket. `app` finds `data` and `foundation` resources **by their 
    **Deep-analysis Lambda:** name `deep-analysis-demo`, own role `value-screener-deep-analysis` (logs only),
    `java21`, handler `io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest`, 512 MB, 10 s, no
    SnapStart, alias `live`.
-6. **HTTP API:** routes `ANY /api/{proxy+}` → backend alias `live` (payload 2.0); stage `$default`, auto-deploy,
+6. **HTTP API:** routes `ANY /api/{proxy+}` → backend alias `live` (payload 1.0 since 2026-11-23, see Task 7 result); stage `$default`, auto-deploy,
    throttling rate `5`, burst `10` (user decision 2026-11-23, see Task 6 result); no access logs. Lambda permission scoped to the alias and this API.
 7. **CloudFront:** one distribution, default certificate, `PriceClass_100`, `default_root_object = "index.html"`.
    - Default behaviour → frontend bucket `value-screener-frontend-<account>` via OAC, managed policy
@@ -205,7 +205,7 @@ design).
 **Files:** Create: `infra/app/api.tf` (`aws_apigatewayv2_api`, integration on the backend alias ARN, route,
 stage, `aws_lambda_permission` with `qualifier = "live"`), `tests/api.tftest.hcl`; output `api_endpoint`.
 
-- [ ] Failing tftest: protocol `HTTP`, payload `2.0`, route key `ANY /api/{proxy+}`, stage `$default` with
+- [ ] Failing tftest: protocol `HTTP`, payload `1.0`, route key `ANY /api/{proxy+}`, stage `$default` with
   `throttling_rate_limit = 5`, `throttling_burst_limit = 10`, permission qualifier `live`.
 - [ ] **Cost check (flood on the `execute-api` URL):** brute-forcing the origin secret is not a risk (48 random
   alphanumeric chars ≈ 2²⁸⁶, constant-time compare), but a flood of requests that only get 403 is still billed. At
@@ -240,6 +240,13 @@ header → `403` from the backend (proves route, permission, alias, SnapStart re
 - [ ] User: `plan` → go → `apply` (distribution takes ~5 min) → `npm ci && npm run build` → `aws s3 sync dist/`
   to the bucket → open `https://<cloudfront_domain>` → smoke test as USER, then as ADMIN (design goal 7) → the
   Review Focus `curl` checks. Commit.
+
+**Task 7 live bug and fix (2026-11-23):** login showed the app, the next click got 401 ("Sitzung abgelaufen").
+Evidence: browser kept only `XSRF-TOKEN`; the login response had one `set-cookie` (the cleared `XSRF-TOKEN`), no
+`JSESSIONID`. Root cause (read in the adapter source): for HTTP API v2 the adapter 2.0.3 writes `headers` with
+`getFirst` per name plus `multiValueHeaders`; API Gateway format 2.0 ignores `multiValueHeaders`. Fix (user chose A):
+payload format 1.0 in `api.tf` and `getAwsProxyHandler` in `StreamLambdaHandler`; `StreamLambdaHandlerTest` now sends
+1.0 events and logs in end-to-end (both cookies present, `/api/auth/me` 200 with the session). Backend 553 tests.
 
 ### Task 8: CI deploy workflow
 

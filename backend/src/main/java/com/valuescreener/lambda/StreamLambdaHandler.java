@@ -1,7 +1,7 @@
 package com.valuescreener.lambda;
 
 import com.amazonaws.serverless.exceptions.ContainerInitializationException;
-import com.amazonaws.serverless.proxy.model.HttpApiV2ProxyRequest;
+import com.amazonaws.serverless.proxy.model.AwsProxyRequest;
 import com.amazonaws.serverless.proxy.model.AwsProxyResponse;
 import com.amazonaws.serverless.proxy.spring.SpringBootLambdaContainerHandler;
 import com.amazonaws.services.lambda.runtime.Context;
@@ -13,17 +13,22 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Lambda entry point behind the HTTP API (payload format 2.0). Spring starts once in the static initialiser,
+ * Lambda entry point behind the HTTP API (payload format 1.0). Spring starts once in the static initialiser,
  * which is what SnapStart snapshots after the init phase. Terraform handler:
  * {@code com.valuescreener.lambda.StreamLambdaHandler::handleRequest}.
+ *
+ * <p>Format 1.0, not 2.0: in format 2.0 API Gateway reads response headers only from the single-value
+ * {@code headers} map, where this adapter keeps just the first value per name, so of the two Set-Cookie headers
+ * on login (session + CSRF) the session cookie was lost. Format 1.0 reads {@code multiValueHeaders}.
+ * Must match {@code payload_format_version} in infra/app/api.tf.
  */
 public class StreamLambdaHandler implements RequestStreamHandler {
 
-    private static final SpringBootLambdaContainerHandler<HttpApiV2ProxyRequest, AwsProxyResponse> HANDLER;
+    private static final SpringBootLambdaContainerHandler<AwsProxyRequest, AwsProxyResponse> HANDLER;
 
     static {
         try {
-            HANDLER = SpringBootLambdaContainerHandler.getHttpApiV2ProxyHandler(ValueScreenerApplication.class);
+            HANDLER = SpringBootLambdaContainerHandler.getAwsProxyHandler(ValueScreenerApplication.class);
         } catch (ContainerInitializationException e) {
             // Fail the init phase loudly: a half-started container must not be snapshotted.
             throw new IllegalStateException("Could not initialise Spring Boot application", e);

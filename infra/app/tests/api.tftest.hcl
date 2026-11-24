@@ -54,10 +54,10 @@ run "http_api_routes_api_paths_to_the_backend_alias" {
   assert {
     condition = (
       aws_apigatewayv2_integration.backend.integration_type == "AWS_PROXY"
-      && aws_apigatewayv2_integration.backend.payload_format_version == "2.0"
+      && aws_apigatewayv2_integration.backend.payload_format_version == "1.0"
       && aws_apigatewayv2_integration.backend.integration_uri == "arn:aws:lambda:eu-central-1:123456789012:function:value-screener-backend:live"
     )
-    error_message = "Lambda proxy integration, payload 2.0 (StreamLambdaHandler), on the alias live."
+    error_message = "Lambda proxy integration on the alias live, payload 1.0 (StreamLambdaHandler uses getAwsProxyHandler; 2.0 dropped the session cookie)."
   }
 
   assert {

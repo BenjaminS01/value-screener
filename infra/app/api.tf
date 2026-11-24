@@ -11,10 +11,14 @@ resource "aws_apigatewayv2_api" "main" {
 }
 
 resource "aws_apigatewayv2_integration" "backend" {
-  api_id                 = aws_apigatewayv2_api.main.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_alias.backend_live.arn
-  payload_format_version = "2.0"
+  api_id           = aws_apigatewayv2_api.main.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_alias.backend_live.arn
+
+  # 1.0, not 2.0: format 2.0 reads response headers only from a single-value map, where the Java adapter keeps
+  # one value per name, so of two Set-Cookie headers (session + CSRF on login) the session cookie was lost.
+  # Must match StreamLambdaHandler (getAwsProxyHandler).
+  payload_format_version = "1.0"
 }
 
 resource "aws_apigatewayv2_route" "api" {

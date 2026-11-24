@@ -1,10 +1,8 @@
 package com.valuescreener.lambda;
 
-import com.amazonaws.serverless.proxy.model.HttpApiV2HttpContext;
-import com.amazonaws.serverless.proxy.model.HttpApiV2ProxyRequest;
-import com.amazonaws.serverless.proxy.model.HttpApiV2ProxyRequestContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.valuescreener.persistence.DynamoTestSupport;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -13,14 +11,21 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Drives the real handler with HTTP API v2 events against DynamoDB Local. The handler initialises Spring in
- * a static block, so the configuration is passed as system properties that are set before the class loads
- * (Spring Boot reads system properties as a property source). No production code is test-aware.
+ * Drives the real handler with HTTP API events in payload format 1.0 (as API Gateway sends them) against
+ * DynamoDB Local. The handler initialises Spring in a static block, so the configuration is passed as system
+ * properties that are set before the class loads (Spring Boot reads system properties as a property source).
+ * No production code is test-aware.
+ *
+ * <p>Format 1.0 because API Gateway reads response headers of format 2.0 only from the single-value
+ * {@code headers} map: the adapter keeps just the first value per name there, so of two Set-Cookie headers
+ * (session + CSRF on login) one was dropped. Format 1.0 reads {@code multiValueHeaders}.
  */
 class StreamLambdaHandlerTest {
 
@@ -46,34 +51,60 @@ class StreamLambdaHandlerTest {
     }
 
     private static JsonNode invoke(String path, String originHeader) throws Exception {
-        return invoke("GET", path, originHeader);
+        Map<String, String> headers = new LinkedHashMap<>();
+        if (originHeader != null) {
+            headers.put("X-Origin-Verify", originHeader);
+        }
+        return invoke("GET", path, headers, null);
     }
 
-    private static JsonNode invoke(String method, String path, String originHeader) throws Exception {
-        HttpApiV2ProxyRequest event = new HttpApiV2ProxyRequest();
-        event.setVersion("2.0");
-        event.setRawPath(path);
-        event.setRawQueryString("");
-        event.setBody(null);
-        HttpApiV2ProxyRequestContext context = new HttpApiV2ProxyRequestContext();
-        context.setHttp(new HttpApiV2HttpContext());
-        context.getHttp().setMethod(method);
-        context.getHttp().setPath(path);
-        context.getHttp().setProtocol("HTTP/1.1");
-        context.getHttp().setSourceIp("203.0.113.7");
-        context.setStage("$default");
-        event.setRequestContext(context);
-        java.util.Map<String, String> headers = new java.util.HashMap<>();
-        headers.put("accept", "application/json");
-        if (originHeader != null) {
-            headers.put("x-origin-verify", originHeader);
+    /** An HTTP API event in payload format 1.0, built as JSON like API Gateway sends it. */
+    private static JsonNode invoke(String method, String path, Map<String, String> headers, String body)
+            throws Exception {
+        Map<String, String> all = new LinkedHashMap<>();
+        all.put("Accept", "application/json");
+        all.putAll(headers);
+
+        ObjectNode event = MAPPER.createObjectNode();
+        event.put("version", "1.0");
+        event.put("resource", "/api/{proxy+}");
+        event.put("path", path);
+        event.put("httpMethod", method);
+        ObjectNode single = event.putObject("headers");
+        ObjectNode multi = event.putObject("multiValueHeaders");
+        all.forEach((name, value) -> {
+            single.put(name, value);
+            multi.putArray(name).add(value);
+        });
+        ObjectNode context = event.putObject("requestContext");
+        context.put("stage", "$default");
+        context.put("httpMethod", method);
+        context.put("path", path);
+        context.putObject("identity").put("sourceIp", "203.0.113.7");
+        if (body == null) {
+            event.putNull("body");
+        } else {
+            event.put("body", body);
         }
-        event.setHeaders(headers);
+        event.put("isBase64Encoded", false);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        new StreamLambdaHandler().handleRequest(
-                new ByteArrayInputStream(MAPPER.writeValueAsBytes(event)), out, null);
+        new StreamLambdaHandler().handleRequest(new ByteArrayInputStream(MAPPER.writeValueAsBytes(event)), out, null);
         return MAPPER.readTree(out.toByteArray());
+    }
+
+    /** All Set-Cookie values API Gateway sees in a format 1.0 response, as name=value (attributes cut off). */
+    private static Map<String, String> setCookies(JsonNode response) {
+        Map<String, String> cookies = new LinkedHashMap<>();
+        response.path("multiValueHeaders").fields().forEachRemaining(header -> {
+            if (header.getKey().equalsIgnoreCase("Set-Cookie")) {
+                header.getValue().forEach(v -> {
+                    String pair = v.asText().split(";", 2)[0];
+                    cookies.put(pair.substring(0, pair.indexOf('=')), pair.substring(pair.indexOf('=') + 1));
+                });
+            }
+        });
+        return cookies;
     }
 
     @Test
@@ -103,6 +134,31 @@ class StreamLambdaHandlerTest {
     @Test
     void originFilterRunsBeforeSecurityOnProtectedAndLoginPaths() throws Exception {
         assertThat(invoke("/api/portfolio", null).get("statusCode").asInt()).isEqualTo(403);
-        assertThat(invoke("POST", "/api/auth/login", null).get("statusCode").asInt()).isEqualTo(403);
+        assertThat(invoke("POST", "/api/auth/login", Map.of(), null).get("statusCode").asInt()).isEqualTo(403);
+    }
+
+    /** The live bug of 2026-11-23: after login the browser got only XSRF-TOKEN, never JSESSIONID. */
+    @Test
+    void loginDeliversSessionAndCsrfCookiesAndTheSessionWorks() throws Exception {
+        String token = MAPPER.readTree(invoke("/api/auth/csrf", SECRET).get("body").asText()).get("token").asText();
+
+        Map<String, String> loginHeaders = new LinkedHashMap<>();
+        loginHeaders.put("X-Origin-Verify", SECRET);
+        loginHeaders.put("Content-Type", "application/json");
+        loginHeaders.put("Cookie", "XSRF-TOKEN=" + token);
+        loginHeaders.put("X-XSRF-TOKEN", token);
+        JsonNode login = invoke("POST", "/api/auth/login", loginHeaders,
+                "{\"username\":\"admin\",\"password\":\"test-password\"}");
+
+        assertThat(login.get("statusCode").asInt()).isEqualTo(200);
+        Map<String, String> cookies = setCookies(login);
+        assertThat(cookies).containsKeys("JSESSIONID", "XSRF-TOKEN");
+
+        Map<String, String> meHeaders = new LinkedHashMap<>();
+        meHeaders.put("X-Origin-Verify", SECRET);
+        meHeaders.put("Cookie", "JSESSIONID=" + cookies.get("JSESSIONID"));
+        JsonNode me = invoke("GET", "/api/auth/me", meHeaders, null);
+        assertThat(me.get("statusCode").asInt()).isEqualTo(200);
+        assertThat(MAPPER.readTree(me.get("body").asText()).get("username").asText()).isEqualTo("admin");
     }
 }
