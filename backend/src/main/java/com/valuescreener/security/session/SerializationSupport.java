@@ -3,6 +3,7 @@ package com.valuescreener.security.session;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InvalidClassException;
 import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -14,9 +15,14 @@ import java.io.UncheckedIOException;
  */
 public final class SerializationSupport {
 
-    /** JDK types, Spring Security types (security context, authentication, authorities) and our own. */
+    /**
+     * Size limits first (a real security context is about 1.3 KB), then the allow-list: JDK types, Spring Security
+     * types (security context, authentication, authorities) and our own.
+     */
+    private static final int MAX_BYTES = 16_384;
     private static final ObjectInputFilter FILTER = ObjectInputFilter.Config.createFilter(
-            "java.**;org.springframework.security.**;com.valuescreener.**;!*");
+            "maxdepth=20;maxrefs=1000;maxbytes=" + MAX_BYTES + ";maxarray=4096;"
+                    + "java.**;org.springframework.security.**;com.valuescreener.**;!*");
 
     private SerializationSupport() {
     }
@@ -32,6 +38,10 @@ public final class SerializationSupport {
     }
 
     public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
+        // The filter's maxbytes is only checked when a class or reference is read, not for a long string at the end.
+        if (data.length > MAX_BYTES) {
+            throw new InvalidClassException("serialized data larger than " + MAX_BYTES + " bytes");
+        }
         try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(data))) {
             in.setObjectInputFilter(FILTER);
             return in.readObject();

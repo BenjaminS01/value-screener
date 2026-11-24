@@ -186,7 +186,7 @@ merged into `CONSUMER_GOODS`; travel/hospitality broadened to `CONSUMER_SERVICES
 ### 7.1 Runtime
 
 - Managed runtime **Java 21**, **zip** package (SnapStart does not support container images).
-- Adapter: `aws-serverless-java-container-springboot3` (HTTP API payload 2.0). The app keeps its normal
+- Adapter: `aws-serverless-java-container-springboot3` (HTTP API payload 1.0; changed 2026-11-23, see section 9). The app keeps its normal
   `main` for local runs.
 - **SnapStart** on published versions; API Gateway invokes an **alias** (e.g. `live`) that points to
   the latest published version.
@@ -278,7 +278,10 @@ CloudFront edge. To get the real client IP without letting clients forge it:
 
 ## 9. API Gateway
 
-- **HTTP API**, one `ANY /{proxy+}` route plus `ANY /` if needed → backend alias. Payload format 2.0.
+- **HTTP API**, one `ANY /{proxy+}` route plus `ANY /` if needed → backend alias. Payload format **1.0**
+  (changed 2026-11-23 from 2.0: in format 2.0 API Gateway reads response headers only from the single-value
+  `headers` map, where the adapter 2.0.3 keeps the first value per name, so the login lost its session cookie; format
+  1.0 reads `multiValueHeaders`).
 - Throttling on the stage: low limits (e.g. rate 10 req/s, burst 20); builder may adjust.
 - Access logs off or into a log group with short retention (builder's call; cost ≈ 0).
 

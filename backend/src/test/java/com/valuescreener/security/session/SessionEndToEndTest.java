@@ -11,9 +11,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -105,6 +107,15 @@ class SessionEndToEndTest extends DynamoTestSupport {
         assertThat(sessions.findById(sessionId(cookie))).isNull();
         mockMvc.perform(get("/api/auth/me").cookie(new Cookie("JSESSIONID", cookie)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void storedSessionHasMaxInactiveSecondsOf7200() throws Exception {
+        String cookie = cookieValue(sessionSetCookie(login(csrf(), null, "10.9.0.4")));
+        var item = newClient().getItem(b -> b.tableName(dynamoProperties.tableName()).consistentRead(true)
+                .key(Map.of("pk", AttributeValue.fromS("SESSION#" + sessionId(cookie)),
+                        "sk", AttributeValue.fromS("SESSION")))).item();
+        assertThat(item.get("maxInactiveSeconds").n()).isEqualTo("7200");
     }
 
     @Test
