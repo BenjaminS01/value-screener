@@ -2,7 +2,7 @@
 
 Letztes Update: 2026-11-26
 
-## Task 11: lighter research list (2026-11-26, branch `feature/lighter-research-list`)
+## Task 11: lighter research list, live (2026-11-26, PR #11, tag `v3.2.0`)
 
 Spec `docs/superpowers/specs/2026-11-26-lighter-research-list-design.md`, plan
 `docs/superpowers/plans/2026-11-26-lighter-research-list.md`.
@@ -17,12 +17,13 @@ Spec `docs/superpowers/specs/2026-11-26-lighter-research-list-design.md`, plan
 - **Frontend:** `SnapshotSummary` type for overview, grouping and portfolio; the pages look the same.
 - Tests: backend 558, frontend 175. Final review: one Important (null name crashed sort/search) fixed; minors in
   the plan's result notes.
-- **Release:** tag `v3.2.0` after the PR is merged; then live check. If a row shows the ISIN as name, re-push it
-  with `scripts/push-research.sh <ISIN>`.
+- **Live** with `v3.2.0` (deploy green). Live check by the user: overview groups, names, "im Portfolio", country
+  view, portfolio to detail, and a research sync all work. If a row ever shows the ISIN as name, re-push it with
+  `scripts/push-research.sh <ISIN>`.
 
 **Deutsche Kurzfassung:** Die Research-Liste liest jetzt nur noch den kleinen Index statt aller kompletten
 Snapshots. Der Index bekommt dafür Name, Ticker, Land, Gruppenquelle und Datum; vorhandene Snapshots werden beim
-ersten Start einmal nachgefüllt. Übersicht und Portfolio sehen gleich aus. Live geht es mit Tag `v3.2.0`.
+ersten Start einmal nachgefüllt. Übersicht und Portfolio sehen gleich aus. Seit `v3.2.0` live und von dir geprüft.
 
 ## Serverless rewrite part 3 done: app live, CI deploy, research sync (2026-11-24)
 
@@ -131,9 +132,8 @@ plan named here. Dead code (`HistoryQuery.count`, `IpState.expired`) was removed
   - New sessions: put with `attribute_not_exists(pk)`; on a condition failure check whether the stored item is
     our own (same `created`, i.e. an SDK retry) before treating it as a collision.
   - End-to-end assertion that a stored session has `maxInactiveSeconds` = 7200.
-- **Task 11, before the live table holds about 30 snapshots** (research sync is live since 2026-11-24 without it,
-  fewer than 10 snapshots): lighter list endpoint for the research overview (it still reads all snapshots once per
-  load; needs a frontend change).
+- ~~Task 11, lighter list endpoint~~: done and live 2026-11-26 (`v3.2.0`). Its deferred minors (comment in
+  `StockGroup.java`, backfill robust per item, unknown `groupSource`) join the cleanup below.
 - **Next plan that touches persistence/groups (general cleanup):**
   - Rename `persistence/HistoryQuery` → `PartitionQueries` (it reads snapshot, index and history partitions).
   - `app.dynamodb.seed-groups` as a field of `DynamoProperties` instead of two `@Value`s.
@@ -142,7 +142,7 @@ plan named here. Dead code (`HistoryQuery.count`, `IpState.expired`) was removed
   - `ItemConditions.versionEquals(null)`: `IllegalStateException` instead of `IllegalArgumentException`.
 
 **Deutsche Kurzfassung:** Offene Punkte aus den Reviews, bewusst nicht jetzt umgesetzt: Session-Härtung als
-erster Task von Teil 3 (erledigt), schlankere Research-Liste (Task 11, vor etwa 30 Snapshots live), kleine Aufräumarbeiten im nächsten Plan,
+erster Task von Teil 3 (erledigt), schlankere Research-Liste (Task 11, seit 2026-11-26 live), kleine Aufräumarbeiten im nächsten Plan,
 der Persistenz oder Gruppen berührt. Toter Code ist bereits entfernt.
 
 ## Package structure cleanup (2026-11-18)

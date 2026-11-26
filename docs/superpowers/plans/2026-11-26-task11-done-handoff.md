@@ -1,23 +1,20 @@
-# Handoff: Task 11 implemented, release pending (2026-11-26)
+# Handoff: Task 11 live (2026-11-26)
 
 For a new Claude session. This file replaces `2026-11-24-part3-done-handoff.md` as entry point.
 
 ## Where we stand
 
-- Task 11 (lighter research list) is implemented on branch `feature/lighter-research-list`; details in
-  `PROJECT-STATUS.md` (top section) and the result notes of `2026-11-26-lighter-research-list.md`.
-- Still open, in this order (user steps, one at a time):
-  1. Commit and push the branch, open the PR, merge it.
-  2. Tag `v3.2.0` on `main`, push the tag; the deploy workflow must run green.
-  3. Live check in the browser: overview shows groups, country view, "veraltet", "im Portfolio"; portfolio opens
-     a researched position. CloudWatch shows `Snapshot index backfilled for N snapshots` once. A row showing the
-     ISIN as name gets re-pushed with `scripts/push-research.sh <ISIN>`.
-- After the live check: mark Task 11 live in `PROJECT-STATUS.md`.
+- Task 11 (lighter research list) is live with `v3.2.0` (PR #11). The user checked overview, portfolio and a
+  research sync live. Details: `PROJECT-STATUS.md` (top section) and the result notes of
+  `2026-11-26-lighter-research-list.md`.
+- No planned task is open. Everything left is backlog.
 
-## Next (backlog, not urgent)
+## Next (backlog, user picks)
 
-The deferred minors of Task 11 (see plan result notes), `PROJECT-STATUS.md` "Backlog for later plans", the viewer
-TLS minimum (needs an own domain) and the CloudFront flat-rate plan with WAF.
+- **Cleanup plan** (persistence/groups): items in `PROJECT-STATUS.md` "Backlog for later plans" plus the deferred
+  minors of Task 11.
+- Viewer TLS minimum (needs an own domain).
+- CloudFront flat-rate plan with WAF.
 
 ## Working mode (binding, unchanged)
 
@@ -27,5 +24,5 @@ secrets never in chat or repo.
 
 ## Deutsche Kurzfassung
 
-Task 11 ist umgesetzt und getestet, aber noch nicht live. Offen: Branch committen und mergen, Tag `v3.2.0`
-setzen, danach Live-Check von Übersicht und Portfolio.
+Task 11 ist live und geprüft. Kein geplanter Task ist mehr offen; als Nächstes wählst du aus dem Backlog:
+Aufräum-Plan, TLS-Minimum (braucht eigene Domain) oder CloudFront-Flatrate mit WAF.
