@@ -64,6 +64,19 @@ class CompanySnapshotTest {
     }
 
     @Test
+    void lastResearchedAtIsNewestFindingDateOrNull() {
+        CompanySnapshot snapshot = minimalSnapshot();
+        assertThat(snapshot.lastResearchedAt()).isNull();
+
+        snapshot.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("28.0"), null,
+                "c", null, LocalDate.of(2026, 5, 10));
+        snapshot.upsertFinding(ResearchCriterion.PB_RATIO, new BigDecimal("1.0"), null,
+                "c", null, LocalDate.of(2026, 3, 1));
+
+        assertThat(snapshot.lastResearchedAt()).isEqualTo(LocalDate.of(2026, 5, 10));
+    }
+
+    @Test
     void upsertFindingAddsNewFindingWhenCriterionNotYetPresent() {
         CompanySnapshot snapshot = minimalSnapshot();
 

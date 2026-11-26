@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchPortfolio } from '../api/portfolioApi'
-import { CompanySnapshot, fetchAllSnapshots, fetchGroups, StockGroup } from '../api/researchApi'
+import { fetchAllSnapshots, fetchGroups, SnapshotSummary, StockGroup } from '../api/researchApi'
 import type { AuthUser } from '../api/authApi'
 import { writeErrorText } from '../api/errorText'
 import type { Navigate } from '../navigation'
@@ -14,7 +14,7 @@ interface Props {
 type Grouping = 'group' | 'country'
 
 export function ResearchOverviewPage({ navigate }: Props) {
-  const [snapshots, setSnapshots] = useState<CompanySnapshot[]>([])
+  const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([])
   const [groups, setGroups] = useState<StockGroup[]>([])
   const [held, setHeld] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)

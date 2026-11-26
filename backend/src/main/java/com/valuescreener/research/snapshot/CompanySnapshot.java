@@ -5,6 +5,7 @@ import com.valuescreener.research.history.ReplacedFinding;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -155,4 +156,9 @@ public class CompanySnapshot {
     public String getCountry() { return country; }
     public String getBusinessDescription() { return businessDescription; }
     public List<ResearchFinding> getFindings() { return List.copyOf(findings); }
+
+    /** Newest finding date, null without findings. */
+    public LocalDate lastResearchedAt() {
+        return findings.stream().map(ResearchFinding::getAsOfDate).max(Comparator.naturalOrder()).orElse(null);
+    }
 }

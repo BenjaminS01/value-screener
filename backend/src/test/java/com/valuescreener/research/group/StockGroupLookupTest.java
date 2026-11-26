@@ -1,6 +1,7 @@
 package com.valuescreener.research.group;
 
 import com.valuescreener.research.snapshot.CompanySnapshotRepository;
+import com.valuescreener.research.snapshot.GroupSource;
 import com.valuescreener.research.snapshot.SnapshotIndexEntry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,13 +27,18 @@ class StockGroupLookupTest {
     @Mock
     private StockGroupRepository groups;
 
+    private static SnapshotIndexEntry entry(String isin, String groupKey) {
+        return new SnapshotIndexEntry(isin, "T", "Name", "USA", groupKey,
+                groupKey == null ? null : GroupSource.AI, null);
+    }
+
     @Test
     void groupsComeFromTheIndexAndOneGroupReadNeverFromSnapshotItems() {
         when(snapshots.findIndex()).thenReturn(List.of(
-                new SnapshotIndexEntry("US0000000001", "BANKS"),
-                new SnapshotIndexEntry("US0000000002", null),
-                new SnapshotIndexEntry("US0000000003", "BANKS"),
-                new SnapshotIndexEntry("US0000000004", "INSURANCE")));
+                entry("US0000000001", "BANKS"),
+                entry("US0000000002", null),
+                entry("US0000000003", "BANKS"),
+                entry("US0000000004", "INSURANCE")));
         when(groups.findAll()).thenReturn(List.of(new StockGroup("BANKS", "Banks", 10),
                 new StockGroup("INSURANCE", "Insurance", 20)));
 
@@ -44,7 +50,6 @@ class StockGroupLookupTest {
         assertThat(result.get("US0000000004")).isEqualTo(new StockGroupRef("INSURANCE", "Insurance"));
         verify(snapshots, times(1)).findIndex();
         verify(groups, times(1)).findAll();
-        verify(snapshots, never()).findAll();
         verify(snapshots, never()).findByIsin(any());
     }
 

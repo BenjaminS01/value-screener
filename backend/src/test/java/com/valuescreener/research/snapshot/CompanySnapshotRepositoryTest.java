@@ -159,28 +159,19 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
     }
 
     @Test
-    void findAllByGroupKeyAndWithoutGroup() {
-        saveWithGroup("AAA", "US0000000001", "BANKS");
-        saveWithGroup("BBB", "US0000000002", "INSURANCE");
-        saveWithGroup("CCC", "US0000000003", null);
-
-        assertThat(repository.findAllByGroupKey("BANKS")).extracting(CompanySnapshot::getTicker).containsExactly("AAA");
-        assertThat(repository.findAllByGroupKey("MISSING")).isEmpty();
-        assertThat(repository.findAllWithoutGroup()).extracting(CompanySnapshot::getTicker).containsExactly("CCC");
-        assertThat(repository.findAll()).extracting(CompanySnapshot::getTicker).containsExactly("AAA", "BBB", "CCC");
-    }
-
-    @Test
     void indexItemIsWrittenWithEverySaveAndFollowsTheGroup() {
         saveWithGroup("AAA", "US0000000001", "BANKS");
         saveWithGroup("BBB", "US0000000002", null);
 
-        assertThat(rawItem("SNAPINDEX", "ISIN#US0000000001")).containsOnlyKeys("pk", "sk", "groupKey");
+        assertThat(rawItem("SNAPINDEX", "ISIN#US0000000001")).containsOnlyKeys(
+                "pk", "sk", "ticker", "companyName", "country", "groupKey", "groupSource");
         assertThat(rawItem("SNAPINDEX", "ISIN#US0000000001").get("groupKey").s()).isEqualTo("BANKS");
-        // ungrouped: index item without groupKey
-        assertThat(rawItem("SNAPINDEX", "ISIN#US0000000002")).containsOnlyKeys("pk", "sk");
+        // ungrouped: index item without groupKey / groupSource
+        assertThat(rawItem("SNAPINDEX", "ISIN#US0000000002")).containsOnlyKeys(
+                "pk", "sk", "ticker", "companyName", "country");
         assertThat(repository.findIndex()).containsExactlyInAnyOrder(
-                new SnapshotIndexEntry("US0000000001", "BANKS"), new SnapshotIndexEntry("US0000000002", null));
+                new SnapshotIndexEntry("US0000000001", "AAA", "AAA Inc.", "USA", "BANKS", GroupSource.AI, null),
+                new SnapshotIndexEntry("US0000000002", "BBB", "BBB Inc.", "USA", null, null, null));
 
         // group change moves the index groupKey
         CompanySnapshot moved = repository.findByIsin("US0000000001").orElseThrow();
@@ -189,6 +180,30 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
         assertThat(rawItem("SNAPINDEX", "ISIN#US0000000001").get("groupKey").s()).isEqualTo("INSURANCE");
         assertThat(repository.countByGroupKey("BANKS")).isZero();
         assertThat(repository.countByGroupKey("INSURANCE")).isEqualTo(1);
+    }
+
+    @Test
+    void indexItemCarriesSummaryFields() {
+        CompanySnapshot s = new CompanySnapshot("AAPL", ISIN, "Apple", "USA", "Business");
+        s.assignGroup(new StockGroup("BANKS", "Banks", 10), GroupSource.AI);
+        s.upsertFinding(ResearchCriterion.PE_RATIO, new BigDecimal("1.5"), null, "c", null, LocalDate.of(2026, 5, 10));
+        repository.save(s, List.of(), true);
+
+        assertThat(repository.findIndex()).containsExactly(new SnapshotIndexEntry(ISIN, "AAPL", "Apple", "USA",
+                "BANKS", GroupSource.AI, LocalDate.of(2026, 5, 10)));
+        assertThat(rawItem("SNAPINDEX", "ISIN#" + ISIN).get("lastResearchedAt").s()).isEqualTo("2026-05-10");
+    }
+
+    @Test
+    void indexItemLeavesOutMissingValues() {
+        // older data can lack the country; new snapshots require it
+        CompanySnapshot s = CompanySnapshot.restore("AAPL", ISIN, "Apple", null, "Business", null, null,
+                List.of(), null);
+        repository.save(s, List.of(), false);
+
+        assertThat(repository.findIndex()).containsExactly(
+                new SnapshotIndexEntry(ISIN, "AAPL", "Apple", null, null, null, null));
+        assertThat(rawItem("SNAPINDEX", "ISIN#" + ISIN)).containsOnlyKeys("pk", "sk", "ticker", "companyName");
     }
 
     @Test
@@ -238,8 +253,7 @@ class CompanySnapshotRepositoryTest extends DynamoTestSupport {
             repository.save(s, List.of(), i == 0);
         }
 
-        assertThat(repository.findAll()).hasSize(60);
-        assertThat(repository.findAllByGroupKey("BANKS")).hasSize(60);
+        assertThat(repository.findIndex()).hasSize(60);
         assertThat(repository.countByGroupKey("BANKS")).isEqualTo(60);
     }
 

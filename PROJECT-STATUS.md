@@ -1,6 +1,28 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-24
+Letztes Update: 2026-11-26
+
+## Task 11: lighter research list (2026-11-26, branch `feature/lighter-research-list`)
+
+Spec `docs/superpowers/specs/2026-11-26-lighter-research-list-design.md`, plan
+`docs/superpowers/plans/2026-11-26-lighter-research-list.md`.
+
+- **Index item** (`SNAPINDEX / ISIN#…`) now carries `ticker`, `companyName`, `country`, `groupKey`, `groupSource`,
+  `lastResearchedAt` (absent values left out), still written in the save transaction.
+- **`GET /api/research/snapshots`** returns summary rows from the index (`SnapshotSummaryView`: no findings, no
+  description); ~3 RCU at 100 snapshots instead of ~128. The `?group=` filter and the full-read repository methods
+  are gone. A v1 item without name shows the ISIN as name until the next save.
+- **Backfill v2** (marker `META / INDEX#snapshots-v2`) fills existing snapshots once at Lambda init (profile `aws`
+  sets `seed-groups: true`); it never overwrites an item that already has a name.
+- **Frontend:** `SnapshotSummary` type for overview, grouping and portfolio; the pages look the same.
+- Tests: backend 558, frontend 175. Final review: one Important (null name crashed sort/search) fixed; minors in
+  the plan's result notes.
+- **Release:** tag `v3.2.0` after the PR is merged; then live check. If a row shows the ISIN as name, re-push it
+  with `scripts/push-research.sh <ISIN>`.
+
+**Deutsche Kurzfassung:** Die Research-Liste liest jetzt nur noch den kleinen Index statt aller kompletten
+Snapshots. Der Index bekommt dafür Name, Ticker, Land, Gruppenquelle und Datum; vorhandene Snapshots werden beim
+ersten Start einmal nachgefüllt. Übersicht und Portfolio sehen gleich aus. Live geht es mit Tag `v3.2.0`.
 
 ## Serverless rewrite part 3 done: app live, CI deploy, research sync (2026-11-24)
 

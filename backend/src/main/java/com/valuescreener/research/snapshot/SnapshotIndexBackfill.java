@@ -22,11 +22,13 @@ import software.amazon.awssdk.services.dynamodb.model.TransactionConflictExcepti
 import java.util.Map;
 
 /**
- * Creates the snapshot index items for snapshots saved before the index existed. If the marker item
- * ({@code META / INDEX#snapshots-v1}) is absent, the SNAPSHOT partition is read once, one index item is put
- * per snapshot (idempotent: the put just rewrites the same content) and the marker is written last, so an
- * interrupted run is completed by the next start and two instances running together do no harm. With the
- * marker present nothing is read.
+ * Fills the snapshot index items for snapshots saved before the index (v1) or before the index carried the list
+ * fields (v2). If the marker item ({@code META / INDEX#snapshots-v2}) is absent, the SNAPSHOT partition is read once
+ * in full and the full index item is put per snapshot, but only where no index item exists or the existing one has
+ * no {@code companyName} (a v1 item): an item with a name was written by a save, which is newer than this read, and
+ * is never overwritten. The marker is written last, so an interrupted run is completed by the next start and two
+ * instances running together do no harm. With the marker present nothing is read. The v1 marker
+ * ({@code INDEX#snapshots-v1}) is no longer read.
  *
  * <p>Same run rule and ordering as {@link StockGroupSeeder} (runs right after it): only when an endpoint is
  * set, {@code app.dynamodb.create-table=true} or {@code app.dynamodb.seed-groups=true}.
@@ -37,7 +39,7 @@ public class SnapshotIndexBackfill implements ApplicationRunner {
 
     /** Must stay after StockGroupSeeder.ORDER. */
     static final int ORDER = StockGroupSeeder.ORDER + 10;
-    static final String MARKER_SK = "INDEX#snapshots-v1";
+    static final String MARKER_SK = "INDEX#snapshots-v2";
 
     private static final Logger log = LoggerFactory.getLogger(SnapshotIndexBackfill.class);
 
@@ -64,17 +66,16 @@ public class SnapshotIndexBackfill implements ApplicationRunner {
             }
             QueryRequest request = QueryRequest.builder().tableName(props.tableName()).consistentRead(true)
                     .keyConditionExpression("pk = :pk")
-                    .expressionAttributeValues(Map.of(":pk", AttributeValue.fromS(SnapshotItem.PK)))
-                    .projectionExpression("sk, groupKey").build();
+                    .expressionAttributeValues(Map.of(":pk", AttributeValue.fromS(SnapshotItem.PK))).build();
             int indexed = 0;
-            for (Map<String, AttributeValue> snapshot : HistoryQuery.all(client, request)) {
-                String isin = snapshot.get("sk").s().substring(SnapshotItem.SK_PREFIX.length());
-                AttributeValue group = snapshot.get(SnapshotIndex.GROUP_KEY);
+            for (Map<String, AttributeValue> stored : HistoryQuery.all(client, request)) {
+                CompanySnapshot snapshot = SnapshotItem.SCHEMA.mapToItem(stored).toDomain();
                 try {
-                    // never overwrite: an item that exists was written by a save and is newer than this read
+                    // never overwrite an item with a name: a save wrote it, and it is newer than this read
                     client.putItem(PutItemRequest.builder().tableName(props.tableName())
-                            .item(SnapshotIndex.item(isin, group == null ? null : group.s()))
-                            .conditionExpression("attribute_not_exists(pk)").build());
+                            .item(SnapshotIndex.item(snapshot))
+                            .conditionExpression("attribute_not_exists(pk) OR attribute_not_exists(#n)")
+                            .expressionAttributeNames(Map.of("#n", SnapshotIndex.COMPANY_NAME)).build());
                     indexed++;
                 } catch (ConditionalCheckFailedException | TransactionConflictException alreadyIndexed) {
                     // fine: a save has written (or is writing) this item

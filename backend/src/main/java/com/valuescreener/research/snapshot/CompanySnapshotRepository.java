@@ -8,18 +8,12 @@ public interface CompanySnapshotRepository {
 
     Optional<CompanySnapshot> findByIsin(String isin);
 
-    List<CompanySnapshot> findAll();
-
-    List<CompanySnapshot> findAllByGroupKey(String key);
-
-    List<CompanySnapshot> findAllWithoutGroup();
-
     /** Number of snapshots in the group, from the snapshot index. */
     long countByGroupKey(String key);
 
     /**
-     * The snapshot index (ISIN and group of every snapshot), eventually consistent: for group counts and
-     * lookups, one small read instead of reading the snapshot items.
+     * The snapshot index (list fields and group of every snapshot), eventually consistent: for the research list,
+     * group counts and lookups, one small read instead of reading the snapshot items.
      */
     List<SnapshotIndexEntry> findIndex();
 

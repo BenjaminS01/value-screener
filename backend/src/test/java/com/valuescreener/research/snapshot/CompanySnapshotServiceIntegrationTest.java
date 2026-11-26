@@ -28,6 +28,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** The snapshot service against a real DynamoDB (Local): history is written only for real changes. */
 class CompanySnapshotServiceIntegrationTest extends DynamoTestSupport {
@@ -151,17 +152,13 @@ class CompanySnapshotServiceIntegrationTest extends DynamoTestSupport {
     }
 
     @Test
-    void listsAndFiltersGroupsWithNamesFromTheCatalog() {
+    void listsSummariesWithGroupNamesFromTheCatalog() {
         upsert(request("BANKS", pe("24.1", "x")));
         service.upsert(new UpsertCompanySnapshotRequest("MSFT", "US5949181045", "Microsoft", "USA", "Software",
                 "INSURANCE", null, List.of()), GroupSource.AI, HistoryOrigin.INGEST);
 
-        assertThat(service.list(null)).hasSize(2);
-        assertThat(service.list("banks")).singleElement().satisfies(v -> {
-            assertThat(v.ticker()).isEqualTo("AAPL");
-            assertThat(v.group().name()).isEqualTo("Banks");
-        });
-        assertThat(service.list("none")).isEmpty();
+        assertThat(service.list()).extracting(SnapshotSummaryView::ticker, v -> v.group().name())
+                .containsExactlyInAnyOrder(tuple("AAPL", "Banks"), tuple("MSFT", "Insurance"));
         assertThat(groupService.list()).extracting(StockGroupView::stockCount).containsExactly(1L, 1L);
     }
 
@@ -181,6 +178,7 @@ class CompanySnapshotServiceIntegrationTest extends DynamoTestSupport {
 
         assertThatThrownBy(() -> upsert(request("TEMP", pe("24.1", "x"))))
                 .isInstanceOf(UnknownGroupException.class);
-        assertThat(snapshots.findAll()).isEmpty();
+        assertThat(snapshots.findIndex()).isEmpty();
+        assertThat(snapshots.findByIsin(ISIN)).isEmpty();
     }
 }

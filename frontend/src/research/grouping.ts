@@ -1,18 +1,18 @@
-import type { CompanySnapshot, StockGroup } from '../api/researchApi'
+import type { SnapshotSummary, StockGroup } from '../api/researchApi'
 
 export interface Section {
   title: string
-  snapshots: CompanySnapshot[]
+  snapshots: SnapshotSummary[]
 }
 
 const NO_GROUP = 'Ohne Gruppe'
 const NO_COUNTRY = 'Ohne Land'
 
-function byName(a: CompanySnapshot, b: CompanySnapshot): number {
+function byName(a: SnapshotSummary, b: SnapshotSummary): number {
   return a.companyName.localeCompare(b.companyName, 'de')
 }
 
-export function groupByStockGroup(snapshots: CompanySnapshot[], groups: StockGroup[]): Section[] {
+export function groupByStockGroup(snapshots: SnapshotSummary[], groups: StockGroup[]): Section[] {
   const known = new Set(groups.map((g) => g.key))
   const sections: Section[] = groups
     .map((g) => ({
@@ -25,9 +25,9 @@ export function groupByStockGroup(snapshots: CompanySnapshot[], groups: StockGro
   return sections
 }
 
-export function groupByCountry(snapshots: CompanySnapshot[]): Section[] {
-  const byCountry = new Map<string, CompanySnapshot[]>()
-  const none: CompanySnapshot[] = []
+export function groupByCountry(snapshots: SnapshotSummary[]): Section[] {
+  const byCountry = new Map<string, SnapshotSummary[]>()
+  const none: SnapshotSummary[] = []
   for (const s of snapshots) {
     const country = s.country?.trim()
     if (!country) {
@@ -43,7 +43,7 @@ export function groupByCountry(snapshots: CompanySnapshot[]): Section[] {
   return sections
 }
 
-export function matchesSearch(snapshot: CompanySnapshot, query: string): boolean {
+export function matchesSearch(snapshot: SnapshotSummary, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (q === '') return true
   return [snapshot.companyName, snapshot.ticker, snapshot.isin].some((v) => v.toLowerCase().includes(q))

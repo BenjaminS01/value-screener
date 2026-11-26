@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { CompanySnapshot, StockGroup } from '../api/researchApi'
+import type { SnapshotSummary, StockGroup } from '../api/researchApi'
 import { groupByCountry, groupByStockGroup, matchesSearch } from './grouping'
 
-function snap(over: Partial<CompanySnapshot>): CompanySnapshot {
-  return {
-    ticker: 'T', isin: 'I', companyName: 'N', country: 'US',
-    businessDescription: '', group: null, findings: [], lastResearchedAt: null, stale: false, ...over,
-  }
+function snap(over: Partial<SnapshotSummary>): SnapshotSummary {
+  return { ticker: 'T', isin: 'I', companyName: 'N', country: 'US', group: null, lastResearchedAt: null, stale: false, ...over }
 }
 const g = (key: string, name: string) => ({ key, name, source: 'AI' as const })
 const groups: StockGroup[] = [
