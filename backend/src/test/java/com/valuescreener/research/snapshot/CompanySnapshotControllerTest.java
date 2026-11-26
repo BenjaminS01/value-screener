@@ -42,21 +42,23 @@ class CompanySnapshotControllerTest {
     }
 
     @Test
-    void listsAllSnapshots() throws Exception {
-        when(service.list(null)).thenReturn(List.of(sampleView()));
+    void listsSnapshotSummaries() throws Exception {
+        when(service.list()).thenReturn(List.of(new SnapshotSummaryView("AAPL", "US0378331005", "Apple Inc.", "USA",
+                new SnapshotGroupView("SEMICONDUCTORS", "Semiconductors", GroupSource.AI),
+                LocalDate.of(2026, 8, 1), false)));
 
         mockMvc.perform(get("/api/research/snapshots"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].ticker").value("AAPL"));
-    }
-
-    @Test
-    void listPassesGroupFilter() throws Exception {
-        when(service.list("none")).thenReturn(List.of(sampleView()));
-
-        mockMvc.perform(get("/api/research/snapshots").param("group", "none"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].isin").value("US0378331005"));
+                .andExpect(jsonPath("$[0].isin").value("US0378331005"))
+                .andExpect(jsonPath("$[0].ticker").value("AAPL"))
+                .andExpect(jsonPath("$[0].companyName").value("Apple Inc."))
+                .andExpect(jsonPath("$[0].country").value("USA"))
+                .andExpect(jsonPath("$[0].group.key").value("SEMICONDUCTORS"))
+                .andExpect(jsonPath("$[0].group.name").value("Semiconductors"))
+                .andExpect(jsonPath("$[0].lastResearchedAt").value("2026-08-01"))
+                .andExpect(jsonPath("$[0].stale").value(false))
+                .andExpect(jsonPath("$[0].findings").doesNotExist())
+                .andExpect(jsonPath("$[0].businessDescription").doesNotExist());
     }
 
     @Test

@@ -37,8 +37,19 @@ export interface CompanySnapshot {
   stale: boolean
 }
 
-export function fetchAllSnapshots(): Promise<CompanySnapshot[]> {
-  return apiFetch<CompanySnapshot[]>('/api/research/snapshots')
+/** One row of the research list: no findings or description (those come with fetchSnapshot). */
+export interface SnapshotSummary {
+  ticker: string
+  isin: string
+  companyName: string
+  country: string | null
+  group: SnapshotGroup | null
+  lastResearchedAt: string | null
+  stale: boolean
+}
+
+export function fetchAllSnapshots(): Promise<SnapshotSummary[]> {
+  return apiFetch<SnapshotSummary[]>('/api/research/snapshots')
 }
 
 export async function fetchSnapshot(isin: string): Promise<CompanySnapshot | null> {

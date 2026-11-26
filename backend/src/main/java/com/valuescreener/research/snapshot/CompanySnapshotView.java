@@ -1,7 +1,6 @@
 package com.valuescreener.research.snapshot;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -23,8 +22,7 @@ public record CompanySnapshotView(
         SnapshotGroupView group = groupKey == null ? null
                 : new SnapshotGroupView(groupKey, groupNames.getOrDefault(groupKey, groupKey),
                         snapshot.getGroupSource());
-        LocalDate lastResearchedAt = snapshot.getFindings().stream().map(ResearchFinding::getAsOfDate)
-                .max(Comparator.naturalOrder()).orElse(null);
+        LocalDate lastResearchedAt = snapshot.lastResearchedAt();
         return new CompanySnapshotView(
                 snapshot.getTicker(), snapshot.getIsin(), snapshot.getCompanyName(),
                 snapshot.getCountry(), snapshot.getBusinessDescription(), group,

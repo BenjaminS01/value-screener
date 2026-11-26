@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -212,19 +213,49 @@ class CompanySnapshotServiceTest {
     }
 
     @Test
-    void listFiltersByGroupAndNone() {
-        CompanySnapshot grouped = existing();
-        grouped.assignGroup(SEMIS, GroupSource.AI);
-        CompanySnapshot ungrouped = new CompanySnapshot("MSFT", "US5949181045", "Microsoft", "USA", "Software.");
-        when(repository.findAll()).thenReturn(List.of(grouped, ungrouped));
-        when(repository.findAllWithoutGroup()).thenReturn(List.of(ungrouped));
-        when(repository.findAllByGroupKey("SEMICONDUCTORS")).thenReturn(List.of(grouped));
-        when(repository.findAllByGroupKey("NOPE")).thenReturn(List.of());
+    void listMapsIndexEntriesWithGroupNamesAndStaleFlag() {
+        LocalDate today = LocalDate.of(2026, 11, 12);
+        when(repository.findIndex()).thenReturn(List.of(
+                new SnapshotIndexEntry("US0378331005", "AAPL", "Apple Inc.", "USA", "BANKS", GroupSource.AI, today),
+                new SnapshotIndexEntry("US5949181045", "MSFT", "Microsoft", null, null, null, null)));
 
-        assertThat(service.list(null)).hasSize(2);
-        assertThat(service.list("none")).extracting(CompanySnapshotView::ticker).containsExactly("MSFT");
-        assertThat(service.list(" semiconductors ")).extracting(CompanySnapshotView::ticker).containsExactly("AAPL");
-        assertThat(service.list("nope")).isEmpty();
+        List<SnapshotSummaryView> rows = service.list();
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0)).isEqualTo(new SnapshotSummaryView("AAPL", "US0378331005", "Apple Inc.", "USA",
+                new SnapshotGroupView("BANKS", "Banks", GroupSource.AI), today, false));
+        assertThat(rows.get(1)).isEqualTo(new SnapshotSummaryView("MSFT", "US5949181045", "Microsoft", null,
+                null, null, true));
+        verify(repository, never()).findByIsin(any());
+    }
+
+    @Test
+    void listShowsKeyWhenGroupNameUnknown() {
+        when(repository.findIndex()).thenReturn(List.of(new SnapshotIndexEntry("US0378331005", "AAPL", "Apple Inc.",
+                "USA", "OLD", GroupSource.MANUAL, null)));
+
+        assertThat(service.list()).singleElement().extracting(SnapshotSummaryView::group)
+                .isEqualTo(new SnapshotGroupView("OLD", "OLD", GroupSource.MANUAL));
+    }
+
+    @Test
+    void listFallsBackWhenAnIndexItemHasNoNameOrTicker() {
+        // a v1 index item (only the group) written by an older release must not break the overview
+        when(repository.findIndex()).thenReturn(List.of(new SnapshotIndexEntry("US0378331005", null, null, null,
+                "BANKS", null, null)));
+
+        SnapshotSummaryView row = service.list().get(0);
+
+        assertThat(row.companyName()).isEqualTo("US0378331005");
+        assertThat(row.ticker()).isEmpty();
+    }
+
+    @Test
+    void emptyIndexDoesNotLoadGroupNames() {
+        when(repository.findIndex()).thenReturn(List.of());
+
+        assertThat(service.list()).isEmpty();
+        verify(groups, never()).namesByKey();
     }
 
     @Test

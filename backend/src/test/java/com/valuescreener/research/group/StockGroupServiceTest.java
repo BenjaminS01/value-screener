@@ -1,6 +1,7 @@
 package com.valuescreener.research.group;
 
 import com.valuescreener.research.snapshot.CompanySnapshotRepository;
+import com.valuescreener.research.snapshot.GroupSource;
 import com.valuescreener.research.snapshot.SnapshotIndexEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,11 @@ class StockGroupServiceTest {
         service = new StockGroupService(groups, snapshots);
     }
 
+    private static SnapshotIndexEntry entry(String isin, String groupKey) {
+        return new SnapshotIndexEntry(isin, "T", "Name", "USA", groupKey,
+                groupKey == null ? null : GroupSource.AI, null);
+    }
+
     @Test
     void listIsSortedBySortOrderThenName() {
         when(groups.findAll()).thenReturn(List.of(
@@ -41,8 +47,8 @@ class StockGroupServiceTest {
                 new StockGroup("BETA", "Beta", 20),
                 new StockGroup("FIRST", "First", 10)));
         when(snapshots.findIndex()).thenReturn(List.of(
-                new SnapshotIndexEntry("US0000000001", "FIRST"), new SnapshotIndexEntry("US0000000002", "FIRST"),
-                new SnapshotIndexEntry("US0000000003", "ZED"), new SnapshotIndexEntry("US0000000004", null)));
+                entry("US0000000001", "FIRST"), entry("US0000000002", "FIRST"),
+                entry("US0000000003", "ZED"), entry("US0000000004", null)));
 
         List<StockGroupView> views = service.list();
 
@@ -50,7 +56,7 @@ class StockGroupServiceTest {
         assertThat(views).extracting(StockGroupView::stockCount).containsExactly(2L, 0L, 1L);
         // one read of the small snapshot index; neither the snapshot items nor a count query per group
         verify(snapshots, org.mockito.Mockito.times(1)).findIndex();
-        verify(snapshots, never()).findAll();
+        verify(snapshots, never()).findByIsin(any());
         verify(snapshots, never()).countByGroupKey(any());
     }
 

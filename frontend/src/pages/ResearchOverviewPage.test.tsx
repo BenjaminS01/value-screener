@@ -2,13 +2,14 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResearchOverviewPage } from './ResearchOverviewPage'
 import type { AuthUser } from '../api/authApi'
+import type { SnapshotSummary } from '../api/researchApi'
 
 const user: AuthUser = { username: 'guest', role: 'USER' }
 
-const snapshots = [
-  { ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'AI' }, findings: [], lastResearchedAt: '2025-01-01', stale: true },
-  { ticker: 'SAP', isin: 'DE0007164600', companyName: 'SAP SE', country: 'DE', businessDescription: '', group: { key: 'tech', name: 'Technologie', source: 'MANUAL' }, findings: [] },
-  { ticker: 'XOM', isin: 'US30231G1022', companyName: 'Exxon Mobil', country: 'US', businessDescription: '', group: null, findings: [] },
+const snapshots: SnapshotSummary[] = [
+  { ticker: 'AAPL', isin: 'US0378331005', companyName: 'Apple Inc.', country: 'US', group: { key: 'tech', name: 'Technologie', source: 'AI' }, lastResearchedAt: '2025-01-01', stale: true },
+  { ticker: 'SAP', isin: 'DE0007164600', companyName: 'SAP SE', country: 'DE', group: { key: 'tech', name: 'Technologie', source: 'MANUAL' }, lastResearchedAt: '2026-10-01', stale: false },
+  { ticker: 'XOM', isin: 'US30231G1022', companyName: 'Exxon Mobil', country: 'US', group: null, lastResearchedAt: '2026-10-01', stale: false },
 ]
 const groups = [{ key: 'tech', name: 'Technologie', sortOrder: 1, stockCount: 2 }]
 

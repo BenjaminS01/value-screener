@@ -24,7 +24,6 @@ import java.util.Optional;
 public class CompanySnapshotService {
 
     private static final Logger log = LoggerFactory.getLogger(CompanySnapshotService.class);
-    private static final String NO_GROUP_FILTER = "none";
 
     private final CompanySnapshotRepository repository;
     private final StockGroupService groups;
@@ -132,18 +131,11 @@ public class CompanySnapshotService {
         return toView(repository.save(snapshot, List.of(), groupChanged(snapshot, previous)));
     }
 
-    /** null = all, "none" = ungrouped, otherwise a (normalized) group key; an unknown key yields an empty list. */
-    public List<CompanySnapshotView> list(String groupFilter) {
-        List<CompanySnapshot> snapshots;
-        if (groupFilter == null) {
-            snapshots = repository.findAll();
-        } else if (NO_GROUP_FILTER.equalsIgnoreCase(groupFilter.trim())) {
-            snapshots = repository.findAllWithoutGroup();
-        } else {
-            snapshots = repository.findAllByGroupKey(StockGroup.trimUpper(groupFilter));
-        }
-        Map<String, String> names = snapshots.isEmpty() ? Map.of() : groups.namesByKey();
-        return snapshots.stream().map(s -> CompanySnapshotView.from(s, freshness, names)).toList();
+    /** The research list from the snapshot index (eventually consistent): no snapshot item is read. */
+    public List<SnapshotSummaryView> list() {
+        List<SnapshotIndexEntry> index = repository.findIndex();
+        Map<String, String> names = index.isEmpty() ? Map.of() : groups.namesByKey();
+        return index.stream().map(e -> SnapshotSummaryView.from(e, freshness, names)).toList();
     }
 
     public CompanySnapshotView getByIsin(String isin) {

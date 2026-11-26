@@ -1,29 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { assignGroup, fetchAllSnapshots, fetchGroups, fetchSnapshot } from './researchApi'
+import type { SnapshotSummary } from './researchApi'
 
 describe('researchApi', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('fetchAllSnapshots returns snapshots from the backend', async () => {
-    const snapshot = {
+  it('fetchAllSnapshots returns the summary rows from the backend', async () => {
+    const snapshot: SnapshotSummary = {
       ticker: 'AAPL',
       isin: 'US0378331005',
       companyName: 'Apple Inc.',
       country: 'US',
       group: { key: 'tech', name: 'Technologie', source: 'AI' },
-      businessDescription: 'Consumer electronics.',
-      findings: [
-        {
-          criterionKey: 'PE_RATIO',
-          numericValue: 28.5,
-          booleanValue: null,
-          claim: 'P/E of 28.5 as of the latest filing.',
-          sourceUrl: 'https://example.com/aapl',
-          asOfDate: '2026-08-01',
-        },
-      ],
+      lastResearchedAt: '2026-08-01',
+      stale: false,
     }
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

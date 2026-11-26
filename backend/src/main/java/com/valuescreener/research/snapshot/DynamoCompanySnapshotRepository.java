@@ -1,6 +1,5 @@
 package com.valuescreener.research.snapshot;
 
-import com.valuescreener.persistence.HistoryQuery;
 import com.valuescreener.research.group.StockGroupRepository;
 import com.valuescreener.research.group.UnknownGroupException;
 import com.valuescreener.research.history.FindingHistoryItem;
@@ -15,7 +14,6 @@ import software.amazon.awssdk.services.dynamodb.model.CancellationReason;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.services.dynamodb.model.Put;
-import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
@@ -54,21 +52,6 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
         return response.hasItem() ? Optional.of(toDomain(response.item())) : Optional.empty();
     }
 
-    @Override
-    public List<CompanySnapshot> findAll() {
-        return query(null, Map.of(), Map.of());
-    }
-
-    @Override
-    public List<CompanySnapshot> findAllByGroupKey(String key) {
-        return query("#g = :g", Map.of("#g", "groupKey"), Map.of(":g", AttributeValue.fromS(key)));
-    }
-
-    @Override
-    public List<CompanySnapshot> findAllWithoutGroup() {
-        return query("attribute_not_exists(#g)", Map.of("#g", "groupKey"), Map.of());
-    }
-
     /** From the snapshot index (eventually consistent), not from the snapshot items. */
     @Override
     public long countByGroupKey(String key) {
@@ -95,7 +78,7 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
                     FindingHistoryItem.from(findingHistory.get(i), i), true)));
         }
         String referencedGroup = groupChanged ? snapshot.getGroupKey() : null;
-        items.add(SnapshotIndex.put(tableName, isin, snapshot.getGroupKey()));
+        items.add(SnapshotIndex.put(tableName, snapshot));
         if (referencedGroup != null) {
             items.add(StockGroupRepository.markReferenced(tableName, referencedGroup)); // LAST: see translate
         }
@@ -167,27 +150,6 @@ public class DynamoCompanySnapshotRepository implements CompanySnapshotRepositor
     private TransactWriteItem historyPut(Map<String, AttributeValue> item) {
         return TransactWriteItem.builder().put(Put.builder().tableName(tableName).item(item)
                 .conditionExpression(historyPutCondition()).build()).build();
-    }
-
-    private List<CompanySnapshot> query(String filter, Map<String, String> names,
-                                        Map<String, AttributeValue> values) {
-        return HistoryQuery.all(client, partitionRequest(filter, names, values).build()).stream()
-                .map(DynamoCompanySnapshotRepository::toDomain).toList();
-    }
-
-    private QueryRequest.Builder partitionRequest(String filter, Map<String, String> names,
-                                                  Map<String, AttributeValue> values) {
-        Map<String, AttributeValue> allValues = new java.util.HashMap<>(values);
-        allValues.put(":pk", AttributeValue.fromS(SnapshotItem.PK));
-        QueryRequest.Builder request = QueryRequest.builder().tableName(tableName).consistentRead(false)
-                .keyConditionExpression("pk = :pk").expressionAttributeValues(allValues);
-        if (filter != null) {
-            request.filterExpression(filter);
-        }
-        if (!names.isEmpty()) {
-            request.expressionAttributeNames(names);
-        }
-        return request;
     }
 
     private static CompanySnapshot toDomain(Map<String, AttributeValue> item) {
