@@ -21,7 +21,6 @@ function formatNumber(value: number, fractionDigits?: number): string {
   })
 }
 
-
 type Mode = 'idle' | 'sell' | 'correct'
 
 /**
@@ -130,9 +129,14 @@ export function AdminPositionRow({ position, onOpen, onChanged }: AdminPositionR
     <tr>
       <td>
         {editing ? (
-          <input aria-label="Company" form={formId} value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+          <input
+            aria-label="Company"
+            form={formId}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+          />
         ) : (
-          <button type="button" onClick={() => onOpen(position.isin)}>
+          <button type="button" className="btn-link" onClick={() => onOpen(position.isin)}>
             {position.companyName}
           </button>
         )}
@@ -145,16 +149,21 @@ export function AdminPositionRow({ position, onOpen, onChanged }: AdminPositionR
         )}
       </td>
       <td>{position.group ? position.group.name : '—'}</td>
-      <td>
+      <td className="num">
         {editing ? (
           <input aria-label="Quantity" form={formId} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
         ) : (
           formatNumber(position.quantity)
         )}
       </td>
-      <td>
+      <td className="num">
         {editing ? (
-          <input aria-label="Entry price" form={formId} value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} />
+          <input
+            aria-label="Entry price"
+            form={formId}
+            value={entryPrice}
+            onChange={(e) => setEntryPrice(e.target.value)}
+          />
         ) : (
           formatNumber(position.entryPrice, 2)
         )}

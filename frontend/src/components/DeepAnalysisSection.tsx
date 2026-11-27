@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react'
 import { writeErrorText } from '../api/errorText'
-import {
-  DeepAnalysisQuota,
-  DeepAnalysisResult,
-  fetchDeepAnalysisQuota,
-  runDeepAnalysis,
-} from '../api/deepAnalysisApi'
+import { DeepAnalysisQuota, DeepAnalysisResult, fetchDeepAnalysisQuota, runDeepAnalysis } from '../api/deepAnalysisApi'
 import { formatDateTime } from '../research/format'
 
 interface Props {
@@ -50,13 +45,17 @@ export function DeepAnalysisSection({ isin }: Props) {
 
   return (
     <div>
-      {quota !== null && <p>Remaining today: {quota.remainingToday} of {quota.limitPerDay} analyses</p>}
+      {quota !== null && (
+        <p className="muted">
+          Remaining today: {quota.remainingToday} of {quota.limitPerDay} analyses
+        </p>
+      )}
       <button type="button" onClick={run} disabled={running || exhausted}>
         Run deep analysis
       </button>
       {error !== null && <p role="alert">{error}</p>}
       {result !== null && (
-        <div>
+        <div className="result-list notice">
           <p>{result.message}</p>
           <p>{result.greeting}</p>
           <p>Function: {result.functionName}</p>

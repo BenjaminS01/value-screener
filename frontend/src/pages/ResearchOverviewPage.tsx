@@ -53,33 +53,54 @@ export function ResearchOverviewPage({ navigate }: Props) {
   return (
     <section>
       <h1>Research</h1>
-      <label>
-        Search
-        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
-      </label>
-      <div role="radiogroup" aria-label="Grouping">
+      <div className="toolbar">
         <label>
-          <input type="radio" name="grouping" checked={grouping === 'group'} onChange={() => setGrouping('group')} />
-          by group
+          Search
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        <label>
-          <input type="radio" name="grouping" checked={grouping === 'country'} onChange={() => setGrouping('country')} />
-          by country
-        </label>
+        <div role="radiogroup" aria-label="Grouping" className="toolbar">
+          <label>
+            <input type="radio" name="grouping" checked={grouping === 'group'} onChange={() => setGrouping('group')} />
+            by group
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="grouping"
+              checked={grouping === 'country'}
+              onChange={() => setGrouping('country')}
+            />
+            by country
+          </label>
+        </div>
       </div>
-      {loading && <p>Loading …</p>}
+      {loading && <p className="muted">Loading …</p>}
       {error !== null && <p role="alert">{error}</p>}
       {sections.map((section) => (
-        <div key={section.title}>
+        <div key={section.title} className="card">
           <h2>{section.title}</h2>
-          <ul>
+          <ul className="stock-list">
             {section.snapshots.map((s) => (
               <li key={s.isin}>
-                <button type="button" onClick={() => navigate({ name: 'researchDetail', isin: s.isin })}>
-                  <span>{s.companyName}</span> <span>{s.ticker}</span> <span>{s.isin}</span>{' '}
-                  <span>{grouping === 'country' ? (s.group?.name ?? '–') : (s.country?.trim() || '–')}</span>
-                  {s.stale && <> <span>Stale</span></>}
-                  {held.has(s.isin) && <> <span>In portfolio</span></>}
+                <button
+                  type="button"
+                  className="stock-row"
+                  onClick={() => navigate({ name: 'researchDetail', isin: s.isin })}
+                >
+                  <span className="stock-row__name">{s.companyName}</span> <span>{s.ticker}</span>{' '}
+                  <span className="stock-row__isin">{s.isin}</span>{' '}
+                  <span className="stock-row__meta">
+                    {grouping === 'country' ? (s.group?.name ?? '–') : s.country?.trim() || '–'}
+                  </span>{' '}
+                  <span className="stock-row__badges">
+                    {s.stale && <span className="badge badge--stale">Stale</span>}
+                    {held.has(s.isin) && (
+                      <>
+                        {' '}
+                        <span className="badge badge--portfolio">In portfolio</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               </li>
             ))}

@@ -56,7 +56,7 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Buy position">
+    <form onSubmit={handleSubmit} aria-label="Buy position" className="form-grid">
       <label>
         Ticker
         <input value={ticker} onChange={(e) => setTicker(e.target.value)} />
@@ -81,14 +81,16 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
         Purchase date
         <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
       </label>
-      <label>
+      <label className="full">
         Why are you buying? (optional, appended to the investment thesis)
         <textarea value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} />
       </label>
-      <button type="submit" disabled={pending}>
-        Buy
-      </button>
-      {error && <p role="alert">{error}</p>}
+      <div className="full">
+        <button type="submit" disabled={pending}>
+          Buy
+        </button>
+        {error && <p role="alert">{error}</p>}
+      </div>
     </form>
   )
 }

@@ -40,7 +40,7 @@ describe('ResearchOverviewPage', () => {
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
     expect(screen.getAllByText('Stale')).toHaveLength(1)
-    expect(within(screen.getByText('Apple Inc.').closest('li')!).getByText('Stale')).toBeInTheDocument()
+    expect(within(screen.getByText('Apple Inc.').closest('li')!).getByText('Stale')).toHaveClass('badge', 'badge--stale')
   })
 
   it('switches to country sections', async () => {
@@ -63,7 +63,7 @@ describe('ResearchOverviewPage', () => {
   it('marks held positions with In portfolio', async () => {
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     const row = (await screen.findByText('Apple Inc.')).closest('button')!
-    expect(within(row).getByText('In portfolio')).toBeInTheDocument()
+    expect(within(row).getByText('In portfolio')).toHaveClass('badge', 'badge--portfolio')
     const other = screen.getByText('SAP SE').closest('button')!
     expect(within(other).queryByText('In portfolio')).not.toBeInTheDocument()
   })

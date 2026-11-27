@@ -1,0 +1,488 @@
+/* Global stylesheet: one calm theme, element defaults plus a few utility classes.
+   CSP in AWS allows only same-origin styles and fonts, so: system fonts, no imports. */
+
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --text: #1f2933;
+  --muted: #5f6b7a;
+  --border: #dde2e8;
+  --accent: #1d5c8c;
+  --accent-hover: #164a72;
+  --accent-soft: #e6f0f8;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --radius: 8px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --content: 1100px;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0 0 0.75rem;
+}
+h1 {
+  font-size: 1.75rem;
+}
+h2 {
+  font-size: 1.25rem;
+}
+h3 {
+  font-size: 1rem;
+  margin-top: 1rem;
+  color: var(--muted);
+}
+p {
+  margin: 0 0 0.75rem;
+}
+a {
+  color: var(--accent);
+}
+
+/* ---------- layout ---------- */
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.app-header__inner {
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 0.75rem 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+}
+.app-header nav {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1;
+}
+.brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+.user-chip {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 1.5rem 16px 2rem;
+}
+
+.app-footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.app-footer__inner {
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 1rem 16px;
+}
+.app-footer nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ---------- controls ---------- */
+
+button {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+button[type='submit'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button[type='submit']:hover:not(:disabled) {
+  background: var(--accent-hover);
+  color: #fff;
+}
+button + button {
+  margin-left: 0.4rem;
+}
+
+.btn-link {
+  border: none;
+  background: none;
+  padding: 0.25rem 0.5rem;
+  color: var(--accent);
+}
+.btn-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.btn-link + .btn-link {
+  margin-left: 0;
+}
+.app-header nav .btn-link {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.app-header nav .btn-link[aria-current='page'] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  max-width: 100%;
+}
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+textarea {
+  width: 100%;
+  min-height: 5rem;
+}
+
+form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0 1rem;
+}
+.form-grid .full {
+  grid-column: 1 / -1;
+}
+
+[role='alert'] {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+[role='status'],
+.notice {
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+/* ---------- tables ---------- */
+
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.6rem 1rem 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+td.num {
+  font-variant-numeric: tabular-nums;
+}
+tbody tr:hover {
+  background: #f9fafb;
+}
+td form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+td form label {
+  margin-bottom: 0;
+}
+td form button + button {
+  margin-left: 0;
+}
+td .btn-link {
+  padding-left: 0;
+  font-weight: 600;
+}
+
+/* ---------- badges ---------- */
+
+.badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: middle;
+  background: #eef0f3;
+  color: #3e4c59;
+}
+.badge:first-child {
+  margin-left: 0;
+}
+.badge--portfolio {
+  background: #e3f2e8;
+  color: #1e6b3a;
+}
+.badge--holding {
+  background: #e3f2e8;
+  color: #1e6b3a;
+}
+.badge--stale {
+  background: #fdf0d8;
+  color: #8a5a00;
+}
+.badge--watching {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.badge--rejected {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.badge--muted {
+  background: #eef0f3;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ---------- research ---------- */
+
+.stock-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.stock-list li + li {
+  border-top: 1px solid var(--border);
+}
+.stock-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 2fr) 5rem 9rem minmax(6rem, 1fr) auto;
+  gap: 0.25rem 1rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 0.65rem 0.25rem;
+}
+.stock-row:hover:not(:disabled) {
+  background: #f9fafb;
+  color: var(--text);
+}
+.stock-row__name {
+  font-weight: 600;
+}
+.stock-row__isin,
+.stock-row__meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.stock-row__badges {
+  text-align: right;
+}
+@media (max-width: 640px) {
+  .stock-row {
+    grid-template-columns: 1fr auto;
+  }
+  .stock-row__isin,
+  .stock-row__meta {
+    display: none;
+  }
+  .stock-row__badges {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1.25rem;
+  margin: 0 0 0.75rem;
+}
+.facts dt {
+  color: var(--muted);
+}
+.facts dd {
+  margin: 0;
+}
+
+.criteria {
+  margin: 0;
+}
+.criteria__row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) 3fr;
+  gap: 0.25rem 1.25rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.criteria__row:last-child {
+  border-bottom: none;
+}
+.criteria dt {
+  font-weight: 600;
+}
+.criteria dd {
+  margin: 0;
+}
+.criteria .value {
+  margin-right: 0.5rem;
+}
+.criteria .date {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0.5rem;
+}
+@media (max-width: 640px) {
+  .criteria__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.history {
+  margin-top: 0.35rem;
+}
+.history ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.history li {
+  margin-bottom: 0.25rem;
+}
+.history li > * + * {
+  margin-left: 0.4rem;
+}
+
+.pre-wrap {
+  white-space: pre-wrap;
+}
+
+.result-list p {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+}
+
+/* ---------- login ---------- */
+
+.login {
+  max-width: 380px;
+}
+.login form label {
+  margin-bottom: 1rem;
+}
+.login button[type='submit'] {
+  width: 100%;
+  padding: 0.55rem;
+}
+
+.toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.app-main > section > .btn-link:first-child {
+  padding-left: 0;
+  margin-bottom: 0.75rem;
+}

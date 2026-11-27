@@ -13,7 +13,6 @@ interface Props {
 const CONFLICT = 'The thesis was changed in the meantime, please reload'
 const STATUS_LABELS: Record<ThesisStatus, string> = { WATCHING: 'Watching', REJECTED: 'Rejected' }
 // React renders these strings as text nodes (never HTML); pre-wrap keeps the line breaks.
-const PRE_WRAP = { whiteSpace: 'pre-wrap' } as const
 
 interface FormState {
   whyInteresting: string
@@ -33,10 +32,27 @@ function toForm(t: InvestmentThesis | null): FormState {
   }
 }
 
-function statusLine(t: InvestmentThesis): string {
-  if (t.holding) return 'Holding'
-  if (t.status === null) return 'No status'
-  return t.statusReason ? `${STATUS_LABELS[t.status]}: ${t.statusReason}` : STATUS_LABELS[t.status]
+const STATUS_BADGE: Record<ThesisStatus, string> = { WATCHING: 'badge--watching', REJECTED: 'badge--rejected' }
+
+function StatusLine({ thesis: t }: { thesis: InvestmentThesis }) {
+  if (t.holding)
+    return (
+      <p>
+        <span className="badge badge--holding">Holding</span>
+      </p>
+    )
+  if (t.status === null)
+    return (
+      <p>
+        <span className="badge badge--muted">No status</span>
+      </p>
+    )
+  return (
+    <p>
+      <span className={`badge ${STATUS_BADGE[t.status]}`}>{STATUS_LABELS[t.status]}</span>
+      {t.statusReason && <> {t.statusReason}</>}
+    </p>
+  )
 }
 
 export function InvestmentThesisSection({ user, isin }: Props) {
@@ -111,25 +127,25 @@ export function InvestmentThesisSection({ user, isin }: Props) {
   const holding = thesis?.holding ?? false
 
   return (
-    <div>
+    <div className="card">
       <h2>Investment thesis</h2>
-      <p>Personal view of the operator, not investment advice.</p>
-      {loading && <p>Loading …</p>}
+      <p className="muted">Personal view of the operator, not investment advice.</p>
+      {loading && <p className="muted">Loading …</p>}
       {loadError !== null && <p role="alert">{loadError}</p>}
       {!loading && loadError === null && !editing && (
         <>
           {thesis === null ? (
-            <p>No investment thesis yet</p>
+            <p className="muted">No investment thesis yet</p>
           ) : (
             <>
               <h3>Why interesting</h3>
-              <p style={PRE_WRAP}>{thesis.whyInteresting}</p>
+              <p className="pre-wrap">{thesis.whyInteresting}</p>
               <h3>Expected development</h3>
-              <p style={PRE_WRAP}>{thesis.expectedDevelopment}</p>
+              <p className="pre-wrap">{thesis.expectedDevelopment}</p>
               <h3>When to sell or drop</h3>
-              <p style={PRE_WRAP}>{thesis.exitCriteria}</p>
-              <p>{statusLine(thesis)}</p>
-              <p>Updated on {formatDate(thesis.updatedAt)}</p>
+              <p className="pre-wrap">{thesis.exitCriteria}</p>
+              <StatusLine thesis={thesis} />
+              <p className="muted">Updated on {formatDate(thesis.updatedAt)}</p>
             </>
           )}
           {user.role === 'ADMIN' && (
@@ -149,7 +165,10 @@ export function InvestmentThesisSection({ user, isin }: Props) {
         >
           <label>
             Why interesting
-            <textarea value={form.whyInteresting} onChange={(e) => setForm({ ...form, whyInteresting: e.target.value })} />
+            <textarea
+              value={form.whyInteresting}
+              onChange={(e) => setForm({ ...form, whyInteresting: e.target.value })}
+            />
           </label>
           <label>
             Expected development

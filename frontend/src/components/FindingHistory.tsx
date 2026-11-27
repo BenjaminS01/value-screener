@@ -7,8 +7,8 @@ export function FindingHistory({ entries }: { entries: FindingHistoryEntry[] }) 
   const [open, setOpen] = useState(false)
   if (entries.length === 0) return null
   return (
-    <div>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <div className="history">
+      <button type="button" className="btn-link" aria-expanded={open} onClick={() => setOpen(!open)}>
         History ({entries.length})
       </button>
       {open && (
@@ -16,7 +16,7 @@ export function FindingHistory({ entries }: { entries: FindingHistoryEntry[] }) 
           {entries.map((e, i) => (
             <li key={i}>
               {formatValue(e) !== null && <strong>{formatValue(e)}</strong>} <span>{e.claim}</span>{' '}
-              <span>{formatDate(e.asOfDate)}</span>{' '}
+              <span className="date">{formatDate(e.asOfDate)}</span>{' '}
               {isSafeHttpUrl(e.sourceUrl) ? (
                 <a href={e.sourceUrl} target="_blank" rel="noopener noreferrer">
                   Source

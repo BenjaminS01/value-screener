@@ -82,6 +82,7 @@ describe('ResearchDetailPage', () => {
     renderPage()
     await screen.findByText('P/E is 12.5')
     expect(screen.getAllByText('Stale')).toHaveLength(1)
+    expect(screen.getByText('Stale')).toHaveClass('badge', 'badge--stale')
   })
 
   it('shows a collapsible history per criterion, newest first', async () => {
@@ -151,6 +152,7 @@ describe('ResearchDetailPage', () => {
     renderPage()
     await screen.findByRole('heading', { level: 1 })
     expect(screen.getAllByText('Not researched')).toHaveLength(14)
+    expect(screen.getAllByText('Not researched')[0]).toHaveClass('badge', 'badge--muted')
   })
 
   it('renders unsafe source urls as plain text, not links', async () => {
@@ -162,7 +164,7 @@ describe('ResearchDetailPage', () => {
 
   it('shows portfolio badge only for held isin', async () => {
     renderPage()
-    expect(await screen.findByText('The operator holds this position')).toBeInTheDocument()
+    expect(await screen.findByText('The operator holds this position')).toHaveClass('badge', 'badge--portfolio')
   })
 
   it('omits badge when not held', async () => {

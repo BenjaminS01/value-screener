@@ -48,14 +48,15 @@ describe('InvestmentThesisSection', () => {
     expect(screen.getByText('When to sell or drop')).toBeInTheDocument()
     expect(screen.getByText('Wachstum')).toBeInTheDocument()
     expect(screen.getByText('Moat bricht weg')).toBeInTheDocument()
-    expect(screen.getByText(/Watching/)).toHaveTextContent('Zu teuer')
+    expect(screen.getByText('Watching')).toHaveClass('badge', 'badge--watching')
+    expect(screen.getByText('Watching').closest('p')).toHaveTextContent('Zu teuer')
     expect(screen.getByText('Updated on 01 Nov 2026')).toBeInTheDocument()
   })
 
   it('shows Holding instead of the status when holding', async () => {
     getResponse = () => json(200, thesis({ holding: true }))
     render(<InvestmentThesisSection user={guest} isin={ISIN} />)
-    expect(await screen.findByText('Holding')).toBeInTheDocument()
+    expect(await screen.findByText('Holding')).toHaveClass('badge', 'badge--holding')
     expect(screen.queryByText(/Watching/)).not.toBeInTheDocument()
   })
 
@@ -82,7 +83,7 @@ describe('InvestmentThesisSection', () => {
     const { container } = render(<InvestmentThesisSection user={guest} isin={ISIN} />)
     const el = await screen.findByText(/alert\(1\)/)
     expect(el.textContent).toBe('<script>alert(1)</script>\nZeile 2')
-    expect(el).toHaveStyle({ whiteSpace: 'pre-wrap' })
+    expect(el).toHaveClass('pre-wrap')
     expect(container.querySelector('script')).toBeNull()
   })
 

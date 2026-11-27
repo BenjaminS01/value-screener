@@ -44,17 +44,13 @@ export function LoginPage({ onLoggedIn, navigate, notice }: LoginPageProps) {
   }
 
   return (
-    <section>
+    <section className="card login">
       <h1>Log in</h1>
       {notice && <p role="status">{notice}</p>}
       <form onSubmit={handleSubmit}>
         <label>
           Username
-          <input
-            value={username}
-            autoComplete="username"
-            onChange={(e) => setUsername(e.target.value)}
-          />
+          <input value={username} autoComplete="username" onChange={(e) => setUsername(e.target.value)} />
         </label>
         <label>
           Password
@@ -71,10 +67,10 @@ export function LoginPage({ onLoggedIn, navigate, notice }: LoginPageProps) {
       </form>
       {error && <p role="alert">{error}</p>}
       <nav>
-        <button type="button" onClick={() => navigate({ name: 'impressum' })}>
+        <button type="button" className="btn-link" onClick={() => navigate({ name: 'impressum' })}>
           Legal notice (Impressum)
         </button>
-        <button type="button" onClick={() => navigate({ name: 'datenschutz' })}>
+        <button type="button" className="btn-link" onClick={() => navigate({ name: 'datenschutz' })}>
           Privacy (Datenschutz)
         </button>
       </nav>
