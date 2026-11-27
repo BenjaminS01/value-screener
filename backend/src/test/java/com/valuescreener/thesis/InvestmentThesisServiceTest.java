@@ -180,7 +180,7 @@ class InvestmentThesisServiceTest {
 
         InvestmentThesis thesis = service.prepareAppendPurchaseReason(ISIN, "  Moat intact ");
 
-        assertThat(thesis.getWhyInteresting()).isEqualTo("[2026-11-12] Kauf: Moat intact");
+        assertThat(thesis.getWhyInteresting()).isEqualTo("[2026-11-12] Buy: Moat intact");
         assertThat(thesis.getUpdatedAt()).isEqualTo(NOW);
         assertThat(thesis.getVersion()).isNull();
         verify(repository, never()).save(any());
@@ -194,7 +194,7 @@ class InvestmentThesisServiceTest {
         InvestmentThesis prepared = service.prepareAppendPurchaseReason(ISIN, "Moat intact");
 
         assertThat(prepared).isSameAs(thesis);
-        assertThat(thesis.getWhyInteresting()).isEqualTo("old why\n\n[2026-11-12] Kauf: Moat intact");
+        assertThat(thesis.getWhyInteresting()).isEqualTo("old why\n\n[2026-11-12] Buy: Moat intact");
         verify(repository, never()).save(any());
     }
 

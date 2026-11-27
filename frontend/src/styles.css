@@ -379,7 +379,7 @@ td .btn-link {
 .stock-row__badges {
   text-align: right;
 }
-@media (max-width: 640px) {
+@media (max-width: 800px) {
   .stock-row {
     grid-template-columns: 1fr auto;
   }
