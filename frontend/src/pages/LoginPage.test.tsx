@@ -22,6 +22,13 @@ describe('LoginPage', () => {
     document.cookie = 'XSRF-TOKEN=tok'
   })
 
+  it('shows the project overview next to the login form', () => {
+    render(<LoginPage onLoggedIn={vi.fn()} navigate={vi.fn()} />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Value Screener' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Username')).toBeInTheDocument()
+  })
+
   it('calls onLoggedIn with the returned user', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, { username: 'ben', role: 'ADMIN' })))
     const onLoggedIn = vi.fn()

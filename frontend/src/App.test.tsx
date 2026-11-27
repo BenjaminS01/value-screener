@@ -55,7 +55,7 @@ describe('App', () => {
   it('shows header and start page when logged in', async () => {
     stubFetch({ 'GET /api/auth/me': () => res(200, USER) })
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Unsere Anwendung' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Value Screener' })).toBeInTheDocument()
     expect(screen.getByText('ben (ADMIN)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Portfolio' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Research' })).toBeInTheDocument()

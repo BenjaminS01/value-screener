@@ -486,3 +486,50 @@ td .btn-link {
   padding-left: 0;
   margin-bottom: 0.75rem;
 }
+
+/* ---------- project overview ---------- */
+
+.overview__lead {
+  font-size: 1.1rem;
+  max-width: 48rem;
+  margin-bottom: 1.25rem;
+}
+.overview__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.overview__tiles .card {
+  margin-bottom: 0;
+}
+.overview__tiles h2 {
+  font-size: 1.05rem;
+  color: var(--accent);
+}
+.overview__tiles p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+.overview > p:last-child {
+  margin-top: 1.25rem;
+}
+
+.login-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.login-layout .overview__tiles {
+  grid-template-columns: 1fr;
+}
+.login-layout .login {
+  max-width: none;
+}
+
+@media (max-width: 800px) {
+  .overview__tiles,
+  .login-layout {
+    grid-template-columns: 1fr;
+  }
+}

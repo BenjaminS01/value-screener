@@ -1,7 +1,9 @@
+import { ProjectOverview } from '../components/ProjectOverview'
+
 export function StartPage() {
   return (
     <section>
-      <h1>Unsere Anwendung</h1>
+      <ProjectOverview />
     </section>
   )
 }

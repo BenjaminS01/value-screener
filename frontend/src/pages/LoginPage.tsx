@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { ApiError } from '../api/apiClient'
 import { AuthUser, login } from '../api/authApi'
+import { ProjectOverview } from '../components/ProjectOverview'
 import { Navigate } from '../navigation'
 
 interface LoginPageProps {
@@ -44,36 +45,39 @@ export function LoginPage({ onLoggedIn, navigate, notice }: LoginPageProps) {
   }
 
   return (
-    <section className="card login">
-      <h1>Log in</h1>
-      {notice && <p role="status">{notice}</p>}
-      <form onSubmit={handleSubmit}>
-        <label>
-          Username
-          <input value={username} autoComplete="username" onChange={(e) => setUsername(e.target.value)} />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            autoComplete="current-password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <button type="submit" disabled={pending}>
-          Log in
-        </button>
-      </form>
-      {error && <p role="alert">{error}</p>}
-      <nav>
-        <button type="button" className="btn-link" onClick={() => navigate({ name: 'impressum' })}>
-          Legal notice (Impressum)
-        </button>
-        <button type="button" className="btn-link" onClick={() => navigate({ name: 'datenschutz' })}>
-          Privacy (Datenschutz)
-        </button>
-      </nav>
-    </section>
+    <div className="login-layout">
+      <ProjectOverview />
+      <section className="card login">
+        <h2>Log in</h2>
+        {notice && <p role="status">{notice}</p>}
+        <form onSubmit={handleSubmit}>
+          <label>
+            Username
+            <input value={username} autoComplete="username" onChange={(e) => setUsername(e.target.value)} />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              autoComplete="current-password"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={pending}>
+            Log in
+          </button>
+        </form>
+        {error && <p role="alert">{error}</p>}
+        <nav>
+          <button type="button" className="btn-link" onClick={() => navigate({ name: 'impressum' })}>
+            Legal notice (Impressum)
+          </button>
+          <button type="button" className="btn-link" onClick={() => navigate({ name: 'datenschutz' })}>
+            Privacy (Datenschutz)
+          </button>
+        </nav>
+      </section>
+    </div>
   )
 }
