@@ -50,23 +50,23 @@ export function DeepAnalysisSection({ isin }: Props) {
 
   return (
     <div>
-      {quota !== null && <p>Heute noch {quota.remainingToday} von {quota.limitPerDay} Analysen</p>}
+      {quota !== null && <p>Remaining today: {quota.remainingToday} of {quota.limitPerDay} analyses</p>}
       <button type="button" onClick={run} disabled={running || exhausted}>
-        Tiefenanalyse starten
+        Run deep analysis
       </button>
       {error !== null && <p role="alert">{error}</p>}
       {result !== null && (
         <div>
           <p>{result.message}</p>
           <p>{result.greeting}</p>
-          <p>Funktion: {result.functionName}</p>
+          <p>Function: {result.functionName}</p>
           <p>Version: {result.functionVersion}</p>
           <p>Region: {result.region}</p>
-          <p>Speicher (MB): {result.memoryLimitMb}</p>
-          <p>Request-ID: {result.awsRequestId}</p>
-          <p>Kaltstart: {result.coldStart ? 'ja' : 'nein'}</p>
-          <p>Ausgeführt am: {formatDateTime(result.invokedAt)}</p>
-          <p>Quelle: {result.source === 'LAMBDA' ? 'AWS Lambda' : 'lokale Simulation'}</p>
+          <p>Memory (MB): {result.memoryLimitMb}</p>
+          <p>Request ID: {result.awsRequestId}</p>
+          <p>Cold start: {result.coldStart ? 'yes' : 'no'}</p>
+          <p>Invoked at: {formatDateTime(result.invokedAt)}</p>
+          <p>Source: {result.source === 'LAMBDA' ? 'AWS Lambda' : 'local simulation'}</p>
         </div>
       )}
     </div>

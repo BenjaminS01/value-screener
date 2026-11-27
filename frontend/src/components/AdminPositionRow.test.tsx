@@ -35,9 +35,9 @@ describe('AdminPositionRow', () => {
     vi.mocked(portfolioApi.sellPosition).mockResolvedValue(undefined)
     const onChanged = vi.fn()
     renderRow(onChanged)
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-    fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '4' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf bestätigen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+    fireEvent.change(screen.getByLabelText('Quantity to sell'), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm partial sale' }))
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect(portfolioApi.sellPosition).toHaveBeenCalledWith('US0378331005', 4)
   })
@@ -46,14 +46,14 @@ describe('AdminPositionRow', () => {
     vi.mocked(portfolioApi.correctPosition).mockResolvedValue(undefined)
     const onChanged = vi.fn()
     renderRow(onChanged)
-    fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
     expect(screen.getByLabelText('Ticker')).toHaveValue('AAPL')
-    expect(screen.getByLabelText('Unternehmen')).toHaveValue('Apple Inc.')
-    expect(screen.getByLabelText('Stückzahl')).toHaveValue('10')
-    expect(screen.getByLabelText('Einstandskurs')).toHaveValue('150.5')
-    expect(screen.getByLabelText('Kaufdatum')).toHaveValue('2026-01-15')
-    fireEvent.change(screen.getByLabelText('Stückzahl'), { target: { value: '12' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    expect(screen.getByLabelText('Company')).toHaveValue('Apple Inc.')
+    expect(screen.getByLabelText('Quantity')).toHaveValue('10')
+    expect(screen.getByLabelText('Entry price')).toHaveValue('150.5')
+    expect(screen.getByLabelText('Purchase date')).toHaveValue('2026-01-15')
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '12' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect(portfolioApi.correctPosition).toHaveBeenCalledWith('US0378331005', {
       ticker: 'AAPL',
@@ -64,35 +64,35 @@ describe('AdminPositionRow', () => {
     })
   })
 
-  it('shows the values as text; Korrigieren turns the same cells into inputs', () => {
+  it('shows the values as text; Correct turns the same cells into inputs', () => {
     renderRow()
     expect(screen.getByRole('button', { name: 'Apple Inc.' })).toBeInTheDocument()
-    expect(screen.getByText('150,50')).toBeInTheDocument()
+    expect(screen.getByText('150.50')).toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
     expect(screen.getAllByRole('row')).toHaveLength(1)
     expect(screen.getAllByLabelText('Ticker')).toHaveLength(1)
-    expect(screen.queryByText('150,50')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Korrigieren' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument()
+    expect(screen.queryByText('150.50')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Correct' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
   it('saves nothing when no value changed and shows the text again', async () => {
     const onChanged = vi.fn()
     renderRow(onChanged)
-    fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
-    expect(await screen.findByText('150,50')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('150.50')).toBeInTheDocument()
     expect(screen.queryByLabelText('Ticker')).not.toBeInTheDocument()
     expect(portfolioApi.correctPosition).not.toHaveBeenCalled()
     expect(onChanged).not.toHaveBeenCalled()
   })
 
-  it('Abbrechen leaves edit mode without saving', () => {
+  it('Cancel leaves edit mode without saving', () => {
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
-    fireEvent.change(screen.getByLabelText('Stückzahl'), { target: { value: '99' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '99' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByText('10')).toBeInTheDocument()
     expect(portfolioApi.correctPosition).not.toHaveBeenCalled()
   })
@@ -113,77 +113,77 @@ describe('AdminPositionRow', () => {
     const onChanged = vi.fn()
     renderRow(onChanged)
     if (kind === 'sell') {
-      fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-      fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '1' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf bestätigen' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+      fireEvent.change(screen.getByLabelText('Quantity to sell'), { target: { value: '1' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm partial sale' }))
     } else if (kind === 'correct') {
-      fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
-      fireEvent.change(screen.getByLabelText('Stückzahl'), { target: { value: '11' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
+      fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '11' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     } else {
-      fireEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     }
     await waitFor(() =>
-      expect(onChanged).toHaveBeenCalledWith('Die Position wurde inzwischen geändert, bitte neu laden'),
+      expect(onChanged).toHaveBeenCalledWith('The position was changed in the meantime, please reload'),
     )
   })
 
   it('accepts a German decimal comma when selling', async () => {
     vi.mocked(portfolioApi.sellPosition).mockResolvedValue(undefined)
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-    fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '2,5' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf bestätigen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+    fireEvent.change(screen.getByLabelText('Quantity to sell'), { target: { value: '2,5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm partial sale' }))
     await waitFor(() => expect(portfolioApi.sellPosition).toHaveBeenCalledWith('US0378331005', 2.5))
   })
 
   it('does not sell for an empty quantity and shows a message', async () => {
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf bestätigen' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
+    fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm partial sale' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please enter a valid number')
     expect(portfolioApi.sellPosition).not.toHaveBeenCalled()
   })
 
   it('does not sell for quantity 0', async () => {
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-    fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '0' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf bestätigen' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
+    fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+    fireEvent.change(screen.getByLabelText('Quantity to sell'), { target: { value: '0' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm partial sale' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please enter a valid number')
     expect(portfolioApi.sellPosition).not.toHaveBeenCalled()
   })
 
   it.each([
-    ['Stückzahl', '0'],
-    ['Einstandskurs', '-1'],
+    ['Quantity', '0'],
+    ['Entry price', '-1'],
   ])('does not correct for %s %s', async (label, value) => {
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
     fireEvent.change(screen.getByLabelText(label), { target: { value } })
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please enter a valid number')
     expect(portfolioApi.correctPosition).not.toHaveBeenCalled()
   })
 
   it('resets the sell quantity when sell mode is opened again', async () => {
     vi.mocked(portfolioApi.sellPosition).mockResolvedValue(undefined)
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-    fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '4' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf bestätigen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+    fireEvent.change(screen.getByLabelText('Quantity to sell'), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm partial sale' }))
     await waitFor(() => expect(portfolioApi.sellPosition).toHaveBeenCalled())
-    await waitFor(() => expect(screen.queryByLabelText('Verkaufsmenge')).not.toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-    expect(screen.getByLabelText('Verkaufsmenge')).toHaveValue('')
+    await waitFor(() => expect(screen.queryByLabelText('Quantity to sell')).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+    expect(screen.getByLabelText('Quantity to sell')).toHaveValue('')
   })
 
   it('does not correct for an invalid number', async () => {
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Korrigieren' }))
-    fireEvent.change(screen.getByLabelText('Einstandskurs'), { target: { value: 'x' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Bitte eine gültige Zahl eingeben')
+    fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
+    fireEvent.change(screen.getByLabelText('Entry price'), { target: { value: 'x' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please enter a valid number')
     expect(portfolioApi.correctPosition).not.toHaveBeenCalled()
   })
 
@@ -192,7 +192,7 @@ describe('AdminPositionRow', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const onChanged = vi.fn()
     renderRow(onChanged)
-    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect(portfolioApi.deletePosition).toHaveBeenCalledWith('US0378331005')
   })
@@ -200,16 +200,16 @@ describe('AdminPositionRow', () => {
   it('does not delete when confirmation is declined', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false)
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(portfolioApi.deletePosition).not.toHaveBeenCalled()
   })
 
-  it('shows Keine Berechtigung on 403', async () => {
+  it('shows Not allowed on 403', async () => {
     vi.mocked(portfolioApi.sellPosition).mockRejectedValue(new ApiError('Forbidden', 403))
     renderRow()
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf' }))
-    fireEvent.change(screen.getByLabelText('Verkaufsmenge'), { target: { value: '1' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Teilverkauf bestätigen' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Keine Berechtigung')
+    fireEvent.click(screen.getByRole('button', { name: 'Partial sale' }))
+    fireEvent.change(screen.getByLabelText('Quantity to sell'), { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm partial sale' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not allowed')
   })
 })

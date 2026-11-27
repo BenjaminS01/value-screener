@@ -21,12 +21,12 @@ describe('groupByStockGroup', () => {
       snap({ isin: '4', companyName: 'Nix', group: null }),
     ]
     const r = groupByStockGroup(s, groups)
-    expect(r.map((x) => x.title)).toEqual(['Technologie', 'Energie', 'Ohne Gruppe'])
+    expect(r.map((x) => x.title)).toEqual(['Technologie', 'Energie', 'No group'])
     expect(r[0].snapshots.map((x) => x.companyName)).toEqual(['Alpha', 'Zeta'])
   })
-  it('puts a snapshot with an unknown group key into Ohne Gruppe', () => {
+  it('puts a snapshot with an unknown group key into No group', () => {
     const r = groupByStockGroup([snap({ group: g('zzz', 'Zzz') })], groups)
-    expect(r.map((x) => x.title)).toEqual(['Ohne Gruppe'])
+    expect(r.map((x) => x.title)).toEqual(['No group'])
   })
 })
 
@@ -40,7 +40,7 @@ describe('groupByCountry', () => {
       snap({ isin: '5', country: '  ' }),
     ]
     const r = groupByCountry(s)
-    expect(r.map((x) => x.title)).toEqual(['DE', 'US', 'Ohne Land'])
+    expect(r.map((x) => x.title)).toEqual(['DE', 'US', 'No country'])
     expect(r[2].snapshots).toHaveLength(3)
   })
 })

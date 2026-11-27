@@ -11,16 +11,16 @@ interface LoginPageProps {
 
 function loginErrorMessage(e: unknown): string {
   if (e instanceof ApiError) {
-    if (e.status === 401) return 'Benutzername oder Passwort falsch'
+    if (e.status === 401) return 'Invalid username or password'
     if (e.status === 429) {
       if (e.retryAfterSeconds === null) {
-        return 'Zu viele Anmeldeversuche, bitte später erneut versuchen'
+        return 'Too many login attempts, please try again later'
       }
       const minutes = Math.max(1, Math.ceil(e.retryAfterSeconds / 60))
-      return `Zu viele Anmeldeversuche, bitte in ${minutes} Minuten erneut versuchen`
+      return `Too many login attempts, please try again in ${minutes} minutes`
     }
   }
-  return 'Anmeldung fehlgeschlagen'
+  return 'Login failed'
 }
 
 export function LoginPage({ onLoggedIn, navigate, notice }: LoginPageProps) {
@@ -45,11 +45,11 @@ export function LoginPage({ onLoggedIn, navigate, notice }: LoginPageProps) {
 
   return (
     <section>
-      <h1>Anmelden</h1>
+      <h1>Log in</h1>
       {notice && <p role="status">{notice}</p>}
       <form onSubmit={handleSubmit}>
         <label>
-          Benutzername
+          Username
           <input
             value={username}
             autoComplete="username"
@@ -57,7 +57,7 @@ export function LoginPage({ onLoggedIn, navigate, notice }: LoginPageProps) {
           />
         </label>
         <label>
-          Passwort
+          Password
           <input
             type="password"
             value={password}
@@ -66,16 +66,16 @@ export function LoginPage({ onLoggedIn, navigate, notice }: LoginPageProps) {
           />
         </label>
         <button type="submit" disabled={pending}>
-          Anmelden
+          Log in
         </button>
       </form>
       {error && <p role="alert">{error}</p>}
       <nav>
         <button type="button" onClick={() => navigate({ name: 'impressum' })}>
-          Impressum
+          Legal notice (Impressum)
         </button>
         <button type="button" onClick={() => navigate({ name: 'datenschutz' })}>
-          Datenschutz
+          Privacy (Datenschutz)
         </button>
       </nav>
     </section>

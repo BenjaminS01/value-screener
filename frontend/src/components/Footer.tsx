@@ -8,15 +8,14 @@ export function Footer({ navigate }: FooterProps) {
   return (
     <footer>
       <p>
-        Diese Anwendung ist ein technisches Demonstrationsprojekt. Alle dargestellten Inhalte sind
-        automatisiert erzeugte Analysen auf Basis öffentlich zugänglicher Daten und stellen keine
-        Anlageberatung oder Anlageempfehlung dar. Sie berücksichtigen keine individuellen
-        Anlageziele oder finanziellen Verhältnisse. Jegliche Entscheidung liegt in der
-        Verantwortung des Nutzers.
+        This application is a technical demo project. All content shown is automatically generated
+        analysis based on publicly available data and is not investment advice or a recommendation. It
+        does not take individual investment goals or financial circumstances into account. Every
+        decision is the user's own responsibility.
       </p>
       <nav>
-        <button onClick={() => navigate({ name: 'impressum' })}>Impressum</button>
-        <button onClick={() => navigate({ name: 'datenschutz' })}>Datenschutz</button>
+        <button onClick={() => navigate({ name: 'impressum' })}>Legal notice (Impressum)</button>
+        <button onClick={() => navigate({ name: 'datenschutz' })}>Privacy (Datenschutz)</button>
       </nav>
     </footer>
   )

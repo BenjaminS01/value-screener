@@ -33,20 +33,20 @@ describe('ResearchOverviewPage', () => {
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     expect(await screen.findByRole('heading', { name: 'Technologie' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Ohne Gruppe' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No group' })).toBeInTheDocument()
   })
 
-  it('marks stale snapshots as veraltet', async () => {
+  it('marks stale snapshots as Stale', async () => {
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
-    expect(screen.getAllByText('veraltet')).toHaveLength(1)
-    expect(within(screen.getByText('Apple Inc.').closest('li')!).getByText('veraltet')).toBeInTheDocument()
+    expect(screen.getAllByText('Stale')).toHaveLength(1)
+    expect(within(screen.getByText('Apple Inc.').closest('li')!).getByText('Stale')).toBeInTheDocument()
   })
 
   it('switches to country sections', async () => {
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
-    fireEvent.click(screen.getByLabelText('nach Land'))
+    fireEvent.click(screen.getByLabelText('by country'))
     expect(screen.getByRole('heading', { name: 'DE' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'US' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Technologie' })).not.toBeInTheDocument()
@@ -55,30 +55,30 @@ describe('ResearchOverviewPage', () => {
   it('search narrows the rows', async () => {
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
-    fireEvent.change(screen.getByLabelText('Suche'), { target: { value: 'sap' } })
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'sap' } })
     expect(screen.getByText('SAP SE')).toBeInTheDocument()
     expect(screen.queryByText('Apple Inc.')).not.toBeInTheDocument()
   })
 
-  it('marks held positions with im Portfolio', async () => {
+  it('marks held positions with In portfolio', async () => {
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     const row = (await screen.findByText('Apple Inc.')).closest('button')!
-    expect(within(row).getByText('im Portfolio')).toBeInTheDocument()
+    expect(within(row).getByText('In portfolio')).toBeInTheDocument()
     const other = screen.getByText('SAP SE').closest('button')!
-    expect(within(other).queryByText('im Portfolio')).not.toBeInTheDocument()
+    expect(within(other).queryByText('In portfolio')).not.toBeInTheDocument()
   })
 
   it('still shows the overview without markers when the portfolio fails', async () => {
     mockBackend(() => res(500, { error: 'boom' }))
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
     expect(await screen.findByText('Apple Inc.')).toBeInTheDocument()
-    expect(screen.queryByText('im Portfolio')).not.toBeInTheDocument()
+    expect(screen.queryByText('In portfolio')).not.toBeInTheDocument()
   })
 
   it('shows an error inline when snapshots fail', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(res(403, { error: 'Forbidden' }))))
     render(<ResearchOverviewPage user={user} navigate={vi.fn()} />)
-    expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument()
+    expect(await screen.findByText('Not allowed')).toBeInTheDocument()
   })
 
   it('clicking a row navigates to the detail view', async () => {

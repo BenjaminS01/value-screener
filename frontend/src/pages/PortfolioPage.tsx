@@ -46,7 +46,7 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
       setNotice(null)
       navigate({ name: 'researchDetail', isin })
     } else {
-      setNotice('Noch nicht recherchiert')
+      setNotice('Not researched yet')
     }
   }
 
@@ -56,19 +56,19 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
       {notice && <p>{notice}</p>}
       {error && <p role="alert">{error}</p>}
       {writeMessage && <p role="alert">{writeMessage}</p>}
-      <h2>Gehaltene Positionen</h2>
+      <h2>Holdings</h2>
       <table>
         <thead>
           <tr>
-            <th>Unternehmen</th>
+            <th>Company</th>
             <th>Ticker</th>
-            <th>Gruppe</th>
+            <th>Group</th>
             {isAdmin && (
               <>
-                <th>Stückzahl</th>
-                <th>Einstandskurs</th>
-                <th>Kaufdatum</th>
-                <th>Aktionen</th>
+                <th>Quantity</th>
+                <th>Entry price</th>
+                <th>Purchase date</th>
+                <th>Actions</th>
               </>
             )}
           </tr>
@@ -98,7 +98,7 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
       </table>
       {isAdmin && (
         <>
-          <h2>Position kaufen</h2>
+          <h2>Buy position</h2>
           <AddPositionForm onAdded={handleChanged} />
         </>
       )}

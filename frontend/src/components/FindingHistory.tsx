@@ -9,7 +9,7 @@ export function FindingHistory({ entries }: { entries: FindingHistoryEntry[] }) 
   return (
     <div>
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
-        Verlauf ({entries.length})
+        History ({entries.length})
       </button>
       {open && (
         <ul>
@@ -19,12 +19,12 @@ export function FindingHistory({ entries }: { entries: FindingHistoryEntry[] }) 
               <span>{formatDate(e.asOfDate)}</span>{' '}
               {isSafeHttpUrl(e.sourceUrl) ? (
                 <a href={e.sourceUrl} target="_blank" rel="noopener noreferrer">
-                  Quelle
+                  Source
                 </a>
               ) : (
                 <span>{e.sourceUrl}</span>
               )}{' '}
-              <span>ersetzt am {formatDate(e.replacedAt)}</span>
+              <span>replaced on {formatDate(e.replacedAt)}</span>
             </li>
           ))}
         </ul>

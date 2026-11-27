@@ -7,15 +7,15 @@ describe('Footer', () => {
     render(<Footer navigate={vi.fn()} />)
 
     const footer = screen.getByRole('contentinfo')
-    expect(footer.textContent).toContain('keine Anlageberatung oder Anlageempfehlung dar')
+    expect(footer.textContent).toContain('is not investment advice or a recommendation')
   })
 
   it('navigates to the legal pages', () => {
     const navigate = vi.fn()
     render(<Footer navigate={navigate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Impressum' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Legal notice (Impressum)' }))
     expect(navigate).toHaveBeenCalledWith({ name: 'impressum' })
-    fireEvent.click(screen.getByRole('button', { name: 'Datenschutz' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Privacy (Datenschutz)' }))
     expect(navigate).toHaveBeenCalledWith({ name: 'datenschutz' })
   })
 })

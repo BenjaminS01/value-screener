@@ -48,7 +48,7 @@ describe('App', () => {
   it('shows the login page when /api/auth/me returns 401', async () => {
     stubFetch({ 'GET /api/auth/me': () => res(401, { error: 'Authentication required' }) })
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Portfolio' })).not.toBeInTheDocument()
   })
 
@@ -59,7 +59,7 @@ describe('App', () => {
     expect(screen.getByText('ben (ADMIN)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Portfolio' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Research' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Abmelden' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
   })
 
   it('logout returns to the login page', async () => {
@@ -68,13 +68,13 @@ describe('App', () => {
       'POST /api/auth/logout': () => res(204),
     })
     render(<App />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Abmelden' }))
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Log out' }))
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/auth/logout',
       expect.objectContaining({ method: 'POST' }),
     )
-    expect(screen.queryByText('Sitzung abgelaufen, bitte erneut anmelden')).not.toBeInTheDocument()
+    expect(screen.queryByText('Session expired, please log in again')).not.toBeInTheDocument()
   })
 
   it('logout after the session expired ends cleanly on the login page', async () => {
@@ -83,19 +83,19 @@ describe('App', () => {
       'POST /api/auth/logout': () => res(401, { error: 'Authentication required' }),
     })
     render(<App />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Abmelden' }))
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Log out' }))
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
     expect(fetchMock.mock.calls.filter(([p]) => p === '/api/auth/me')).toHaveLength(1)
-    expect(screen.queryByText('Sitzung abgelaufen, bitte erneut anmelden')).not.toBeInTheDocument()
+    expect(screen.queryByText('Session expired, please log in again')).not.toBeInTheDocument()
   })
 
   it('Impressum and Datenschutz are reachable without login', async () => {
     stubFetch({ 'GET /api/auth/me': () => res(401, { error: 'Authentication required' }) })
     render(<App />)
-    await screen.findByRole('heading', { name: 'Anmelden' })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Impressum' })[0])
+    await screen.findByRole('heading', { name: 'Log in' })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Legal notice (Impressum)' })[0])
     expect(screen.getByRole('heading', { name: 'Impressum' })).toBeInTheDocument()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Datenschutz' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Privacy (Datenschutz)' })[0])
     expect(screen.getByRole('heading', { name: 'Datenschutz' })).toBeInTheDocument()
   })
 
@@ -106,8 +106,8 @@ describe('App', () => {
     })
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: 'Portfolio' }))
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
-    expect(screen.getByText('Sitzung abgelaufen, bitte erneut anmelden')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+    expect(screen.getByText('Session expired, please log in again')).toBeInTheDocument()
     await waitFor(() => {
       expect(fetchMock.mock.calls.filter(([p]) => p === '/api/auth/me')).toHaveLength(1)
     })

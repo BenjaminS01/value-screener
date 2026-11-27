@@ -19,16 +19,16 @@ describe('FindingHistory', () => {
   it('shows a collapsed toggle with the count and expands on click', () => {
     render(<FindingHistory entries={[entry({ claim: 'neuer' }), entry({ claim: 'aelter', numericValue: null, booleanValue: true })]} />)
     expect(screen.queryByText('neuer')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Verlauf (2)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'History (2)' }))
     expect(screen.getByText('neuer')).toBeInTheDocument()
     expect(screen.getByText('aelter')).toBeInTheDocument()
-    expect(screen.getByText('ja')).toBeInTheDocument()
-    expect(screen.getAllByText('ersetzt am 02.03.2026')).toHaveLength(2)
+    expect(screen.getByText('yes')).toBeInTheDocument()
+    expect(screen.getAllByText('replaced on 02 Mar 2026')).toHaveLength(2)
   })
 
   it('keeps the given order and renders unsafe urls as text', () => {
     render(<FindingHistory entries={[entry({ claim: 'first' }), entry({ claim: 'second', sourceUrl: 'javascript:alert(1)' })]} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Verlauf (2)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'History (2)' }))
     const items = screen.getAllByRole('listitem')
     expect(items[0]).toHaveTextContent('first')
     expect(items[1]).toHaveTextContent('second')

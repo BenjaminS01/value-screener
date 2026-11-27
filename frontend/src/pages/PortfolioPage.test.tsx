@@ -41,13 +41,13 @@ describe('PortfolioPage', () => {
     render(<PortfolioPage user={user} navigate={vi.fn()} />)
     expect(await screen.findByText('Apple Inc.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Portfolio' })).toBeInTheDocument()
-    for (const name of ['Unternehmen', 'Ticker', 'Gruppe']) {
+    for (const name of ['Company', 'Ticker', 'Group']) {
       expect(screen.getByRole('columnheader', { name })).toBeInTheDocument()
     }
-    for (const name of ['Stückzahl', 'Einstandskurs', 'Kaufdatum']) {
+    for (const name of ['Quantity', 'Entry price', 'Purchase date']) {
       expect(screen.queryByText(name)).not.toBeInTheDocument()
     }
-    for (const name of ['Kaufen', 'Teilverkauf', 'Korrigieren', 'Löschen']) {
+    for (const name of ['Buy', 'Partial sale', 'Correct', 'Delete']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
     expect(screen.queryByText('5')).not.toBeInTheDocument()
@@ -62,34 +62,34 @@ describe('PortfolioPage', () => {
     expect(screen.getByText('Technologie')).toBeInTheDocument()
   })
 
-  it('ADMIN sees extra columns with de-DE values and action buttons', async () => {
+  it('ADMIN sees extra columns with en-US values and action buttons', async () => {
     mockBackend(adminRows)
     render(<PortfolioPage user={admin} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
-    for (const name of ['Stückzahl', 'Einstandskurs', 'Kaufdatum']) {
+    for (const name of ['Quantity', 'Entry price', 'Purchase date']) {
       expect(screen.getByRole('columnheader', { name })).toBeInTheDocument()
     }
-    expect(screen.getByText('1.234')).toBeInTheDocument()
-    expect(screen.getByText('1.234,50')).toBeInTheDocument()
-    expect(screen.getByText('15.01.2026')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Teilverkauf' })).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: 'Korrigieren' })).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: 'Löschen' })).toHaveLength(2)
-    expect(screen.getByRole('button', { name: 'Kaufen' })).toBeInTheDocument()
+    expect(screen.getByText('1,234')).toBeInTheDocument()
+    expect(screen.getByText('1,234.50')).toBeInTheDocument()
+    expect(screen.getByText('15 Jan 2026')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Partial sale' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Correct' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Buy' })).toBeInTheDocument()
   })
 
   it('separates held positions and the buy form with headings; USER sees no buy heading', async () => {
     mockBackend(adminRows)
     const { unmount } = render(<PortfolioPage user={admin} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
-    expect(screen.getByRole('heading', { level: 2, name: 'Gehaltene Positionen' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Position kaufen' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Holdings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Buy position' })).toBeInTheDocument()
     unmount()
     mockBackend(userRows)
     render(<PortfolioPage user={user} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
-    expect(screen.getByRole('heading', { level: 2, name: 'Gehaltene Positionen' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Position kaufen' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Holdings' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Buy position' })).not.toBeInTheDocument()
   })
 
   it('click on a researched position navigates to the detail', async () => {
@@ -105,7 +105,7 @@ describe('PortfolioPage', () => {
     const navigate = vi.fn()
     render(<PortfolioPage user={user} navigate={navigate} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Microsoft Corp.' }))
-    expect(await screen.findByText('Noch nicht recherchiert')).toBeInTheDocument()
+    expect(await screen.findByText('Not researched yet')).toBeInTheDocument()
     expect(navigate).not.toHaveBeenCalled()
   })
 
@@ -115,7 +115,7 @@ describe('PortfolioPage', () => {
     render(<PortfolioPage user={admin} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
     const row = screen.getByText('Apple Inc.').closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: 'Löschen' }))
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }))
     expect(window.confirm).toHaveBeenCalled()
     await waitFor(() => {
       const gets = mock.mock.calls.filter(([u, o]) => u === '/api/portfolio' && (o?.method ?? 'GET') === 'GET')
@@ -129,25 +129,25 @@ describe('PortfolioPage', () => {
     render(<PortfolioPage user={admin} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
     const row = screen.getByText('Apple Inc.').closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: 'Korrigieren' }))
-    fireEvent.change(within(row).getByLabelText('Stückzahl'), { target: { value: '1' } })
-    fireEvent.click(within(row).getByRole('button', { name: 'Speichern' }))
-    expect(await screen.findByText('Die Position wurde inzwischen geändert, bitte neu laden')).toBeInTheDocument()
+    fireEvent.click(within(row).getByRole('button', { name: 'Correct' }))
+    fireEvent.change(within(row).getByLabelText('Quantity'), { target: { value: '1' } })
+    fireEvent.click(within(row).getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('The position was changed in the meantime, please reload')).toBeInTheDocument()
     await waitFor(() => {
       const gets = mock.mock.calls.filter(([u, o]) => u === '/api/portfolio' && (o?.method ?? 'GET') === 'GET')
       expect(gets).toHaveLength(2)
     })
-    expect(screen.getByText('Die Position wurde inzwischen geändert, bitte neu laden')).toBeInTheDocument()
+    expect(screen.getByText('The position was changed in the meantime, please reload')).toBeInTheDocument()
   })
 
-  it('shows Keine Berechtigung on a 403 write', async () => {
+  it('shows Not allowed on a 403 write', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     mockBackend(adminRows, (_u, method) => (method === 'DELETE' ? res(403, { error: 'Forbidden' }) : res(404, {})))
     render(<PortfolioPage user={admin} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
     const row = screen.getByText('Apple Inc.').closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: 'Löschen' }))
-    expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument()
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }))
+    expect(await screen.findByText('Not allowed')).toBeInTheDocument()
   })
 
   it('shows an error when loading fails', async () => {
@@ -173,10 +173,10 @@ describe('PortfolioPage', () => {
     render(<PortfolioPage user={admin} navigate={vi.fn()} />)
     await screen.findByText('Apple Inc.')
     const row = screen.getByText('Apple Inc.').closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: 'Löschen' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Keine Berechtigung')
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not allowed')
     expect(screen.getByRole('heading', { name: 'Portfolio' })).toBeInTheDocument()
     expect(screen.getByText('Apple Inc.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Kaufen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Buy' })).toBeInTheDocument()
   })
 })
