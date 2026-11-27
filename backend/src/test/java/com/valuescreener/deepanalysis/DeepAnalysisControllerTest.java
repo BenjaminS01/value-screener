@@ -52,7 +52,7 @@ class DeepAnalysisControllerTest {
     private CompanySnapshotService snapshotService;
 
     private static DeepAnalysisResult result() {
-        return new DeepAnalysisResult("NOT_IMPLEMENTED", "Noch nicht implementiert", "Hallo von AWS Lambda",
+        return new DeepAnalysisResult("NOT_IMPLEMENTED", "Not implemented yet", "Hello from AWS Lambda",
                 "deep-analysis-demo", "$LATEST", "eu-central-1", 512, "req-1", true,
                 Instant.parse("2026-11-12T10:00:00Z"), DeepAnalysisResult.Source.LAMBDA);
     }
@@ -145,7 +145,7 @@ class DeepAnalysisControllerTest {
 
         mockMvc.perform(post(URL).with(user("alice").roles("USER")).with(csrf()))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(content().json("{\"error\":\"Tageslimit für die Tiefenanalyse erreicht\"}", true));
+                .andExpect(content().json("{\"error\":\"Daily limit for deep analysis reached\"}", true));
         verifyNoInteractions(invoker);
     }
 
@@ -156,7 +156,7 @@ class DeepAnalysisControllerTest {
 
         mockMvc.perform(post(URL).with(user("alice").roles("USER")).with(csrf()))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(content().json("{\"error\":\"Tageslimit der Anwendung erreicht\"}", true));
+                .andExpect(content().json("{\"error\":\"Daily limit of the application reached\"}", true));
         verifyNoInteractions(invoker);
     }
 
@@ -167,7 +167,7 @@ class DeepAnalysisControllerTest {
 
         mockMvc.perform(post(URL).with(user("alice").roles("USER")).with(csrf()))
                 .andExpect(status().isBadGateway())
-                .andExpect(content().json("{\"error\":\"Tiefenanalyse nicht verfügbar\"}", true));
+                .andExpect(content().json("{\"error\":\"Deep analysis unavailable\"}", true));
     }
 
     @Test

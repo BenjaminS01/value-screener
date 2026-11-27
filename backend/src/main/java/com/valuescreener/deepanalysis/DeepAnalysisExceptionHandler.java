@@ -26,15 +26,15 @@ public class DeepAnalysisExceptionHandler {
     @ExceptionHandler(LimitReachedException.class)
     public ResponseEntity<Map<String, String>> limitReached(LimitReachedException e) {
         String message = e.scope() == LimitReachedException.Scope.GLOBAL
-                ? "Tageslimit der Anwendung erreicht"
-                : "Tageslimit für die Tiefenanalyse erreicht";
+                ? "Daily limit of the application reached"
+                : "Daily limit for deep analysis reached";
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error", message));
     }
 
     @ExceptionHandler(DeepAnalysisUnavailableException.class)
     public ResponseEntity<Map<String, String>> unavailable(DeepAnalysisUnavailableException e) {
         log.warn("Deep analysis unavailable", e);
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "Tiefenanalyse nicht verfügbar"));
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "Deep analysis unavailable"));
     }
 
     /** Usage counter lost against concurrent requests; the client may simply retry. */

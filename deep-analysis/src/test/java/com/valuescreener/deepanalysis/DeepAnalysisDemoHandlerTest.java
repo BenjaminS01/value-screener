@@ -31,9 +31,9 @@ class DeepAnalysisDemoHandlerTest {
         DeepAnalysisResponse r = handler.handleRequest(new DeepAnalysisRequest("US0378331005"), new TestContext());
 
         assertEquals("NOT_IMPLEMENTED", r.status());
-        assertEquals("Noch nicht implementiert – hier wird künftig eine Tiefenanalyse für US0378331005 ausgegeben.",
+        assertEquals("Not implemented yet – a deep analysis for US0378331005 will appear here later.",
                 r.message());
-        assertEquals("Hallo von AWS Lambda", r.greeting());
+        assertEquals("Hello from AWS Lambda", r.greeting());
         assertEquals("deep-analysis-demo", r.functionName());
         assertEquals("7", r.functionVersion());
         assertEquals(512, r.memoryLimitMb());
@@ -55,7 +55,7 @@ class DeepAnalysisDemoHandlerTest {
         DeepAnalysisResponse r = handler.handleRequest(new DeepAnalysisRequest("X"), new TestContext());
 
         assertEquals("INVALID_REQUEST", r.status());
-        assertEquals("Ungültige ISIN", r.message());
+        assertEquals("Invalid ISIN", r.message());
     }
 
     @Test

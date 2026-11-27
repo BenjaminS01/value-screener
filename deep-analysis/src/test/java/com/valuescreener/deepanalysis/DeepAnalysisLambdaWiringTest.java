@@ -38,7 +38,7 @@ class DeepAnalysisLambdaWiringTest {
         JsonNode json = new ObjectMapper().readTree(response.body());
         assertEquals("NOT_IMPLEMENTED", json.get("status").asText());
         assertTrue(json.get("message").asText().contains("US0378331005"));
-        assertEquals("Hallo von AWS Lambda", json.get("greeting").asText());
+        assertEquals("Hello from AWS Lambda", json.get("greeting").asText());
         assertFalse(json.get("awsRequestId").asText().isBlank());
         assertFalse(response.body().contains("arn:"));
     }

@@ -35,9 +35,9 @@ public class DeepAnalysisDemoHandler implements RequestHandler<DeepAnalysisReque
         return new DeepAnalysisResponse(
                 valid ? "NOT_IMPLEMENTED" : "INVALID_REQUEST",
                 valid
-                        ? "Noch nicht implementiert – hier wird künftig eine Tiefenanalyse für " + isin + " ausgegeben."
-                        : "Ungültige ISIN",
-                "Hallo von AWS Lambda",
+                        ? "Not implemented yet – a deep analysis for " + isin + " will appear here later."
+                        : "Invalid ISIN",
+                "Hello from AWS Lambda",
                 context.getFunctionName(),
                 context.getFunctionVersion(),
                 region(),

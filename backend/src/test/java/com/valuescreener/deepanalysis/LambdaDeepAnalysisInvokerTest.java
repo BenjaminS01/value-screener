@@ -24,7 +24,7 @@ class LambdaDeepAnalysisInvokerTest {
 
     private static final String ARN = "arn:aws:lambda:eu-central-1:123456789012:function:secret-fn";
     private static final String OK = """
-            {"status":"NOT_IMPLEMENTED","message":"Noch nicht implementiert","greeting":"Hallo von AWS Lambda",
+            {"status":"NOT_IMPLEMENTED","message":"Not implemented yet","greeting":"Hello from AWS Lambda",
              "functionName":"deep-analysis-demo","functionVersion":"$LATEST","region":"eu-central-1",
              "memoryLimitMb":512,"awsRequestId":"req-1","coldStart":true,"invokedAt":"2026-11-12T10:15:30.123Z"}
             """;
@@ -50,7 +50,7 @@ class LambdaDeepAnalysisInvokerTest {
         DeepAnalysisResult r = invoker.invoke("US0378331005");
 
         assertThat(r.status()).isEqualTo("NOT_IMPLEMENTED");
-        assertThat(r.greeting()).isEqualTo("Hallo von AWS Lambda");
+        assertThat(r.greeting()).isEqualTo("Hello from AWS Lambda");
         assertThat(r.functionName()).isEqualTo("deep-analysis-demo");
         assertThat(r.functionVersion()).isEqualTo("$LATEST");
         assertThat(r.region()).isEqualTo("eu-central-1");

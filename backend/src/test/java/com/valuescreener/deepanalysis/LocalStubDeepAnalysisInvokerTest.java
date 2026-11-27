@@ -22,8 +22,8 @@ class LocalStubDeepAnalysisInvokerTest {
         assertThat(r.source()).isEqualTo(DeepAnalysisResult.Source.LOCAL_STUB);
         assertThat(r.status()).isEqualTo("NOT_IMPLEMENTED");
         assertThat(r.message()).isEqualTo(
-                "Noch nicht implementiert – hier wird künftig eine Tiefenanalyse für US0378331005 ausgegeben.");
-        assertThat(r.greeting()).isEqualTo("Lokale Simulation – keine AWS-Lambda aufgerufen");
+                "Not implemented yet – a deep analysis for US0378331005 will appear here later.");
+        assertThat(r.greeting()).isEqualTo("Local simulation – no AWS Lambda was called");
         assertThat(r.functionName()).isEqualTo("local-stub");
         assertThat(r.functionVersion()).isEqualTo("local");
         assertThat(r.region()).isEqualTo("local");
