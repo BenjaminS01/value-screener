@@ -5,8 +5,8 @@ export interface Section {
   snapshots: SnapshotSummary[]
 }
 
-const NO_GROUP = 'Ohne Gruppe'
-const NO_COUNTRY = 'Ohne Land'
+const NO_GROUP = 'No group'
+const NO_COUNTRY = 'No country'
 
 function byName(a: SnapshotSummary, b: SnapshotSummary): number {
   return a.companyName.localeCompare(b.companyName, 'de')

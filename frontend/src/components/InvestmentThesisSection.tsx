@@ -10,10 +10,9 @@ interface Props {
   isin: string
 }
 
-const CONFLICT = 'Die These wurde inzwischen geändert, bitte neu laden'
-const STATUS_LABELS: Record<ThesisStatus, string> = { WATCHING: 'Beobachten', REJECTED: 'Abgelehnt' }
+const CONFLICT = 'The thesis was changed in the meantime, please reload'
+const STATUS_LABELS: Record<ThesisStatus, string> = { WATCHING: 'Watching', REJECTED: 'Rejected' }
 // React renders these strings as text nodes (never HTML); pre-wrap keeps the line breaks.
-const PRE_WRAP = { whiteSpace: 'pre-wrap' } as const
 
 interface FormState {
   whyInteresting: string
@@ -33,10 +32,27 @@ function toForm(t: InvestmentThesis | null): FormState {
   }
 }
 
-function statusLine(t: InvestmentThesis): string {
-  if (t.holding) return 'Halte ich'
-  if (t.status === null) return 'Kein Status'
-  return t.statusReason ? `${STATUS_LABELS[t.status]}: ${t.statusReason}` : STATUS_LABELS[t.status]
+const STATUS_BADGE: Record<ThesisStatus, string> = { WATCHING: 'badge--watching', REJECTED: 'badge--rejected' }
+
+function StatusLine({ thesis: t }: { thesis: InvestmentThesis }) {
+  if (t.holding)
+    return (
+      <p>
+        <span className="badge badge--holding">Holding</span>
+      </p>
+    )
+  if (t.status === null)
+    return (
+      <p>
+        <span className="badge badge--muted">No status</span>
+      </p>
+    )
+  return (
+    <p>
+      <span className={`badge ${STATUS_BADGE[t.status]}`}>{STATUS_LABELS[t.status]}</span>
+      {t.statusReason && <> {t.statusReason}</>}
+    </p>
+  )
 }
 
 export function InvestmentThesisSection({ user, isin }: Props) {
@@ -111,30 +127,30 @@ export function InvestmentThesisSection({ user, isin }: Props) {
   const holding = thesis?.holding ?? false
 
   return (
-    <div>
-      <h2>Investment-These</h2>
-      <p>Persönliche Einschätzung des Betreibers, keine Anlageempfehlung.</p>
-      {loading && <p>Lade …</p>}
+    <div className="card">
+      <h2>Investment thesis</h2>
+      <p className="muted">Personal view of the operator, not investment advice.</p>
+      {loading && <p className="muted">Loading …</p>}
       {loadError !== null && <p role="alert">{loadError}</p>}
       {!loading && loadError === null && !editing && (
         <>
           {thesis === null ? (
-            <p>Noch keine Investment-These</p>
+            <p className="muted">No investment thesis yet</p>
           ) : (
             <>
-              <h3>Warum interessant</h3>
-              <p style={PRE_WRAP}>{thesis.whyInteresting}</p>
-              <h3>Erwartete Entwicklung</h3>
-              <p style={PRE_WRAP}>{thesis.expectedDevelopment}</p>
-              <h3>Wann verkaufen oder verwerfen</h3>
-              <p style={PRE_WRAP}>{thesis.exitCriteria}</p>
-              <p>{statusLine(thesis)}</p>
-              <p>Aktualisiert am {formatDate(thesis.updatedAt)}</p>
+              <h3>Why interesting</h3>
+              <p className="pre-wrap">{thesis.whyInteresting}</p>
+              <h3>Expected development</h3>
+              <p className="pre-wrap">{thesis.expectedDevelopment}</p>
+              <h3>When to sell or drop</h3>
+              <p className="pre-wrap">{thesis.exitCriteria}</p>
+              <StatusLine thesis={thesis} />
+              <p className="muted">Updated on {formatDate(thesis.updatedAt)}</p>
             </>
           )}
           {user.role === 'ADMIN' && (
             <button type="button" onClick={startEdit}>
-              These bearbeiten
+              Edit thesis
             </button>
           )}
         </>
@@ -145,34 +161,37 @@ export function InvestmentThesisSection({ user, isin }: Props) {
             e.preventDefault()
             void save()
           }}
-          aria-label="Investment-These bearbeiten"
+          aria-label="Edit investment thesis"
         >
           <label>
-            Warum interessant
-            <textarea value={form.whyInteresting} onChange={(e) => setForm({ ...form, whyInteresting: e.target.value })} />
+            Why interesting
+            <textarea
+              value={form.whyInteresting}
+              onChange={(e) => setForm({ ...form, whyInteresting: e.target.value })}
+            />
           </label>
           <label>
-            Erwartete Entwicklung
+            Expected development
             <textarea
               value={form.expectedDevelopment}
               onChange={(e) => setForm({ ...form, expectedDevelopment: e.target.value })}
             />
           </label>
           <label>
-            Wann verkaufen oder verwerfen
+            When to sell or drop
             <textarea value={form.exitCriteria} onChange={(e) => setForm({ ...form, exitCriteria: e.target.value })} />
           </label>
           <label>
             Status
             <select value={form.status ?? ''} onChange={(e) => setStatus(e.target.value)} disabled={holding}>
-              <option value="">Kein Status</option>
-              <option value="WATCHING">Beobachten</option>
-              <option value="REJECTED">Abgelehnt</option>
+              <option value="">No status</option>
+              <option value="WATCHING">Watching</option>
+              <option value="REJECTED">Rejected</option>
             </select>
           </label>
-          {holding && <p>Status gilt nicht, solange die Position gehalten wird</p>}
+          {holding && <p>Status does not apply while the position is held</p>}
           <label>
-            Begründung
+            Reason
             <input
               value={form.statusReason}
               onChange={(e) => setForm({ ...form, statusReason: e.target.value })}
@@ -180,10 +199,10 @@ export function InvestmentThesisSection({ user, isin }: Props) {
             />
           </label>
           <button type="submit" disabled={saving}>
-            Speichern
+            Save
           </button>
           <button type="button" onClick={() => setEditing(false)} disabled={saving}>
-            Abbrechen
+            Cancel
           </button>
           {saveError !== null && <p role="alert">{saveError}</p>}
         </form>

@@ -7,24 +7,24 @@ export function FindingHistory({ entries }: { entries: FindingHistoryEntry[] }) 
   const [open, setOpen] = useState(false)
   if (entries.length === 0) return null
   return (
-    <div>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
-        Verlauf ({entries.length})
+    <div className="history">
+      <button type="button" className="btn-link" aria-expanded={open} onClick={() => setOpen(!open)}>
+        History ({entries.length})
       </button>
       {open && (
         <ul>
           {entries.map((e, i) => (
             <li key={i}>
               {formatValue(e) !== null && <strong>{formatValue(e)}</strong>} <span>{e.claim}</span>{' '}
-              <span>{formatDate(e.asOfDate)}</span>{' '}
+              <span className="date">{formatDate(e.asOfDate)}</span>{' '}
               {isSafeHttpUrl(e.sourceUrl) ? (
                 <a href={e.sourceUrl} target="_blank" rel="noopener noreferrer">
-                  Quelle
+                  Source
                 </a>
               ) : (
                 <span>{e.sourceUrl}</span>
               )}{' '}
-              <span>ersetzt am {formatDate(e.replacedAt)}</span>
+              <span>replaced on {formatDate(e.replacedAt)}</span>
             </li>
           ))}
         </ul>

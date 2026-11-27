@@ -18,8 +18,8 @@ public class LocalStubDeepAnalysisInvoker implements DeepAnalysisInvoker {
         String normalized = isin.trim().toUpperCase(Locale.ROOT);
         return new DeepAnalysisResult(
                 "NOT_IMPLEMENTED",
-                "Noch nicht implementiert – hier wird künftig eine Tiefenanalyse für " + normalized + " ausgegeben.",
-                "Lokale Simulation – keine AWS-Lambda aufgerufen",
+                "Not implemented yet – a deep analysis for " + normalized + " will appear here later.",
+                "Local simulation – no AWS Lambda was called",
                 "local-stub", "local", "local", 0,
                 UUID.randomUUID().toString(), false, clock.instant(),
                 DeepAnalysisResult.Source.LOCAL_STUB);

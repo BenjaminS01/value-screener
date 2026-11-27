@@ -1,6 +1,34 @@
 # Projektstatus: Value Screener
 
-Letztes Update: 2026-11-26
+Letztes Update: 2026-11-27
+
+## Showcase polish (2026-11-27, branch `feature/showcase-polish`, PR open)
+
+Spec `docs/superpowers/specs/2026-11-26-showcase-polish-design.md`, plan
+`docs/superpowers/plans/2026-11-26-showcase-polish.md`.
+
+- **English everywhere:** UI texts, error messages, footer disclaimer, thesis note, backend deep-analysis messages,
+  the deep-analysis Lambda and the thesis purchase note ("Buy:" instead of "Kauf:"; stored old notes stay as data).
+  Impressum and Datenschutz content stays German; links read "Legal notice (Impressum)" / "Privacy (Datenschutz)".
+  Dates `en-GB` ("15 Jan 2026"), numbers `en-US`; input still accepts `,` and `.`.
+- **Design:** one global `frontend/src/styles.css` (no new dependency, CSP-safe), cards, header with active page,
+  research list as column rows, criteria grid, status badges ("In portfolio", "Stale", "Holding", "Watching",
+  "Rejected", "Not researched"). Compact list below 800 px.
+- **Project overview** (`ProjectOverview`) on the login page and the start page; portfolio wording "The operator's
+  personal portfolio, shown as an example and not as investment advice." Unused `LandingPage` removed.
+- **README** rewritten in English for recruiters: features, research flow and architecture as Mermaid, security in
+  general terms only, built vs. roadmap, six screenshots in `docs/images/`, developer section shortened. The local
+  research skill is described as an interim way to create sample data until the in-app deep analysis exists.
+- Final review: two Important findings fixed (German "Kauf:", list overflow at 641-720 px). Tests: backend green,
+  frontend 175.
+- **Deferred minors:** portfolio screenshot (German date placeholder, cut-off "Log out", shows "admin"), README roles
+  table mentions rough account counts, unused `.facts` CSS, legal links shown twice on the login page.
+- **Next:** user pushes and opens the PR; after merge a `v3.3.0` tag deploys. Then check live: login page overview,
+  English texts, badges.
+
+**Deutsche Kurzfassung:** Die App ist jetzt komplett englisch (Rechtstexte bleiben deutsch), hat ein ruhiges Design
+mit Karten und farbigen Badges und zeigt auf Login- und Startseite eine kurze Projektübersicht. Die README ist für
+Recruiter neu geschrieben, mit Diagrammen und Screenshots. Nach dem Merge deployt ein `v3.3.0`-Tag.
 
 ## Task 11: lighter research list, live (2026-11-26, PR #11, tag `v3.2.0`)
 

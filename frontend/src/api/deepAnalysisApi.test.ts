@@ -27,8 +27,8 @@ describe('deepAnalysisApi', () => {
 
   it('runDeepAnalysis surfaces the backend error message', async () => {
     fetchMock().mockResolvedValue(
-      new Response(JSON.stringify({ error: 'Tageslimit für die Tiefenanalyse erreicht' }), { status: 429 }),
+      new Response(JSON.stringify({ error: 'Daily limit for deep analysis reached' }), { status: 429 }),
     )
-    await expect(runDeepAnalysis('US0378331005')).rejects.toThrow('Tageslimit für die Tiefenanalyse erreicht')
+    await expect(runDeepAnalysis('US0378331005')).rejects.toThrow('Daily limit for deep analysis reached')
   })
 })

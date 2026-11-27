@@ -75,7 +75,7 @@ public class InvestmentThesis {
 
     /** Appends a dated paragraph to {@code whyInteresting}; existing text is never changed. */
     public void appendPurchaseReason(String reason, LocalDate date, Instant now) {
-        String paragraph = "[" + date + "] Kauf: " + reason.trim();
+        String paragraph = "[" + date + "] Buy: " + reason.trim();
         String combined = whyInteresting == null ? paragraph : whyInteresting + "\n\n" + paragraph;
         requireMaxLength(combined);
         Objects.requireNonNull(now, "now must not be null");

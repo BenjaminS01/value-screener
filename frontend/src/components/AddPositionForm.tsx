@@ -3,7 +3,7 @@ import { writeErrorText } from '../api/errorText'
 import { parseDecimal } from '../api/parseDecimal'
 import { buyPosition } from '../api/portfolioApi'
 
-const INVALID_NUMBER = 'Bitte eine gültige Zahl eingeben'
+const INVALID_NUMBER = 'Please enter a valid number'
 
 interface AddPositionFormProps {
   onAdded: () => void
@@ -56,7 +56,7 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Position kaufen">
+    <form onSubmit={handleSubmit} aria-label="Buy position" className="form-grid">
       <label>
         Ticker
         <input value={ticker} onChange={(e) => setTicker(e.target.value)} />
@@ -66,29 +66,31 @@ export function AddPositionForm({ onAdded }: AddPositionFormProps) {
         <input value={isin} onChange={(e) => setIsin(e.target.value)} />
       </label>
       <label>
-        Unternehmen
+        Company
         <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
       </label>
       <label>
-        Stückzahl
+        Quantity
         <input value={quantity} onChange={(e) => setQuantity(e.target.value)} />
       </label>
       <label>
-        Einstandskurs
+        Entry price
         <input value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} />
       </label>
       <label>
-        Kaufdatum
+        Purchase date
         <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
       </label>
-      <label>
-        Warum kaufst du? (optional, wird an die Investment-These angehängt)
+      <label className="full">
+        Why are you buying? (optional, appended to the investment thesis)
         <textarea value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} />
       </label>
-      <button type="submit" disabled={pending}>
-        Kaufen
-      </button>
-      {error && <p role="alert">{error}</p>}
+      <div className="full">
+        <button type="submit" disabled={pending}>
+          Buy
+        </button>
+        {error && <p role="alert">{error}</p>}
+      </div>
     </form>
   )
 }

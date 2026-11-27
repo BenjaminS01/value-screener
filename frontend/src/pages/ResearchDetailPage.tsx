@@ -17,12 +17,7 @@ import { InvestmentThesisSection } from '../components/InvestmentThesisSection'
 import { FindingHistory } from '../components/FindingHistory'
 import { formatDate, formatValue } from '../research/format'
 import { DeepAnalysisSection } from '../components/DeepAnalysisSection'
-import {
-  CRITERION_LABELS,
-  FUNDAMENTAL_CRITERIA,
-  isSafeHttpUrl,
-  QUALITATIVE_CRITERIA,
-} from '../research/criteria'
+import { CRITERION_LABELS, FUNDAMENTAL_CRITERIA, isSafeHttpUrl, QUALITATIVE_CRITERIA } from '../research/criteria'
 
 interface Props {
   user: AuthUser
@@ -30,7 +25,7 @@ interface Props {
   navigate: Navigate
 }
 
-const PLACEHOLDER = 'Folgt in einer späteren Phase'
+const PLACEHOLDER = 'Coming in a later phase'
 
 function CriteriaList({
   keys,
@@ -42,23 +37,23 @@ function CriteriaList({
   history: FindingHistoryEntry[]
 }) {
   return (
-    <dl>
+    <dl className="criteria">
       {keys.map((key) => {
         const finding = findings.find((f) => f.criterionKey === key)
         return (
-          <div key={key}>
+          <div key={key} className="criteria__row">
             <dt>{CRITERION_LABELS[key]}</dt>
             <dd>
               {finding === undefined ? (
-                <span>nicht recherchiert</span>
+                <span className="badge badge--muted">Not researched</span>
               ) : (
                 <>
-                  {formatValue(finding) !== null && <strong>{formatValue(finding)}</strong>}{' '}
-                  <span>{finding.claim}</span> <span>{formatDate(finding.asOfDate)}</span>{' '}
-                  {finding.stale && <span>veraltet</span>}{' '}
+                  {formatValue(finding) !== null && <strong className="value">{formatValue(finding)}</strong>}{' '}
+                  <span>{finding.claim}</span> <span className="date">{formatDate(finding.asOfDate)}</span>{' '}
+                  {finding.stale && <span className="badge badge--stale">Stale</span>}{' '}
                   {isSafeHttpUrl(finding.sourceUrl) ? (
                     <a href={finding.sourceUrl} target="_blank" rel="noopener noreferrer">
-                      Quelle
+                      Source
                     </a>
                   ) : (
                     <span>{finding.sourceUrl}</span>
@@ -151,12 +146,12 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
   }
 
   const back = (
-    <button type="button" onClick={() => navigate({ name: 'research' })}>
-      Zurück zur Übersicht
+    <button type="button" className="btn-link" onClick={() => navigate({ name: 'research' })}>
+      <span aria-hidden="true">← </span>Back to overview
     </button>
   )
 
-  if (loading) return <p>Lade …</p>
+  if (loading) return <p className="muted">Loading …</p>
   if (error !== null) {
     return (
       <section>
@@ -169,7 +164,7 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
     return (
       <section>
         {back}
-        <p>Für diese Aktie gibt es noch keine Recherche</p>
+        <p>No research for this stock yet</p>
       </section>
     )
   }
@@ -178,90 +173,106 @@ export function ResearchDetailPage({ user, isin, navigate }: Props) {
     <section>
       {back}
       <h1>{snapshot.companyName}</h1>
-      <p>
+      <p className="muted">
         {snapshot.lastResearchedAt === null
-          ? 'Noch keine Befunde'
-          : `Zuletzt recherchiert ${formatDate(snapshot.lastResearchedAt)}${snapshot.stale ? ' – Neu-Recherche erwägen' : ''}`}
+          ? 'No findings yet'
+          : `Last researched ${formatDate(snapshot.lastResearchedAt)}${snapshot.stale ? ' – consider re-research' : ''}`}
       </p>
-      {historyError && <p>Verlauf konnte nicht geladen werden</p>}
-      {held && <p>Der Betreiber hält diese Position</p>}
+      {historyError && <p className="notice">History could not be loaded</p>}
+      {held && (
+        <p>
+          <span className="badge badge--portfolio">The operator holds this position</span>
+        </p>
+      )}
 
-      <h2>A. Überblick</h2>
-      <p>
-        Ticker: <span>{snapshot.ticker}</span>
-      </p>
-      <p>
-        ISIN: <span>{snapshot.isin}</span>
-      </p>
-      <p>
-        Land: <span>{snapshot.country?.trim() || '–'}</span>
-      </p>
-      <p>
-        Beschreibung: <span>{snapshot.businessDescription?.trim() || '–'}</span>
-      </p>
-      <div>
-        {editingGroup ? (
-          <>
-            <label>
-              Gruppe:{' '}
-              <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
-                {groups.map((g) => (
-                  <option key={g.key} value={g.key}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </label>{' '}
-            <button type="button" onClick={saveGroup} disabled={saving || selectedGroup === ''}>
-              Speichern
-            </button>
-          </>
-        ) : (
-          <>
-            Gruppe:{' '}
-            {snapshot.group === null ? (
-              <span>–</span>
-            ) : (
-              <span>
-                {snapshot.group.name} ({snapshot.group.source === 'AI' ? 'KI-Vorschlag' : 'manuell'})
-              </span>
-            )}
-            {user.role === 'ADMIN' && (
-              <>
-                {' '}
-                <button type="button" onClick={editGroup}>
-                  Bearbeiten
-                </button>
-              </>
-            )}
-          </>
-        )}
-        {saveError !== null && <p role="alert">{saveError}</p>}
+      <div className="card">
+        <h2>A. Overview</h2>
+        <p>
+          Ticker: <span>{snapshot.ticker}</span>
+        </p>
+        <p>
+          ISIN: <span>{snapshot.isin}</span>
+        </p>
+        <p>
+          Country: <span>{snapshot.country?.trim() || '–'}</span>
+        </p>
+        <p>
+          Description: <span>{snapshot.businessDescription?.trim() || '–'}</span>
+        </p>
+        <div>
+          {editingGroup ? (
+            <>
+              <label>
+                Group:{' '}
+                <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
+                  {groups.map((g) => (
+                    <option key={g.key} value={g.key}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>{' '}
+              <button type="button" onClick={saveGroup} disabled={saving || selectedGroup === ''}>
+                Save
+              </button>
+            </>
+          ) : (
+            <>
+              Group:{' '}
+              {snapshot.group === null ? (
+                <span>–</span>
+              ) : (
+                <span>
+                  {snapshot.group.name} ({snapshot.group.source === 'AI' ? 'AI suggestion' : 'manual'})
+                </span>
+              )}
+              {user.role === 'ADMIN' && (
+                <>
+                  {' '}
+                  <button type="button" onClick={editGroup}>
+                    Edit
+                  </button>
+                </>
+              )}
+            </>
+          )}
+          {saveError !== null && <p role="alert">{saveError}</p>}
+        </div>
       </div>
 
       <InvestmentThesisSection user={user} isin={isin} />
 
-      <h2>B. Kennzahlen</h2>
-      <CriteriaList keys={FUNDAMENTAL_CRITERIA} findings={snapshot.findings} history={findingHistory} />
+      <div className="card">
+        <h2>B. Key figures</h2>
+        <CriteriaList keys={FUNDAMENTAL_CRITERIA} findings={snapshot.findings} history={findingHistory} />
+      </div>
 
-      <h2>C. Qualitative Befunde</h2>
-      <CriteriaList keys={QUALITATIVE_CRITERIA} findings={snapshot.findings} history={findingHistory} />
+      <div className="card">
+        <h2>C. Qualitative findings</h2>
+        <CriteriaList keys={QUALITATIVE_CRITERIA} findings={snapshot.findings} history={findingHistory} />
+      </div>
 
-      <h2>D. Quartalsberichte</h2>
-      <button type="button" disabled title="Noch nicht verfügbar">
-        Upload
-      </button>
-      <p>{PLACEHOLDER}</p>
+      <div className="card">
+        <h2>D. Quarterly reports</h2>
+        <button type="button" disabled title="Not available yet">
+          Upload
+        </button>
+        <p className="muted">{PLACEHOLDER}</p>
+      </div>
 
-      <h2>E. KI-Chat</h2>
-      <button type="button" disabled>
-        Quartalsberichte zusammenfassen
-      </button>
-      <input disabled aria-label="Frage zur Aktie" />
-      <p>{PLACEHOLDER}</p>
+      <div className="card">
+        <h2>E. AI chat</h2>
+        <button type="button" disabled>
+          Summarize quarterly reports
+        </button>
+        <input disabled aria-label="Question about the stock" />
+        <p className="muted">{PLACEHOLDER}</p>
+      </div>
 
-      <h2>F. Tiefenanalyse</h2>
-      <DeepAnalysisSection key={isin} isin={isin} />
+      <div className="card">
+        <h2>F. Deep analysis</h2>
+        <DeepAnalysisSection key={isin} isin={isin} />
+      </div>
     </section>
   )
 }

@@ -98,7 +98,7 @@ class InvestmentThesisTest {
 
         thesis.appendPurchaseReason("Moat intact", DAY, T1);
 
-        assertThat(thesis.getWhyInteresting()).isEqualTo("[2026-11-12] Kauf: Moat intact");
+        assertThat(thesis.getWhyInteresting()).isEqualTo("[2026-11-12] Buy: Moat intact");
         assertThat(thesis.getUpdatedAt()).isEqualTo(T1);
     }
 
@@ -110,7 +110,7 @@ class InvestmentThesisTest {
         thesis.appendPurchaseReason("Moat intact", DAY, T1);
 
         assertThat(thesis.getWhyInteresting())
-                .isEqualTo("Cheap and solid.\n\n[2026-11-12] Kauf: Moat intact");
+                .isEqualTo("Cheap and solid.\n\n[2026-11-12] Buy: Moat intact");
     }
 
     @Test

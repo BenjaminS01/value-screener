@@ -3,6 +3,7 @@ import { ApiError } from '../api/apiClient'
 import { writeErrorText } from '../api/errorText'
 import { parseDecimal } from '../api/parseDecimal'
 import { AdminPosition, correctPosition, deletePosition, sellPosition } from '../api/portfolioApi'
+import { formatDate } from '../research/format'
 
 interface AdminPositionRowProps {
   position: AdminPosition
@@ -11,25 +12,20 @@ interface AdminPositionRowProps {
   onChanged: (conflictMessage?: string) => void
 }
 
-const INVALID_NUMBER = 'Bitte eine gültige Zahl eingeben'
+const INVALID_NUMBER = 'Please enter a valid number'
 
 function formatNumber(value: number, fractionDigits?: number): string {
-  return value.toLocaleString('de-DE', {
+  return value.toLocaleString('en-US', {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits ?? 20,
   })
 }
 
-function formatIsoDate(iso: string): string {
-  const [year, month, day] = iso.split('-')
-  return `${day}.${month}.${year}`
-}
-
 type Mode = 'idle' | 'sell' | 'correct'
 
 /**
- * One portfolio row for ADMIN. "Korrigieren" turns the row's own cells into inputs (no second form below
- * the table); "Speichern" without a change only leaves edit mode.
+ * One portfolio row for ADMIN. "Correct" turns the row's own cells into inputs (no second form below
+ * the table); "Save" without a change only leaves edit mode.
  */
 export function AdminPositionRow({ position, onOpen, onChanged }: AdminPositionRowProps) {
   const [mode, setMode] = useState<Mode>('idle')
@@ -122,7 +118,7 @@ export function AdminPositionRow({ position, onOpen, onChanged }: AdminPositionR
   }
 
   function handleDelete() {
-    if (!window.confirm(`Position ${position.companyName} wirklich löschen?`)) return
+    if (!window.confirm(`Really delete position ${position.companyName}?`)) return
     run(() => deletePosition(position.isin))
   }
 
@@ -133,9 +129,14 @@ export function AdminPositionRow({ position, onOpen, onChanged }: AdminPositionR
     <tr>
       <td>
         {editing ? (
-          <input aria-label="Unternehmen" form={formId} value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+          <input
+            aria-label="Company"
+            form={formId}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+          />
         ) : (
-          <button type="button" onClick={() => onOpen(position.isin)}>
+          <button type="button" className="btn-link" onClick={() => onOpen(position.isin)}>
             {position.companyName}
           </button>
         )}
@@ -148,16 +149,21 @@ export function AdminPositionRow({ position, onOpen, onChanged }: AdminPositionR
         )}
       </td>
       <td>{position.group ? position.group.name : '—'}</td>
-      <td>
+      <td className="num">
         {editing ? (
-          <input aria-label="Stückzahl" form={formId} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          <input aria-label="Quantity" form={formId} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
         ) : (
           formatNumber(position.quantity)
         )}
       </td>
-      <td>
+      <td className="num">
         {editing ? (
-          <input aria-label="Einstandskurs" form={formId} value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} />
+          <input
+            aria-label="Entry price"
+            form={formId}
+            value={entryPrice}
+            onChange={(e) => setEntryPrice(e.target.value)}
+          />
         ) : (
           formatNumber(position.entryPrice, 2)
         )}
@@ -165,51 +171,51 @@ export function AdminPositionRow({ position, onOpen, onChanged }: AdminPositionR
       <td>
         {editing ? (
           <input
-            aria-label="Kaufdatum"
+            aria-label="Purchase date"
             type="date"
             form={formId}
             value={purchaseDate}
             onChange={(e) => setPurchaseDate(e.target.value)}
           />
         ) : (
-          formatIsoDate(position.purchaseDate)
+          formatDate(position.purchaseDate)
         )}
       </td>
       <td>
         {mode === 'idle' && (
           <>
             <button type="button" disabled={pending} onClick={openSell}>
-              Teilverkauf
+              Partial sale
             </button>
             <button type="button" disabled={pending} onClick={openCorrect}>
-              Korrigieren
+              Correct
             </button>
             <button type="button" disabled={pending} onClick={handleDelete}>
-              Löschen
+              Delete
             </button>
           </>
         )}
         {mode === 'sell' && (
           <form onSubmit={handleSell}>
             <label>
-              Verkaufsmenge
+              Quantity to sell
               <input value={sellQuantity} onChange={(e) => setSellQuantity(e.target.value)} />
             </label>
             <button type="submit" disabled={pending}>
-              Teilverkauf bestätigen
+              Confirm partial sale
             </button>
             <button type="button" onClick={close}>
-              Abbrechen
+              Cancel
             </button>
           </form>
         )}
         {editing && (
           <form id={formId} onSubmit={handleCorrect}>
             <button type="submit" disabled={pending}>
-              Speichern
+              Save
             </button>
             <button type="button" onClick={close} disabled={pending}>
-              Abbrechen
+              Cancel
             </button>
           </form>
         )}

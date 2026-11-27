@@ -11,7 +11,7 @@ import { ResearchDetailPage } from './pages/ResearchDetailPage'
 import { ResearchOverviewPage } from './pages/ResearchOverviewPage'
 import { StartPage } from './pages/StartPage'
 
-const SESSION_EXPIRED_NOTE = 'Sitzung abgelaufen, bitte erneut anmelden'
+const SESSION_EXPIRED_NOTE = 'Session expired, please log in again'
 
 function App() {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -60,7 +60,7 @@ function App() {
     setView({ name: 'home' })
   }
 
-  if (loading) return <p>Lade …</p>
+  if (loading) return <p className="app-main muted">Loading …</p>
 
   const showLegal = view.name === 'impressum' || view.name === 'datenschutz'
 
@@ -68,8 +68,12 @@ function App() {
   if (showLegal) {
     content = (
       <>
-        {user === null && <button onClick={() => setView({ name: 'home' })}>Zur Anmeldung</button>}
-        {view.name === 'impressum' ? <ImpressumPage /> : <DatenschutzPage />}
+        {user === null && (
+          <button className="btn-link" onClick={() => setView({ name: 'home' })}>
+            <span aria-hidden="true">← </span>Back to login
+          </button>
+        )}
+        <div className="card">{view.name === 'impressum' ? <ImpressumPage /> : <DatenschutzPage />}</div>
       </>
     )
   } else if (user === null) {
@@ -85,21 +89,37 @@ function App() {
   }
 
   return (
-    <div>
+    <div className="app">
       {user !== null && (
-        <header>
-          <button onClick={() => setView({ name: 'home' })}>Value Screener</button>
-          <nav>
-            <button onClick={() => setView({ name: 'portfolio' })}>Portfolio</button>
-            <button onClick={() => setView({ name: 'research' })}>Research</button>
-          </nav>
-          <span>
-            {user.username} ({user.role})
-          </span>
-          <button onClick={handleLogout}>Abmelden</button>
+        <header className="app-header">
+          <div className="app-header__inner">
+            <button className="btn-link brand" onClick={() => setView({ name: 'home' })}>
+              Value Screener
+            </button>
+            <nav>
+              <button
+                className="btn-link"
+                aria-current={view.name === 'portfolio' ? 'page' : undefined}
+                onClick={() => setView({ name: 'portfolio' })}
+              >
+                Portfolio
+              </button>
+              <button
+                className="btn-link"
+                aria-current={view.name === 'research' || view.name === 'researchDetail' ? 'page' : undefined}
+                onClick={() => setView({ name: 'research' })}
+              >
+                Research
+              </button>
+            </nav>
+            <span className="user-chip">
+              {user.username} ({user.role})
+            </span>
+            <button onClick={handleLogout}>Log out</button>
+          </div>
         </header>
       )}
-      <main>{content}</main>
+      <main className="app-main">{content}</main>
       <Footer navigate={setView} />
     </div>
   )

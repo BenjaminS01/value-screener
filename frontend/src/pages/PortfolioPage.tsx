@@ -46,61 +46,65 @@ export function PortfolioPage({ user, navigate }: PortfolioPageProps) {
       setNotice(null)
       navigate({ name: 'researchDetail', isin })
     } else {
-      setNotice('Noch nicht recherchiert')
+      setNotice('Not researched yet')
     }
   }
 
   return (
     <section>
       <h1>Portfolio</h1>
-      {notice && <p>{notice}</p>}
+      {notice && <p className="notice">{notice}</p>}
       {error && <p role="alert">{error}</p>}
       {writeMessage && <p role="alert">{writeMessage}</p>}
-      <h2>Gehaltene Positionen</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Unternehmen</th>
-            <th>Ticker</th>
-            <th>Gruppe</th>
-            {isAdmin && (
-              <>
-                <th>Stückzahl</th>
-                <th>Einstandskurs</th>
-                <th>Kaufdatum</th>
-                <th>Aktionen</th>
-              </>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {positions.map((position) =>
-            isAdmin ? (
-              <AdminPositionRow
-                key={position.isin}
-                position={position as AdminPosition}
-                onOpen={openPosition}
-                onChanged={handleChanged}
-              />
-            ) : (
-              <tr key={position.isin}>
-                <td>
-                  <button type="button" onClick={() => openPosition(position.isin)}>
-                    {position.companyName}
-                  </button>
-                </td>
-                <td>{position.ticker}</td>
-                <td>{position.group ? position.group.name : '—'}</td>
+      <div className="card">
+        <h2>Holdings</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Ticker</th>
+                <th>Group</th>
+                {isAdmin && (
+                  <>
+                    <th>Quantity</th>
+                    <th>Entry price</th>
+                    <th>Purchase date</th>
+                    <th>Actions</th>
+                  </>
+                )}
               </tr>
-            ),
-          )}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {positions.map((position) =>
+                isAdmin ? (
+                  <AdminPositionRow
+                    key={position.isin}
+                    position={position as AdminPosition}
+                    onOpen={openPosition}
+                    onChanged={handleChanged}
+                  />
+                ) : (
+                  <tr key={position.isin}>
+                    <td>
+                      <button type="button" className="btn-link" onClick={() => openPosition(position.isin)}>
+                        {position.companyName}
+                      </button>
+                    </td>
+                    <td>{position.ticker}</td>
+                    <td>{position.group ? position.group.name : '—'}</td>
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
       {isAdmin && (
-        <>
-          <h2>Position kaufen</h2>
+        <div className="card">
+          <h2>Buy position</h2>
           <AddPositionForm onAdded={handleChanged} />
-        </>
+        </div>
       )}
     </section>
   )

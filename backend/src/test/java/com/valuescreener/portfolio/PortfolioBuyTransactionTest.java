@@ -62,7 +62,7 @@ class PortfolioBuyTransactionTest extends DynamoTestSupport {
         PortfolioPosition position = positions.findByIsin(ISIN).orElseThrow();
         InvestmentThesis thesis = theses.findById(ISIN).orElseThrow();
         assertThat(position.getQuantity()).isEqualByComparingTo("10");
-        assertThat(thesis.getWhyInteresting()).isEqualTo("[2026-11-12] Kauf: Moat intact");
+        assertThat(thesis.getWhyInteresting()).isEqualTo("[2026-11-12] Buy: Moat intact");
         // proves the version attribute is set by the VersionedRecordExtension inside transactWriteItems
         assertThat(position.version()).isEqualTo(1L);
         assertThat(thesis.getVersion()).isEqualTo(1L);
